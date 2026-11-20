@@ -109,13 +109,13 @@ test('a bundle patch that names another package is rejected', () => {
   assert.match(pkg.errors[0].message, /does not mention package name "dsh-bad-patch"/)
 })
 
-test('a runtime over 400 lines is rejected', () => {
+test('a runtime over 450 lines is rejected', () => {
   const { result, report } = runJson('bad')
   assert.equal(result.status, 1)
 
   const pkg = packageNamed(report, 'dsh-too-long')
   assert.deepEqual(codes(pkg.errors), ['runtime.lines'])
-  assert.match(pkg.errors[0].message, /405 lines \(max 400\)/)
+  assert.match(pkg.errors[0].message, /451 lines \(max 450\)/)
 })
 
 test('a Wave-1 package without dsh.os warns but still exits 0', () => {
