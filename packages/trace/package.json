@@ -1,6 +1,6 @@
 {
   "name": "@perrylink/dsh-trace",
-  "version": "0.1.1",
+  "version": "0.1.0",
   "description": "Auditable long-term memory governance for DeepSeek Harness: provenance, expiry, conflict and forget.",
   "type": "module",
   "main": "index.js",

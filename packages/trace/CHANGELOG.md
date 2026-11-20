@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.1.1
+## 0.1.1 (deprecated)
 
-- Republish after npm failed to serve the 0.1.0 tarball (metadata existed, tarball 404). No code change.
+- Published but not installable through the default registry path (tarball 404); npm dist-tag  points back to 0.1.0. Use the encoded tarball URL in the README.
 
 ## 0.1.0
 

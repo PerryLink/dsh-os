@@ -20,7 +20,7 @@ search, memory governance, window topology and approval escalation.
 | **Nest** | `dsh-nest` | 0.1.0 MVP | [design](docs/design/05-nest.md) |
 | **Trigger** | `dsh-trigger` | 0.1.0 protocol MVP | [design](docs/design/06-trigger.md) |
 | **Seek** | `dsh-seek` | 0.1.0 protocol MVP | [design](docs/design/07-seek.md) |
-| **Trace** | `@perrylink/dsh-trace` | 0.1.0 protocol MVP | [design](docs/design/08-trace.md) |
+| **Trace** | `@perrylink/dsh-trace` | 0.1.0 protocol MVP (install via encoded tarball URL) | [design](docs/design/08-trace.md) |
 | **Stage** | `dsh-stage` | 0.1.0 protocol MVP | [design](docs/design/09-stage.md) |
 | **Ring** | `dsh-ring` | 0.1.0 protocol MVP | [design](docs/design/10-ring.md) |
 | **Root** | `@perrylink/dsh-root` | 0.1.0 MVP | [design](docs/design/11-root.md) |
