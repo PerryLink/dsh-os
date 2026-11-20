@@ -1,0 +1,4 @@
+# dsh-trigger bundle patch: mount the plugin.
+- insert:
+    - id: dsh-trigger
+      name: dsh-trigger

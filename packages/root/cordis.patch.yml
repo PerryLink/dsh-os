@@ -1,0 +1,4 @@
+# @perrylink/dsh-root bundle patch: mount the plugin.
+- insert:
+    - id: @perrylink/dsh-root
+      name: @perrylink/dsh-root

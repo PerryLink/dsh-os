@@ -1,0 +1,4 @@
+# dsh-allow bundle patch: mount the plugin.
+- insert:
+    - id: dsh-allow
+      name: dsh-allow

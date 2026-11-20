@@ -1,0 +1,4 @@
+# dsh-snip bundle patch: mount the plugin.
+- insert:
+    - id: dsh-snip
+      name: dsh-snip

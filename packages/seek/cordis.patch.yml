@@ -1,0 +1,4 @@
+# dsh-seek bundle patch: mount the plugin.
+- insert:
+    - id: dsh-seek
+      name: dsh-seek

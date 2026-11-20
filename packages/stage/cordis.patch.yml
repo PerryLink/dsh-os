@@ -1,0 +1,4 @@
+# dsh-stage bundle patch: mount the plugin.
+- insert:
+    - id: dsh-stage
+      name: dsh-stage

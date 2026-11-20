@@ -1,0 +1,4 @@
+# dsh-act bundle patch: mount the plugin.
+- insert:
+    - id: dsh-act
+      name: dsh-act

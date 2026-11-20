@@ -1,0 +1,4 @@
+# dsh-ring bundle patch: mount the plugin.
+- insert:
+    - id: dsh-ring
+      name: dsh-ring

@@ -1,0 +1,24 @@
+{
+  "name": "dsh-os",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A family of OS-level primitives for DeepSeek Harness: actions, grants, clipboard, workspace, environment, regression, triggers, evidence, memory, windows and approvals.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PerryLink/dsh-os.git"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "scaffold": "node scripts/scaffold.mjs",
+    "test": "node scripts/test-all.mjs",
+    "publish:all": "node scripts/publish.mjs",
+    "publish:one": "node scripts/publish.mjs"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  }
+}

@@ -1,0 +1,4 @@
+# dsh-nest bundle patch: mount the plugin.
+- insert:
+    - id: dsh-nest
+      name: dsh-nest
