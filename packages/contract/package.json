@@ -1,0 +1,57 @@
+{
+  "name": "@perrylink/dsh-os-contract",
+  "version": "0.1.0",
+  "description": "Canonical service names, capabilities, error codes, refs and thin validators shared by dsh-os modules.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "dsh-os",
+    "contract",
+    "schema",
+    "validation"
+  ],
+  "license": "MIT",
+  "author": "PerryLink contributors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PerryLink/dsh-os.git",
+    "directory": "packages/contract"
+  },
+  "homepage": "https://github.com/PerryLink/dsh-os/tree/main/packages/contract#readme",
+  "bugs": {
+    "url": "https://github.com/PerryLink/dsh-os/issues"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.9.0"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "os": {
+      "service": null,
+      "provides": [],
+      "capabilities": [],
+      "tools": [],
+      "stability": "experimental",
+      "since": "0.1.0"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

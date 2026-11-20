@@ -5,13 +5,36 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   test:
+    name: node ${{ matrix.node }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ matrix.node }}
+          cache: npm
+          # No lockfile is committed (the workspace is dependency-free), so key
+          # the npm cache on the package manifests instead.
+          cache-dependency-path: '**/package.json'
+
       - name: Test every package
         run: node scripts/test-all.mjs
+
+      - name: Conformance
+        run: node scripts/conformance.mjs
+
+      - name: Pack smoke
+        run: node scripts/pack-smoke.mjs
+
+      - name: Version invariants
+        run: node scripts/check-versions.mjs

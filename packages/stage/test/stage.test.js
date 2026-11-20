@@ -141,6 +141,18 @@ test('setLayout normalizes zones and rejects illegal zones', () => {
     { x: 0, y: 0, w: 0, h: 1 },
     { x: 0, y: 0, w: 0.5 },
     { x: 0, y: 0, w: '0.5', h: 1 },
+    { x: Number.NaN, y: 0, w: 0.5, h: 1 },
+    { x: 0, y: Number.NaN, w: 0.5, h: 1 },
+    { x: 0, y: 0, w: Number.NaN, h: 1 },
+    { x: 0, y: 0, w: 0.5, h: Number.NaN },
+    { x: Number.POSITIVE_INFINITY, y: 0, w: 0.5, h: 1 },
+    { x: 0, y: Number.NEGATIVE_INFINITY, w: 0.5, h: 1 },
+    { x: 0, y: 0, w: Number.POSITIVE_INFINITY, h: 1 },
+    { x: 0, y: 0, w: 1, h: Number.NEGATIVE_INFINITY },
+    { x: -0.25, y: 0, w: 0.5, h: 1 },
+    { x: 0, y: -1, w: 0.5, h: 1 },
+    { x: 0, y: 0, w: 1.25, h: 1 },
+    { x: 0, y: 0, w: 1, h: 1.25 },
     null,
   ]
   for (const zone of badZones) {
@@ -204,6 +216,73 @@ test('applyLayout records focused-first assignments and undo reverses the latest
     service.history().map(entry => entry.type),
     ['undo', 'apply', 'undo', 'apply', 'layout', 'topology'],
   )
+})
+
+test('undo refuses with stale_topology after the topology changes', () => {
+  const service = observed()
+  service.setLayout('full', { displayId: 'main', zones: [{ x: 0, y: 0, w: 1, h: 1 }] })
+  const applied = service.applyLayout('full')
+  assert.deepEqual(applied.assignments[0].rect, { x: 0, y: 25, w: 1600, h: 950 })
+  const recordedHash = service.topology().topologyHash
+  assert.equal(recordedHash, service.history()[0].topologyHash)
+
+  const moved = topology()
+  moved.displays[0].workArea.w = 800
+  const movedHash = service.setTopology(moved).topologyHash
+  assert.notEqual(movedHash, recordedHash)
+
+  const before = service.history()
+  const stale = service.undo()
+  assert.equal(stale.ok, false)
+  assert.equal(stale.code, 'stale_topology')
+  assert.equal(stale.applyId, before.find(entry => entry.type === 'apply').id)
+  assert.equal(stale.recordedTopologyHash, recordedHash)
+  assert.equal(stale.topologyHash, movedHash)
+  // Nothing is recorded, marked undone or otherwise mutated by a refused undo.
+  assert.deepEqual(service.history(), before)
+  assert.deepEqual(service.history().find(entry => entry.type === 'apply').undone, false)
+  assert.equal(service.undo().code, 'stale_topology')
+
+  // The stale apply becomes valid again if the topology returns to its hash.
+  service.setTopology(topology())
+  const restored = service.undo()
+  assert.equal(restored.ok, true)
+  assert.equal(restored.undone.id, stale.applyId)
+
+  // Re-applying on the current topology gives undo a fresh, non-stale record.
+  service.setTopology(moved)
+  const reapplied = service.applyLayout('full')
+  assert.deepEqual(reapplied.assignments[0].rect, { x: 0, y: 25, w: 800, h: 950 })
+  const receipt = service.undo()
+  assert.equal(receipt.ok, true)
+  assert.equal(receipt.schema, SCHEMAS.undo)
+  assert.equal(receipt.undone.id, service.history()[1].id)
+  assert.deepEqual(receipt.undone.assignments, reapplied.assignments)
+
+  // Observing the same topology again does not make a healthy apply stale.
+  service.setTopology(topology())
+  service.applyLayout('full')
+  assert.equal(service.undo().ok, true)
+})
+
+test('history entries are copies and undo state is append-only', () => {
+  const service = observed()
+  service.setLayout('full', { displayId: 'main', zones: [{ x: 0, y: 0, w: 1, h: 1 }] })
+  const applied = service.applyLayout('full')
+  const snapshot = service.history()
+  assert.equal(snapshot[0].undone, false)
+
+  snapshot[0].undone = true
+  snapshot[0].assignments = []
+  assert.equal(service.history()[0].undone, false)
+  assert.equal(service.history()[0].assignments.length, 1)
+
+  const receipt = service.undo()
+  receipt.undone.assignments[0].rect.w = 1
+  assert.equal(service.history()[1].assignments[0].rect.w, 1600)
+  assert.equal(service.history()[1].undone, true)
+  assert.equal(typeof service.history()[1].undoneAt, 'string')
+  assert.equal(applied.assignments[0].rect.w, 1600)
 })
 
 test('applyLayout fails clearly without topology, layout or display', () => {
@@ -277,6 +356,11 @@ test('apply provides ctx.stage and registers five plain-object tools', async () 
     ['right'],
   )
   assert.equal((await ctx._tools.get('stage_undo').execute({})).undone.layout.name, 'right')
+  await ctx._tools.get('stage_layout_apply').execute({ name: 'right' })
+  const shifted = topology()
+  shifted.displays[0].workArea.w = 900
+  service.setTopology(shifted)
+  assert.equal((await ctx._tools.get('stage_undo').execute({})).code, 'stale_topology')
   await assert.rejects(
     ctx._tools.get('stage_layout_set').execute({ name: 'bad', displayId: 'main', zones: [{ x: 2, y: 0, w: 1, h: 1 }] }),
     codeIs('invalid_zone'),

@@ -1,7 +1,7 @@
 /**
  * dsh-root — named, explainable environment profiles for DeepSeek Harness.
  *
- * 0.1.0 MVP: Host service `ctx.env` plus the `root_*` agent tools. A profile is
+ * 0.1.2 MVP: Host service `ctx.env` plus the `root_*` agent tools. A profile is
  * a ledger entry (vars, secret *references*, proxy policy, PATH prepends,
  * inheritance and deny patterns) that can be composed and explained.
  *
@@ -25,10 +25,27 @@ const LAYER_RANK = { agent: 0, workspace: 1, user: 2 }
 const VAR_NAME = /^[A-Z_][A-Z0-9_]*$/
 const PROFILE_NAME = /^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,127}$/
 const DENY_PATTERN = /^[A-Za-z0-9_.*-]{1,128}$/
+const CONTROL_CHARS = /[\u0000-\u001f\u007f]/
 const PROFILE_KEYS = new Set(['name', 'vars', 'secretRefs', 'proxy', 'pathPrepend', 'inherit', 'deny', 'trust', 'scope'])
 const STATE_VERSION = 1
 const clone = value => structuredClone(value)
 const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value)
+
+/** Ordered: first match wins. `vars` is for non-secret configuration only. */
+const SECRET_PATTERNS = [
+  ['private-key', /-----BEGIN [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----/],
+  ['openai-key', /\bsk-[A-Za-z0-9_-]{6,}\b/],
+  ['github-token', /\b(?:gh[pousr]_[A-Za-z0-9]{6,}|github_pat_[A-Za-z0-9_]{6,})\b/],
+  ['aws-access-key', /\b(?:AKIA|ASIA)[0-9A-Z]{8,}\b/],
+  ['password', /\b(?:password|passwd|pwd)"?\s*[:=]\s*(?:"[^"]{3,}"|'[^']{3,}'|[^\s'"]{3,})/i],
+]
+
+function detectVarSecret(value) {
+  for (const [reason, pattern] of SECRET_PATTERNS) {
+    if (pattern.test(value)) return reason
+  }
+  return null
+}
 
 function fail(code, message, extra) {
   throw Object.assign(new Error(message), { code }, extra)
@@ -39,11 +56,19 @@ function normalizeEnvRecord(record, field, secret) {
   const out = {}
   for (const [key, value] of Object.entries(record)) {
     if (!VAR_NAME.test(key)) fail('invalid_var_name', `${field} key "${key}" must match ${VAR_NAME}`, { key, field })
-    if (typeof value !== 'string' || value.includes('\0')) fail('invalid_profile', `${field}.${key} must be a string without NUL`, { key })
+    if (typeof value !== 'string' || CONTROL_CHARS.test(value)) {
+      fail('invalid_profile', `${field}.${key} must be a single-line string without control characters`, { key, field })
+    }
     if (secret) {
       if (value.trim() === '') fail('invalid_secret_ref', `secretRefs.${key} must be a non-empty reference`)
       out[key] = value.trim()
-    } else out[key] = value
+    } else {
+      const reason = detectVarSecret(value)
+      if (reason) {
+        fail('secret_in_vars', `vars.${key} looks like a secret (${reason}); store a reference in secretRefs instead`, { key, field, reason })
+      }
+      out[key] = value
+    }
   }
   return out
 }
@@ -53,10 +78,14 @@ function normalizeProxy(proxy) {
   const out = {}
   for (const [key, value] of Object.entries(proxy)) {
     if (!['http', 'https', 'noProxy'].includes(key)) fail('invalid_proxy', `unknown proxy field "${key}"`)
-    if (typeof value !== 'string' || value.trim() === '' || /[\0\r\n]/.test(value)) {
-      fail('invalid_proxy', `proxy.${key} must be a non-empty single-line string`)
+    if (typeof value !== 'string' || value.trim() === '' || CONTROL_CHARS.test(value)) {
+      fail('invalid_proxy', `proxy.${key} must be a non-empty single-line string`, { field: key })
     }
-    out[key] = value.trim()
+    const trimmed = value.trim()
+    if (['http', 'https'].includes(key) && /^[A-Za-z][A-Za-z0-9+.-]*:\/\/[^/?#]*@/.test(trimmed)) {
+      fail('invalid_proxy', `proxy.${key} must not embed credentials (userinfo)`, { field: key })
+    }
+    out[key] = trimmed
   }
   if (Object.keys(out).length === 0) fail('invalid_proxy', 'proxy must set http, https or noProxy')
   return out
@@ -67,8 +96,8 @@ function normalizePathPrepend(entries) {
   if (!Array.isArray(entries)) fail('invalid_profile', 'pathPrepend must be an array')
   const out = []
   for (const entry of entries) {
-    if (typeof entry !== 'string' || entry.trim() === '' || entry.includes('\0')) {
-      fail('invalid_profile', 'pathPrepend entries must be non-empty strings without NUL')
+    if (typeof entry !== 'string' || entry.trim() === '' || CONTROL_CHARS.test(entry)) {
+      fail('invalid_profile', 'pathPrepend entries must be non-empty single-line strings without control characters')
     }
     if (!out.includes(entry)) out.push(entry)
   }
@@ -80,7 +109,9 @@ function normalizeDeny(patterns) {
   if (!Array.isArray(patterns)) fail('invalid_profile', 'deny must be an array')
   const out = []
   for (const pattern of patterns) {
-    if (typeof pattern !== 'string' || !DENY_PATTERN.test(pattern)) fail('invalid_deny', `invalid deny pattern: ${String(pattern)}`)
+    if (typeof pattern !== 'string' || !DENY_PATTERN.test(pattern)) {
+      fail('invalid_deny', `invalid deny pattern ${JSON.stringify(pattern)} (allowed: A-Z a-z 0-9 _ . * -, max 128)`)
+    }
     if (!out.includes(pattern)) out.push(pattern)
   }
   return out

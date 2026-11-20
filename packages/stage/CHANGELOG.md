@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.1
+
+- Make `undo()` topology-aware: every apply already records the `topologyHash`
+  it was computed against, and undo now compares it with the current topology.
+  If the topology changed, undo refuses with
+  `{ ok: false, code: 'stale_topology' }` (including `applyId`,
+  `recordedTopologyHash` and the current `topologyHash`) and records/marks
+  nothing; re-apply the layout and undo the new record instead.
+- Make history append-only: undo state lives in a side table, so past history
+  entries are never mutated in place. `history()` still reports `undone` and
+  `undoneAt` for apply entries.
+- Return `ok: true` on a successful undo and keep all returned history/receipt
+  values as defensive copies.
+- Lock in zone validation with tests: `NaN`, `Infinity`, `-Infinity`,
+  negative values and values above `1` are rejected with `invalid_zone` (the
+  guard already used `Number.isFinite` plus a `0..1` range check).
+
 ## 0.1.0
 
 - Add the topology protocol MVP: `ctx.stage` with `setTopology()` / `topology()`

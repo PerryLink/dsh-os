@@ -1,0 +1,98 @@
+name: release
+
+# Manual packaging only. This workflow builds tarballs for review and never
+# publishes to npm; see the comments at the bottom of the job.
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Comma-separated packages: directory names (act,allow) or npm names (dsh-act,@perrylink/dsh-check)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  pack:
+    name: pack (node 24)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: '**/package.json'
+
+      - name: Test every package
+        run: node scripts/test-all.mjs
+
+      - name: Conformance
+        run: node scripts/conformance.mjs
+
+      - name: Pack smoke
+        run: node scripts/pack-smoke.mjs
+
+      - name: Version invariants
+        run: node scripts/check-versions.mjs
+
+      - name: Pack selected packages
+        env:
+          PACKAGES: ${{ inputs.package }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          IFS=',' read -r -a requested <<< "$PACKAGES"
+          packed=0
+          for raw in "${requested[@]}"; do
+            token="$(printf '%s' "$raw" | tr -d '[:space:]')"
+            [ -z "$token" ] && continue
+            dir=""
+            for manifest in packages/*/package.json; do
+              candidate="$(basename "$(dirname "$manifest")")"
+              name="$(node -p "require('./$manifest').name")"
+              if [ "$token" = "$candidate" ] || [ "$token" = "$name" ]; then
+                dir="$candidate"
+                break
+              fi
+            done
+            if [ -z "$dir" ]; then
+              echo "::error::unknown package '$token'; available: $(ls packages | paste -sd, -)"
+              exit 1
+            fi
+            # A leading ./ is required or npm parses packages/act as a GitHub spec.
+            npm pack "./packages/$dir" --pack-destination artifacts
+            packed=$((packed + 1))
+          done
+          if [ "$packed" -eq 0 ]; then
+            echo "::error::input 'package' selected no packages"
+            exit 1
+          fi
+          ls -l artifacts
+
+      - name: Upload tarballs
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-tarballs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/*.tgz
+          if-no-files-found: error
+          retention-days: 14
+
+      # ---------------------------------------------------------------------
+      # Publishing is deliberately NOT automated. This workflow only builds
+      # and uploads tarballs. Releasing to npm is a separate, manual maintainer
+      # action that requires:
+      #   1. an `NPM_TOKEN` repository secret holding a granular npm token
+      #      allowed to publish `dsh-*` and `@perrylink/*`;
+      #   2. an approval-protected GitHub environment (required reviewers) on
+      #      whatever job would read that token;
+      #   3. a human to review the uploaded artifact and run
+      #      `npm publish <tarball> --access public` by hand.
+      # No token is read and no `npm publish` command runs in this workflow.
+      # ---------------------------------------------------------------------
+      - name: Publishing is manual
+        run: |
+          echo "Tarballs are in artifacts/. This workflow never runs npm publish."
+          echo "Publishing needs NPM_TOKEN and explicit human approval; see the comments above this step."

@@ -1,0 +1,65 @@
+{
+  "name": "@perrylink/dsh-os-cli",
+  "version": "0.1.0",
+  "description": "Offline catalog, doctor and install-command helper for the dsh-os module family.",
+  "type": "module",
+  "bin": {
+    "dsh-os": "bin/dsh-os.js"
+  },
+  "main": "lib/cli.mjs",
+  "exports": {
+    ".": "./lib/cli.mjs",
+    "./package.json": "./package.json",
+    "./catalog.json": "./catalog.json"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "catalog.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "agent-os",
+    "cli",
+    "catalog",
+    "doctor"
+  ],
+  "license": "MIT",
+  "author": "PerryLink contributors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PerryLink/dsh-os.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/PerryLink/dsh-os/tree/main/packages/cli#readme",
+  "bugs": {
+    "url": "https://github.com/PerryLink/dsh-os/issues"
+  },
+  "engines": {
+    "node": ">=22.19.0",
+    "dsh": ">=0.2.1-rc.2 <0.3.0-0"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "os": {
+      "service": null,
+      "provides": [],
+      "capabilities": [],
+      "tools": [],
+      "stability": "experimental",
+      "since": "0.1.0"
+    }
+  },
+  "scripts": {
+    "test": "node --test",
+    "build:catalog": "node scripts/build-catalog.mjs"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

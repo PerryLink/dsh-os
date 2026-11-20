@@ -1,0 +1,4 @@
+# fixture: valid patch for dsh-bad-service
+- insert:
+    - id: dsh-bad-service
+      name: dsh-bad-service

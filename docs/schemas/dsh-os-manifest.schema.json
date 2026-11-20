@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/PerryLink/dsh-os/docs/schemas/dsh-os-manifest.schema.json",
+  "title": "dsh-os module manifest",
+  "type": "object",
+  "required": ["dsh"],
+  "properties": {
+    "name": { "type": "string", "pattern": "^(@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*$" },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?$" },
+    "dsh": {
+      "type": "object",
+      "required": ["manifestVersion", "bundle", "os"],
+      "properties": {
+        "manifestVersion": { "const": 1 },
+        "bundle": {
+          "type": "object",
+          "required": ["patch"],
+          "properties": { "patch": { "type": "string" } },
+          "additionalProperties": true
+        },
+        "os": {
+          "type": "object",
+          "required": ["service", "provides", "capabilities", "tools", "stability", "since"],
+          "properties": {
+            "service": {
+              "type": ["string", "null"],
+              "enum": ["act", "allow", "snip", "check", "nest", "triggers", "evidence", "trace", "stage", "ring", "env", null]
+            },
+            "provides": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+            "requires": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+            "capabilities": {
+              "type": "array",
+              "items": { "enum": ["fs.read", "fs.write", "net", "secret", "spawn", "model", "clipboard", "ui", "notify"] },
+              "uniqueItems": true
+            },
+            "tools": { "type": "array", "items": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$" }, "uniqueItems": true },
+            "ui": {
+              "type": ["object", "null"],
+              "required": ["entry", "views"],
+              "properties": {
+                "entry": { "type": "string" },
+                "views": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+              },
+              "additionalProperties": false
+            },
+            "stability": { "enum": ["experimental", "stable", "frozen", "archived"] },
+            "since": { "type": "string" },
+            "replaces": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

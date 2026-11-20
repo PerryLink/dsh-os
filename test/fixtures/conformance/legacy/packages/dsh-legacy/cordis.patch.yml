@@ -1,0 +1,4 @@
+# fixture: wrong package name on purpose; only a warning before Wave 2
+- insert:
+    - id: dsh-other
+      name: dsh-other

@@ -1,10 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { apply, DEFAULT_TTL_MS, MAX_TTL_MS } from '../index.js'
+import {
+  apply, DEFAULT_TTL_MS, MAX_AUDIT_ENTRIES, MAX_CHECK_AUDIT_ENTRIES, MAX_TTL_MS,
+} from '../index.js'
 
 const HOUR = 60 * 60 * 1000
 
@@ -190,8 +192,29 @@ test('human-facing clients can opt into the admin tools', async () => {
   assert.equal(listed.grants.length, 1)
   assert.equal(listed.grants[0].id, grant.id)
 
-  const revoked = await ctx._tools.get('allow_revoke').execute({ id: grant.id })
+  const revoked = await ctx._tools.get('allow_revoke').execute({ id: grant.id, subject: 'agent:tool' })
   assert.equal(revoked.status, 'revoked')
+})
+
+test('admin tools are subject-scoped: no fleet-wide listing or cross-subject revoke', async () => {
+  const { ctx } = fakeContext({ exposeAdminTools: true })
+  const issue = ctx._tools.get('allow_issue')
+  const list = ctx._tools.get('allow_list')
+  const revoke = ctx._tools.get('allow_revoke')
+  const alice = await issue.execute({ subject: 'human:alice', capability: 'fs.write', scope: '*' })
+  await issue.execute({ subject: 'agent:bob', capability: 'fs.write', scope: '*' })
+
+  assert.deepEqual(list.parameters.required, ['subject'])
+  await assert.rejects(list.execute({}), { code: 'E_SUBJECT' })
+  assert.deepEqual((await list.execute({ subject: 'agent:bob' })).grants.map(grant => grant.subject), ['agent:bob'])
+
+  assert.deepEqual(revoke.parameters.required, ['id', 'subject'])
+  await assert.rejects(revoke.execute({ id: alice.id, subject: 'agent:bob' }), { code: 'E_SUBJECT_MISMATCH' })
+  assert.equal((await list.execute({ subject: 'human:alice' })).grants[0].status, 'active')
+
+  const revoked = await revoke.execute({ id: alice.id, subject: 'human:alice' })
+  assert.equal(revoked.status, 'revoked')
+  assert.throws(() => ctx.get('allow').revoke(alice.id, { subject: 'agent:bob' }), { code: 'E_SUBJECT_MISMATCH' })
 })
 
 test('stateFile round-trips grants and audit through atomic JSON writes', () => {
@@ -207,6 +230,7 @@ test('stateFile round-trips grants and audit through atomic JSON writes', () => 
 
     const second = fakeContext({ stateFile })
     assert.equal(second.service.list().length, 1)
+    assert.equal(second.service.auditStats().totals.security, 1)
     const result = second.service.check({ subject: 's', capability: 'c', scope: 'repo:a' })
     assert.equal(result.allowed, true)
     assert.equal(second.service.audit().some(entry => entry.event === 'allowed'), true)
@@ -236,6 +260,105 @@ test('a persisted grant with a non-numeric expiresAt is dropped (fail closed)', 
     }))
     const { service } = fakeContext({ stateFile })
     assert.deepEqual(service.check({ subject: 's', capability: 'c' }), { allowed: false, reason: 'no-grant' })
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('2100 checks cannot evict issued/revoked audit events', () => {
+  const { service } = fakeContext()
+  const grant = service.issue({ subject: 's', capability: 'c', scope: '*' })
+  for (let index = 0; index < 2100; index += 1) {
+    assert.equal(service.check({ subject: 's', capability: 'c', scope: 'x' }).allowed, true)
+  }
+
+  let events = service.audit(MAX_AUDIT_ENTRIES)
+  assert.equal(events.filter(entry => entry.event === 'issued').length, 1)
+  assert.equal(events.filter(entry => entry.event === 'allowed').length, MAX_CHECK_AUDIT_ENTRIES)
+
+  service.revoke(grant.id)
+  events = service.audit(MAX_AUDIT_ENTRIES)
+  assert.equal(events.filter(entry => entry.event === 'issued').length, 1)
+  assert.equal(events.filter(entry => entry.event === 'revoked').length, 1)
+
+  const stats = service.auditStats()
+  assert.deepEqual(stats.totals, { allowed: 2100, denied: 0, security: 2 })
+  assert.equal(stats.retained.allowed, MAX_CHECK_AUDIT_ENTRIES)
+  assert.equal(stats.retained.security, 2)
+})
+
+test('a malicious flood of security events is capped at MAX_AUDIT_ENTRIES', () => {
+  const { service } = fakeContext()
+  for (let index = 0; index < MAX_AUDIT_ENTRIES + 100; index += 1) {
+    service.issue({ subject: `s${index}`, capability: 'c' })
+  }
+  const events = service.audit(MAX_AUDIT_ENTRIES)
+  assert.equal(events.length, MAX_AUDIT_ENTRIES)
+  assert.equal(service.auditStats().totals.security, MAX_AUDIT_ENTRIES + 100)
+  assert.equal(events[0].event, 'issued')
+  assert.equal(events.at(-1).seq, 101)
+})
+
+test('checks answer from memory without rewriting the state file', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'dsh-allow-nowrite-'))
+  const stateFile = join(dir, 'state.json')
+  try {
+    const { service } = fakeContext({ stateFile })
+    service.issue({ subject: 's', capability: 'c', scope: '*' })
+    const before = readFileSync(stateFile, 'utf8')
+    for (let index = 0; index < 50; index += 1) service.check({ subject: 's', capability: 'c', scope: 'x' })
+    assert.equal(readFileSync(stateFile, 'utf8'), before)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('persistence failure rolls back issue and revoke in memory', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'dsh-allow-readonly-'))
+  const stateFile = join(dir, 'state.json')
+  try {
+    const { service } = fakeContext({ stateFile })
+    const grant = service.issue({ subject: 's', capability: 'c', scope: '*' })
+    chmodSync(dir, 0o500)
+    try {
+      let writable = true
+      try { writeFileSync(join(dir, 'probe'), '') } catch { writable = false }
+      if (writable) {
+        t.skip('directory permissions are not enforced on this platform')
+        return
+      }
+      assert.throws(() => service.issue({ subject: 's', capability: 'other', scope: '*' }), { code: 'E_STATE' })
+      assert.deepEqual(service.list({ capability: 'other' }), [])
+      assert.throws(() => service.revoke(grant.id), { code: 'E_STATE' })
+      assert.equal(service.list().find(item => item.id === grant.id).status, 'active')
+      assert.deepEqual(readdirSync(dir), ['state.json'])
+    } finally {
+      chmodSync(dir, 0o700)
+    }
+    // The disk still says active, so a restart cannot resurrect a revoked grant.
+    const replay = fakeContext({ stateFile }).service
+    assert.equal(replay.list().find(item => item.id === grant.id).status, 'active')
+    assert.equal(replay.check({ subject: 's', capability: 'c', scope: 'x' }).allowed, true)
+  } finally {
+    chmodSync(dir, 0o700)
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('save() removes its temp file when the atomic rename fails', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'dsh-allow-rename-'))
+  const stateFile = join(dir, 'state.json')
+  try {
+    const { service } = fakeContext({ stateFile })
+    const grant = service.issue({ subject: 's', capability: 'c', scope: '*' })
+    rmSync(stateFile)
+    mkdirSync(stateFile)
+
+    assert.throws(() => service.revoke(grant.id), { code: 'E_STATE' })
+    assert.equal(service.list().find(item => item.id === grant.id).status, 'active')
+    assert.throws(() => service.issue({ subject: 's2', capability: 'c', scope: '*' }), { code: 'E_STATE' })
+    assert.deepEqual(service.list({ subject: 's2' }), [])
+    assert.deepEqual(readdirSync(dir), ['state.json'])
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

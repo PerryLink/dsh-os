@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { apply, parseRef, SeekService } from '../index.js'
+import { apply, DEFAULT_TIMEOUT_MS, MAX_REF_LENGTH, parseRef, SeekService } from '../index.js'
 
 /** Fake Cordis context from docs/implementation-contract.md. */
 function fakeContext() {
@@ -75,7 +75,12 @@ test('search fans out in parallel, dedupes by ref and sorts by score then source
   assert.equal(result.total, 3)
   assert.deepEqual(result.errors, [])
   assert.deepEqual(calls.map(call => call.query), ['retry', 'retry'])
-  assert.deepEqual(calls.map(call => call.options), [{ limit: 5 }, { limit: 5 }])
+  for (const call of calls) {
+    assert.equal(call.options.limit, 5)
+    assert.equal(call.options.timeoutMs, DEFAULT_TIMEOUT_MS)
+    assert.ok(call.options.signal instanceof AbortSignal)
+    assert.equal(call.options.signal.aborted, false)
+  }
 })
 
 test('equal scores are ordered by source', async () => {
@@ -124,6 +129,90 @@ test('one provider failure does not fail the query', async () => {
   ])
 })
 
+test('a hanging provider is bounded by timeoutMs and reported as an error', async () => {
+  const { service } = setup()
+  let seen
+  service.registerProvider({
+    name: 'slow',
+    search: (_query, options) => {
+      seen = options
+      return new Promise(() => {})
+    },
+  })
+  service.registerProvider(provider('alpha', [hit('dsh://alpha/a', 0.4)]))
+
+  const started = Date.now()
+  const result = await service.search('x', { timeoutMs: 25 })
+  assert.ok(Date.now() - started < 2000)
+  assert.equal(result.total, 1)
+  assert.deepEqual(result.hits.map(item => item.ref), ['dsh://alpha/a'])
+  assert.deepEqual(result.errors, [{
+    source: 'slow',
+    code: 'provider_timeout',
+    message: 'seek: provider "slow" timed out after 25 ms',
+  }])
+  assert.equal(seen.timeoutMs, 25)
+  assert.ok(seen.signal instanceof AbortSignal)
+  assert.equal(seen.signal.aborted, true)
+})
+
+test('a slow provider that rejects on abort does not affect the other providers', async () => {
+  const { service } = setup()
+  service.registerProvider({
+    name: 'slow',
+    search: (_query, options) => new Promise((_resolve, reject) => {
+      options.signal.addEventListener('abort', () => reject(options.signal.reason), { once: true })
+    }),
+  })
+  service.registerProvider(provider('alpha', [hit('dsh://alpha/a', 0.4)]))
+  const result = await service.search('x', { timeoutMs: 20 })
+  assert.deepEqual(result.hits.map(item => item.ref), ['dsh://alpha/a'])
+  assert.equal(result.errors.length, 1)
+  assert.equal(result.errors[0].code, 'provider_timeout')
+})
+
+test('caller abort is forwarded to providers and stops the query', async () => {
+  const { service } = setup()
+  const controller = new AbortController()
+  let seen
+  service.registerProvider({
+    name: 'hang',
+    search: (_query, options) => {
+      seen = options
+      return new Promise(() => {})
+    },
+  })
+
+  const pending = service.search('x', { signal: controller.signal, timeoutMs: 5000 })
+  await new Promise(resolve => setImmediate(resolve))
+  controller.abort()
+  await assert.rejects(pending, error => error.code === 'aborted')
+  assert.equal(seen.signal.aborted, true)
+
+  const already = new AbortController()
+  already.abort()
+  await assert.rejects(
+    service.search('x', { signal: already.signal }),
+    error => error.code === 'aborted',
+  )
+})
+
+test('overlong and dot-segment refs are rejected as invalid hits', async () => {
+  const { service } = setup()
+  const longestRef = `dsh://alpha/${'a'.repeat(MAX_REF_LENGTH - 'dsh://alpha/'.length)}`
+  service.registerProvider(provider('alpha', [
+    { ref: `dsh://alpha/${'a'.repeat(MAX_REF_LENGTH)}`, source: 'alpha', title: 'too long', snippet: 's' },
+    { ref: 'dsh://alpha/../secret', source: 'alpha', title: 'traversal', snippet: 's' },
+    { ref: longestRef, source: 'alpha', title: 'max', snippet: 's' },
+  ]))
+  const result = await service.search('x')
+  assert.equal(result.hits.length, 1)
+  assert.equal(result.hits[0].title, 'max')
+  assert.equal(result.hits[0].ref.length, MAX_REF_LENGTH)
+  assert.equal(result.errors[0].code, 'invalid_hit')
+  assert.match(result.errors[0].message, /2 hit\(s\) omitted/)
+})
+
 test('invalid and mismatched refs are omitted and reported once per provider', async () => {
   const { service } = setup()
   service.registerProvider(provider('alpha', [
@@ -137,7 +226,7 @@ test('invalid and mismatched refs are omitted and reported once per provider', a
   assert.deepEqual(result.errors, [{
     source: 'alpha',
     code: 'invalid_hit',
-    message: '2 hit(s) omitted: refs must use dsh://<source>/<id> and match hit.source',
+    message: '2 hit(s) omitted: refs must use dsh://<source>/<id> (at most 512 characters) and match hit.source',
   }])
 })
 
@@ -172,6 +261,8 @@ test('hits are normalized to the documented shape', async () => {
 test('parseRef validates the dsh ref format', () => {
   assert.deepEqual(parseRef('dsh://locator/src/index.js'), { source: 'locator', id: 'src/index.js' })
   assert.deepEqual(parseRef('dsh://notes/a-b_c.d~e'), { source: 'notes', id: 'a-b_c.d~e' })
+  const longestId = 'a'.repeat(MAX_REF_LENGTH - 'dsh://locator/'.length)
+  assert.deepEqual(parseRef(`dsh://locator/${longestId}`), { source: 'locator', id: longestId })
   for (const bad of [
     undefined,
     null,
@@ -183,6 +274,11 @@ test('parseRef validates the dsh ref format', () => {
     'dsh://locator/a//b',
     'dsh://locator/a b',
     'dsh://locator/a?q=1',
+    'dsh://locator/../secret',
+    'dsh://locator/a/./b',
+    'dsh://locator/..',
+    `dsh://locator/${longestId}a`,
+    `dsh://locator/${'x'.repeat(MAX_REF_LENGTH)}`,
   ]) {
     assert.equal(parseRef(bad), undefined, `expected invalid: ${String(bad)}`)
   }
@@ -227,6 +323,11 @@ test('search rejects invalid queries, limits and sources', async () => {
   await assert.rejects(service.search('x', { sources: 'alpha' }), error => error.code === 'invalid_sources')
   await assert.rejects(service.search('x', { sources: [1] }), error => error.code === 'invalid_sources')
   await assert.rejects(service.search('x', null), error => error.code === 'invalid_options')
+  for (const timeoutMs of [0, -1, 1.5, '10', Number.NaN, Number.POSITIVE_INFINITY]) {
+    await assert.rejects(service.search('x', { timeoutMs }), error => error.code === 'invalid_timeout')
+  }
+  await assert.rejects(service.search('x', { signal: {} }), error => error.code === 'invalid_signal')
+  await assert.rejects(service.search('x', { signal: null }), error => error.code === 'invalid_signal')
 })
 
 test('providers are queried in parallel', async () => {
@@ -267,5 +368,21 @@ test('agent tools call the service', async () => {
   await assert.rejects(
     ctx._tools.get('seek_search').execute({}),
     error => error.code === 'invalid_query',
+  )
+})
+
+test('seek_search forwards exec.signal to providers', async () => {
+  const { ctx, service } = setup()
+  service.registerProvider({ name: 'hang', search: () => new Promise(() => {}) })
+  const controller = new AbortController()
+  const pending = ctx._tools.get('seek_search').execute(
+    { query: 'x', sources: ['hang'] },
+    { signal: controller.signal },
+  )
+  controller.abort()
+  await assert.rejects(pending, error => error.code === 'aborted')
+  await assert.rejects(
+    ctx._tools.get('seek_search').execute({ query: 'x' }, { signal: { aborted: false } }),
+    error => error.code === 'invalid_signal',
   )
 })

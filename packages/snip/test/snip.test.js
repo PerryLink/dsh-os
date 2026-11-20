@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { chmodSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { SnipService, apply, detectSecret } from '../index.js'
@@ -131,6 +131,102 @@ test('stateFile persists redacted data atomically and reloads', () => {
     assert.equal(safe.get(unsafeEntry.id).text, '[redacted:openai-key]')
     assert.ok(!readFileSync(unsafeFile, 'utf8').includes('leak sk-'))
   } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('sourceApp is screened for secrets and length/character validated', () => {
+  const snip = new SnipService()
+  const labelled = snip.add({ text: 'note', sourceApp: '  Chrome  ' })
+  assert.equal(snip.get(labelled.id).sourceApp, 'Chrome')
+  assert.equal(snip.get(snip.add({ text: 'no app' }).id).sourceApp, 'unknown')
+
+  for (const label of [
+    `key sk-${'a'.repeat(32)}`,
+    `ghp_${'b'.repeat(36)}`,
+    `AKIA${'C'.repeat(16)}`,
+    'Slack\nInjected',
+    'x'.repeat(81),
+    42,
+  ]) {
+    assert.throws(() => snip.add({ text: 'rejected', sourceApp: label }), { code: 'SNIP_BAD_SOURCE_APP' })
+  }
+  assert.equal(snip.list().length, 2, 'rejected sourceApp values are never stored')
+})
+
+test('loading a snapshot strips secret-looking sourceApp metadata', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'dsh-snip-meta-'))
+  try {
+    const stateFile = join(dir, 'state.json')
+    const secretApp = `Chrome sk-${'d'.repeat(32)}`
+    writeFileSync(stateFile, JSON.stringify({
+      version: 1,
+      entries: [{
+        id: 'legacy',
+        kind: 'text',
+        text: 'legacy text',
+        sourceApp: secretApp,
+        createdAt: new Date(T0).toISOString(),
+        expiresAt: new Date(T0 + DAY).toISOString(),
+      }],
+    }), 'utf8')
+
+    const snip = new SnipService({ stateFile, now: () => T0 })
+    assert.equal(snip.get('legacy').sourceApp, 'unknown')
+    assert.ok(!readFileSync(stateFile, 'utf8').includes(secretApp))
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('search only sees stored text and forget leaves no index residue', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'dsh-snip-search-'))
+  try {
+    const stateFile = join(dir, 'state.json')
+    const snip = new SnipService({ stateFile })
+    const secret = `sk-${'s'.repeat(32)}`
+    const added = snip.add({ text: `my ${secret}`, sourceApp: 'shell' })
+
+    assert.deepEqual(snip.search(secret), [])
+    assert.deepEqual(snip.search('my'), [])
+    assert.deepEqual(snip.search('[redacted:openai-key]').map(entry => entry.id), [added.id])
+    assert.equal(snip.forget(added.id), true)
+    assert.deepEqual(snip.search('[redacted:openai-key]'), [])
+    assert.ok(!readFileSync(stateFile, 'utf8').includes(secret))
+
+    const reloaded = new SnipService({ stateFile })
+    assert.deepEqual(reloaded.list(), [])
+    assert.deepEqual(reloaded.search(secret), [])
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('failed state writes leave memory and disk unchanged', t => {
+  if (process.platform === 'win32' || (typeof process.getuid === 'function' && process.getuid() === 0)) {
+    return t.skip('needs POSIX write permissions owned by a non-root user')
+  }
+  const dir = mkdtempSync(join(tmpdir(), 'dsh-snip-ro-'))
+  try {
+    const stateFile = join(dir, 'state.json')
+    const snip = new SnipService({ stateFile })
+    const kept = snip.add({ text: 'kept' })
+    chmodSync(dir, 0o500)
+    try {
+      assert.throws(() => snip.add({ text: 'blocked' }), { code: 'SNIP_STATE_WRITE_FAILED' })
+      assert.equal(snip.list().length, 1)
+      assert.equal(snip.get(kept.id).text, 'kept')
+      assert.throws(() => snip.forget(kept.id), { code: 'SNIP_STATE_WRITE_FAILED' })
+      assert.equal(snip.get(kept.id).text, 'kept')
+    } finally {
+      chmodSync(dir, 0o700)
+    }
+
+    const reloaded = new SnipService({ stateFile })
+    assert.equal(reloaded.list().length, 1)
+    assert.equal(reloaded.get(kept.id).text, 'kept')
+  } finally {
+    try { chmodSync(dir, 0o700) } catch {}
     rmSync(dir, { recursive: true, force: true })
   }
 })

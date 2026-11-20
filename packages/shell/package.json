@@ -1,0 +1,75 @@
+{
+  "name": "@perrylink/dsh-os-shell",
+  "version": "0.1.0",
+  "description": "Optional UI shell for dsh-os: a view contribution registry, open history and a minimal HTML renderer.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./ui": "./ui/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "ui/index.js",
+    "cordis.patch.yml",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "agent-os",
+    "shell",
+    "ui"
+  ],
+  "license": "MIT",
+  "author": "PerryLink contributors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PerryLink/dsh-os.git",
+    "directory": "packages/shell"
+  },
+  "homepage": "https://github.com/PerryLink/dsh-os/tree/main/packages/shell#readme",
+  "bugs": {
+    "url": "https://github.com/PerryLink/dsh-os/issues"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.9.0",
+    "dsh": ">=0.2.1-rc.2 <0.3.0-0"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "os": {
+      "service": null,
+      "provides": [
+        "osShell"
+      ],
+      "capabilities": [
+        "ui"
+      ],
+      "tools": [
+        "os_shell_views",
+        "os_shell_open",
+        "os_shell_close"
+      ],
+      "ui": {
+        "entry": "./ui/index.js",
+        "views": []
+      },
+      "stability": "experimental",
+      "since": "0.1.0"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

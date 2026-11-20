@@ -8,7 +8,7 @@
  */
 
 import { randomUUID } from 'node:crypto'
-import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
+import { closeSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 
 /** Cordis plugin name. */
@@ -21,7 +21,12 @@ export const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000
 export const MAX_TTL_MS = 30 * 24 * 60 * 60 * 1000
 export const MAX_SUBJECT_LENGTH = 256, MAX_CAPABILITY_LENGTH = 256, MAX_SCOPE_LENGTH = 512, MAX_APPROVER_LENGTH = 128
 export const MAX_AUDIT_ENTRIES = 2000
+/** `allowed`/`denied` are sampled so routine checks cannot flush the security trail. */
+export const MAX_CHECK_AUDIT_ENTRIES = 200
 const STATE_VERSION = 1
+
+const CHECK_EVENTS = new Set(['allowed', 'denied'])
+const isCheck = event => CHECK_EVENTS.has(event)
 
 function fail(code, message) {
   const error = new Error(message)
@@ -37,9 +42,8 @@ function text(value, field, code, max) {
   return trimmed
 }
 
-function objectInput(value) {  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    fail('E_INPUT', 'input must be an object')
-  }
+function objectInput(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) fail('E_INPUT', 'input must be an object')
   return value
 }
 
@@ -66,9 +70,7 @@ function scopeCovers(pattern, requested) {
 
 function resolveTtl(ttlMs) {
   if (ttlMs === undefined) return DEFAULT_TTL_MS
-  if (typeof ttlMs !== 'number' || !Number.isFinite(ttlMs) || ttlMs <= 0) {
-    fail('E_TTL', 'ttlMs must be a positive finite number of milliseconds')
-  }
+  if (typeof ttlMs !== 'number' || !Number.isFinite(ttlMs) || ttlMs <= 0) fail('E_TTL', 'ttlMs must be a positive finite number of milliseconds')
   if (ttlMs > MAX_TTL_MS) fail('E_TTL', `ttlMs must not exceed ${MAX_TTL_MS} ms (30 days)`)
   return ttlMs
 }
@@ -84,38 +86,42 @@ function cloneEvidence(evidence) {
   }
 }
 
+/** Reject persisted grants that cannot be interpreted safely (fail closed). */
+function validGrant(grant) {
+  if (!grant || typeof grant !== 'object') return false
+  if (![grant.id, grant.subject, grant.capability, grant.approver].every(value => typeof value === 'string' && value !== '')) return false
+  if (!['active', 'revoked', 'expired'].includes(grant.status)) return false
+  if (!Number.isFinite(grant.createdAt) || (grant.expiresAt !== null && !Number.isFinite(grant.expiresAt))) return false
+  return typeof grant.scope === 'string'
+    || (Array.isArray(grant.scope) && grant.scope.length > 0 && grant.scope.every(scope => typeof scope === 'string'))
+}
+
+/** Persisted counters are advisory; when absent or malformed, derive them from the log. */
+function loadCounts(value, audit) {
+  const count = number => (Number.isSafeInteger(number) && number >= 0 ? number : 0)
+  if (value && typeof value === 'object' && !Array.isArray(value)) return { allowed: count(value.allowed), denied: count(value.denied), security: count(value.security) }
+  return audit.reduce((counts, entry) => {
+    if (isCheck(entry?.event)) counts[entry.event] += 1
+    else counts.security += 1
+    return counts
+  }, { allowed: 0, denied: 0, security: 0 })
+}
+
 /**
  * Durable-enough local state: an in-memory Map by default, or an atomically
  * written JSON file when `config.stateFile` is set.
  */
-/** Reject persisted grants that cannot be interpreted safely (fail closed). */
-function validGrant(grant) {
-  if (!grant || typeof grant !== 'object') return false
-  if (typeof grant.id !== 'string' || grant.id === '') return false
-  if (typeof grant.subject !== 'string' || grant.subject === '') return false
-  if (typeof grant.capability !== 'string' || grant.capability === '') return false
-  if (!['active', 'revoked', 'expired'].includes(grant.status)) return false
-  if (!Number.isFinite(grant.createdAt)) return false
-  if (grant.expiresAt !== null && !Number.isFinite(grant.expiresAt)) return false
-  const scopeOk = typeof grant.scope === 'string'
-    || (Array.isArray(grant.scope) && grant.scope.length > 0 && grant.scope.every(scope => typeof scope === 'string'))
-  if (!scopeOk) return false
-  if (typeof grant.approver !== 'string' || grant.approver === '') return false
-  return true
-}
-
 export class GrantStore {
   constructor(config = {}) {
     this.clock = typeof config.now === 'function' ? config.now : () => Date.now()
     this.stateFile = null
     if (config.stateFile !== undefined && config.stateFile !== null) {
-      if (typeof config.stateFile !== 'string' || !config.stateFile.trim()) {
-        fail('E_STATE', 'stateFile must be a non-empty path string')
-      }
+      if (typeof config.stateFile !== 'string' || !config.stateFile.trim()) fail('E_STATE', 'stateFile must be a non-empty path string')
       this.stateFile = resolve(config.stateFile)
     }
     this.grants = new Map()
     this.auditLog = []
+    this.counts = { allowed: 0, denied: 0, security: 0 }
     this.nextSeq = 1
     if (this.stateFile) this.load()
   }
@@ -132,36 +138,49 @@ export class GrantStore {
       if (error && error.code === 'ENOENT') return
       fail('E_STATE', `cannot read state file ${this.stateFile}: ${error.message}`)
     }
-    if (!raw || typeof raw !== 'object' || !Array.isArray(raw.grants) || !Array.isArray(raw.audit)) {
-      fail('E_STATE', `invalid state file ${this.stateFile}`)
-    }
-    if (raw.version !== STATE_VERSION) {
-      fail('E_STATE', `unsupported state version ${String(raw.version)} in ${this.stateFile}`)
-    }
-    for (const grant of raw.grants) {
-      // Unknown fields are tolerated; records that cannot be evaluated safely
-      // are dropped so a corrupted file cannot create a permanent grant.
-      if (validGrant(grant)) this.grants.set(grant.id, grant)
-    }
+    if (!raw || typeof raw !== 'object' || !Array.isArray(raw.grants) || !Array.isArray(raw.audit)) fail('E_STATE', `invalid state file ${this.stateFile}`)
+    if (raw.version !== STATE_VERSION) fail('E_STATE', `unsupported state version ${String(raw.version)} in ${this.stateFile}`)
+    // Unknown fields are tolerated; records that cannot be evaluated safely are
+    // dropped so a corrupted file cannot create a permanent grant.
+    for (const grant of raw.grants) if (validGrant(grant)) this.grants.set(grant.id, grant)
     this.auditLog = raw.audit.slice(-MAX_AUDIT_ENTRIES)
+    this.counts = loadCounts(raw.counts, this.auditLog)
+    this.trimAudit()
     this.nextSeq = this.auditLog.reduce((max, entry) => Math.max(max, Number(entry?.seq) || 0), 0) + 1
   }
 
   save() {
     if (!this.stateFile) return
-    mkdirSync(dirname(this.stateFile), { recursive: true })
-    const temp = `${this.stateFile}.${process.pid}.${randomUUID()}.tmp`
     const body = JSON.stringify({
-      version: STATE_VERSION,
-      grants: [...this.grants.values()],
-      audit: this.auditLog,
+      version: STATE_VERSION, counts: this.counts, grants: [...this.grants.values()], audit: this.auditLog,
     }, null, 2) + '\n'
+    const temp = `${this.stateFile}.${process.pid}.${randomUUID()}.tmp`
+    let fd
     try {
-      writeFileSync(temp, body, { encoding: 'utf8', mode: 0o600 })
+      mkdirSync(dirname(this.stateFile), { recursive: true })
+      fd = openSync(temp, 'wx', 0o600)
+      writeSync(fd, body)
+      fsyncSync(fd)
+      closeSync(fd)
+      fd = undefined
       renameSync(temp, this.stateFile)
     } catch (error) {
+      if (fd !== undefined) { try { closeSync(fd) } catch {} }
       try { unlinkSync(temp) } catch {}
       fail('E_STATE', `cannot write state file ${this.stateFile}: ${error.message}`)
+    }
+  }
+
+  /** Keep the newest check events, then evict check events before security events. */
+  trimAudit() {
+    let checks = this.auditLog.filter(entry => isCheck(entry?.event)).length
+    while (checks > MAX_CHECK_AUDIT_ENTRIES) {
+      this.auditLog.splice(this.auditLog.findIndex(entry => isCheck(entry?.event)), 1)
+      checks -= 1
+    }
+    while (this.auditLog.length > MAX_AUDIT_ENTRIES) {
+      const at = this.auditLog.findIndex(entry => isCheck(entry?.event))
+      this.auditLog.splice(at < 0 ? 0 : at, 1)
     }
   }
 
@@ -174,10 +193,10 @@ export class GrantStore {
       entry.scope = clone(grant.scope)
     }
     Object.assign(entry, extra)
+    if (isCheck(event)) this.counts[event] += 1
+    else this.counts.security += 1
     this.auditLog.push(entry)
-    if (this.auditLog.length > MAX_AUDIT_ENTRIES) {
-      this.auditLog.splice(0, this.auditLog.length - MAX_AUDIT_ENTRIES)
-    }
+    this.trimAudit()
     return entry
   }
 }
@@ -246,8 +265,7 @@ export class AllowService {
     const requestedScope = args.scope === undefined ? null : normalizeScope(args.scope)
     const requested = requestedScope === null ? null : (Array.isArray(requestedScope) ? requestedScope : [requestedScope])
     const now = this.sweep()
-    const candidates = [...this.store.grants.values()]
-      .filter(grant => grant.subject === subject && grant.capability === capability)
+    const candidates = [...this.store.grants.values()].filter(grant => grant.subject === subject && grant.capability === capability)
     const active = candidates.filter(grant => grant.status === 'active')
     const matched = active.find(grant => requested === null
       || requested.every(scope => scopeCovers(grant.scope, scope)))
@@ -284,10 +302,20 @@ export class AllowService {
       : { allowed: false, reason }
   }
 
-  revoke(id) {
+  /**
+   * Revoke a grant by id. `options.subject` is optional for trusted service
+   * callers; when given it must match the grant owner.
+   */
+  revoke(id, options = {}) {
     const grantId = text(id, 'grant id', 'E_ID', 128)
     const grant = this.store.grants.get(grantId)
     if (!grant) fail('E_GRANT_NOT_FOUND', `unknown grant: ${grantId}`)
+    const subject = options?.subject === undefined
+      ? null
+      : text(options.subject, 'subject', 'E_SUBJECT', MAX_SUBJECT_LENGTH)
+    if (subject !== null && grant.subject !== subject) {
+      fail('E_SUBJECT_MISMATCH', 'grant does not belong to this subject')
+    }
     this.sweep()
     if (grant.status !== 'active') return clone(grant)
     const previous = grant.status
@@ -322,6 +350,17 @@ export class AllowService {
     if (!Number.isInteger(limit) || limit < 1) fail('E_LIMIT', 'limit must be a positive integer')
     return this.store.auditLog.slice(-limit).reverse().map(entry => clone(entry))
   }
+
+  /** Cumulative event totals plus what the retained log still holds. */
+  auditStats() {
+    const retained = { allowed: 0, denied: 0, security: 0 }
+    for (const entry of this.store.auditLog) {
+      if (isCheck(entry?.event)) retained[entry.event] += 1
+      else retained.security += 1
+    }
+    return { totals: { ...this.store.counts }, retained: { ...retained, entries: this.store.auditLog.length },
+      limits: { entries: MAX_AUDIT_ENTRIES, checkEntries: MAX_CHECK_AUDIT_ENTRIES } }
+  }
 }
 
 const OUTPUT = {
@@ -337,81 +376,55 @@ const SCOPE_SCHEMA = {
   ],
 }
 
+function defineTool(name, description, properties, required, execute) {
+  return { name, description, parameters: { type: 'object', additionalProperties: false, properties, required }, output: OUTPUT, execute }
+}
+
 /** Plain ToolDefinition objects; no dependency on `@deepseek-ai/dsh-tools`. */
 export function createTools(service, options = {}) {
   const tools = [
-    {
-      name: 'allow_issue',
-      description: 'Issue a revocable capability grant and return it. Grants expire (default 24h, max 30 days).',
-      parameters: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          subject: { type: 'string', description: 'Who receives the grant, e.g. "agent:planner" or "plugin:dsh-act".' },
-          capability: { type: 'string', description: 'Capability name, e.g. "fs.write" or "tool.invoke".' },
-          scope: SCOPE_SCHEMA,
-          ttlMs: { type: 'number', minimum: 1, maximum: MAX_TTL_MS, description: 'Lifetime in milliseconds (default 24h, max 30 days).' },
-          approver: { type: 'string', description: 'Who approved it (default "user").' },
-        },
-        required: ['subject', 'capability'],
+    defineTool('allow_issue',
+      'Issue a revocable capability grant and return it. Grants expire (default 24h, max 30 days).',
+      {
+        subject: { type: 'string', description: 'Who receives the grant, e.g. "agent:planner" or "plugin:dsh-act".' },
+        capability: { type: 'string', description: 'Capability name, e.g. "fs.write" or "tool.invoke".' },
+        scope: SCOPE_SCHEMA,
+        ttlMs: { type: 'number', minimum: 1, maximum: MAX_TTL_MS, description: 'Lifetime in milliseconds (default 24h, max 30 days).' },
+        approver: { type: 'string', description: 'Who approved it (default "user").' },
       },
-      output: OUTPUT,
-      async execute(args) {
-        return service.issue(args)
+      ['subject', 'capability'],
+      async args => service.issue(args)),
+    defineTool('allow_check',
+      'Check whether an active grant covers subject + capability + scope. Does not throw when denied.',
+      {
+        subject: { type: 'string' },
+        capability: { type: 'string' },
+        scope: SCOPE_SCHEMA,
       },
-    },
-    {
-      name: 'allow_check',
-      description: 'Check whether an active grant covers subject + capability + scope. Does not throw when denied.',
-      parameters: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          subject: { type: 'string' },
-          capability: { type: 'string' },
-          scope: SCOPE_SCHEMA,
-        },
-        required: ['subject', 'capability', 'scope'],
+      ['subject', 'capability', 'scope'],
+      async args => service.check(args)),
+    defineTool('allow_revoke',
+      'Revoke one of the subject\'s grants by id; the subject must own the grant.',
+      {
+        id: { type: 'string', description: 'Grant id returned by allow_issue.' },
+        subject: { type: 'string', description: 'Owner of the grant; must match the stored subject.' },
       },
-      output: OUTPUT,
-      async execute(args) {
-        return service.check(args)
+      ['id', 'subject'],
+      async args => service.revoke(args.id, {
+        subject: text(args.subject, 'subject', 'E_SUBJECT', MAX_SUBJECT_LENGTH),
+      })),
+    defineTool('allow_list',
+      'List one subject\'s grants. Subject is required so the tool cannot enumerate other subjects.',
+      {
+        subject: { type: 'string', description: 'Exact subject whose grants are returned.' },
+        capability: { type: 'string' },
+        status: { type: 'string', enum: ['active', 'revoked', 'expired'] },
+        approver: { type: 'string' },
       },
-    },
-    {
-      name: 'allow_revoke',
-      description: 'Revoke a grant by id. Idempotent for grants that are already revoked or expired.',
-      parameters: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          id: { type: 'string', description: 'Grant id returned by allow_issue.' },
-        },
-        required: ['id'],
-      },
-      output: OUTPUT,
-      async execute(args) {
-        return service.revoke(args.id)
-      },
-    },
-    {
-      name: 'allow_list',
-      description: 'List grants, optionally filtered by exact subject, capability, status or approver.',
-      parameters: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          subject: { type: 'string' },
-          capability: { type: 'string' },
-          status: { type: 'string', enum: ['active', 'revoked', 'expired'] },
-          approver: { type: 'string' },
-        },
-      },
-      output: OUTPUT,
-      async execute(args) {
-        return { grants: service.list(args) }
-      },
-    },
+      ['subject'],
+      async args => ({
+        grants: service.list({ ...args, subject: text(args.subject, 'subject', 'E_SUBJECT', MAX_SUBJECT_LENGTH) }),
+      })),
   ]
   // Issuing, revoking and listing every subject are human-facing operations.
   // Exposing them to the model would let an agent mint its own Grant and

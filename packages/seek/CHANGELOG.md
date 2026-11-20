@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.1
+
+- Add per-provider deadlines. `search(query, { timeoutMs })` defaults to 10 s
+  and calls each provider with `(query, { limit, signal, timeoutMs })`, where
+  `signal` is `AbortSignal.any([AbortSignal.timeout(timeoutMs), callerSignal])`.
+  A provider that times out is reported as `{ code: 'provider_timeout' }` in
+  `errors`; it can no longer block the whole query.
+- Add caller cancellation: `search(query, { signal })` forwards the caller's
+  `AbortSignal` (the tools pass the host `exec.signal`) to every provider and
+  rejects with `code: 'aborted'` once aborted. Invalid signals throw
+  `invalid_signal`; invalid timeouts throw `invalid_timeout`.
+- Harden ref validation: `parseRef` now rejects empty and overlong refs
+  (`MAX_REF_LENGTH` = 512) and `.`/`..` path segments, in addition to the
+  existing `dsh://<source>/<id>` grammar and source/ref match.
+- Add tests for hanging-provider timeouts, abort forwarding, `exec.signal`
+  propagation and overlong/dot-segment refs.
+
 ## 0.1.0
 
 - Implement `SeekService` and provide it as the `ctx.evidence` host seam with

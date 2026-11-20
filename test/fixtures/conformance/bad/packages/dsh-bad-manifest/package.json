@@ -1,0 +1,40 @@
+{
+  "name": "dsh-bad-manifest",
+  "version": "0.1.0",
+  "description": "Conformance fixture: malformed dsh.os and runtime.",
+  "type": "module",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "cordis.patch.yml"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24.9.0",
+    "dsh": ">=0.2.1-rc.2"
+  },
+  "dependencies": {
+    "left-pad": "^1.0.0"
+  },
+  "dsh": {
+    "manifestVersion": 2,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "os": {
+      "service": "act",
+      "provides": [
+        "act"
+      ],
+      "capabilities": [
+        "fs.read",
+        "root",
+        "fs.read"
+      ],
+      "tools": [
+        "allow_list"
+      ],
+      "stability": "beta",
+      "since": "not-a-version"
+    }
+  }
+}

@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.2
+
+- Audit retention is tiered: at most 200 `allowed`/`denied` events are kept,
+  while `issued`, `revoked` and `expired` are evicted only after every check
+  event under the total 2000-entry cap. `auditStats()` reports cumulative totals
+  (counted even after eviction) and what the retained log still holds.
+- `save()` now opens the sibling temp file, writes, `fsync`s and closes it
+  before the atomic `rename`, and removes the temp file when persistence fails.
+  The existing in-memory rollback of `issue()`/`revoke()` is covered by
+  read-only-directory and rename-failure tests.
+- Admin tools are subject-scoped: `allow_list` requires `subject` (no
+  fleet-wide enumeration) and `allow_revoke` requires `id` plus a matching
+  `subject` (no cross-subject revocation). Both are still opt-in behind
+  `exposeAdminTools: true`.
+- `revoke(id, { subject })` accepts an optional owner guard; the service remains
+  backward compatible when it is omitted.
+- Tests: 18 cases, including 2100-check retention, the 2000-entry cap, check
+  no-write, persistence failure rollback and cross-subject tool refusal.
+
 ## 0.1.1
 
 - Security: only `allow_check` is registered by default. `allow_issue`,

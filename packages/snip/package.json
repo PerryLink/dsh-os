@@ -1,6 +1,6 @@
 {
   "name": "dsh-snip",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local-first, searchable clipboard ledger for DeepSeek Harness with secret exclusion and clipboard:// agent handles.",
   "type": "module",
   "main": "index.js",

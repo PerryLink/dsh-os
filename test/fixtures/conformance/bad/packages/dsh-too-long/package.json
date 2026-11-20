@@ -1,0 +1,36 @@
+{
+  "name": "dsh-too-long",
+  "version": "0.1.0",
+  "description": "Conformance fixture: runtime exceeds the 400-line cap.",
+  "type": "module",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24.9.0",
+    "dsh": ">=0.2.1-rc.2 <0.3.0-0"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "os": {
+      "service": "trace",
+      "provides": [
+        "trace"
+      ],
+      "capabilities": [
+        "fs.read"
+      ],
+      "tools": [
+        "trace_list"
+      ],
+      "stability": "experimental",
+      "since": "0.1.0"
+    }
+  }
+}

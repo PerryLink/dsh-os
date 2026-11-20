@@ -1,0 +1,36 @@
+{
+  "name": "dsh-bad-patch",
+  "version": "0.1.0",
+  "description": "Conformance fixture: patch exists but names another package.",
+  "type": "module",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24.9.0",
+    "dsh": ">=0.2.1-rc.2 <0.3.0-0"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "os": {
+      "service": "snip",
+      "provides": [
+        "snip"
+      ],
+      "capabilities": [
+        "clipboard"
+      ],
+      "tools": [
+        "snip_search"
+      ],
+      "stability": "experimental",
+      "since": "0.1.0"
+    }
+  }
+}

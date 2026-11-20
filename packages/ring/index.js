@@ -207,8 +207,11 @@ export class RingService {
     if (!isObject(options)) fail('E_INPUT', 'resolve options must be an object')
     const decision = readText(options.decision, 'decision', 'E_INPUT', 64)
     if (kase.state === 'resolved') fail('E_STATE', 'case is already resolved')
+    if (kase.state === 'expired') {
+      fail('E_STATE', 'cannot resolve an expired case; escalate it with an explicit target or raise a new case')
+    }
     const at = readTimestamp(this.clock(), 'clock')
-    const late = kase.state === 'expired' || at > kase.expiresAt
+    const late = kase.expiredAt !== undefined || at > kase.expiresAt
     kase.state = 'resolved'
     kase.decision = decision
     kase.resolvedAt = at
@@ -276,7 +279,9 @@ export class RingService {
   }
 
   #record(kase, kind, at, extra = {}) {
-    const receipt = { id: randomUUID(), caseId: kase.id, kind, at, ...extra }
+    // Receipts are append-only evidence: freeze the stored entry so no later
+    // code path can rewrite history, and hand callers a mutable copy.
+    const receipt = Object.freeze({ id: randomUUID(), caseId: kase.id, kind, at, ...extra })
     this.#receipts.push(receipt)
     return clone(receipt)
   }

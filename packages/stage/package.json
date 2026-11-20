@@ -1,6 +1,6 @@
 {
   "name": "dsh-stage",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Display, window and space topology protocol for DeepSeek Harness agents, with normalized, reversible layouts.",
   "type": "module",
   "main": "index.js",

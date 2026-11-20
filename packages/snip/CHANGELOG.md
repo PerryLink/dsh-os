@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.1
+
+- Screen `sourceApp` for secrets and validate it: non-strings, control
+  characters, labels over 80 characters and secret-looking labels are rejected
+  with `SNIP_BAD_SOURCE_APP`; empty labels become `unknown`. Persisted
+  snapshots are re-sanitized on load.
+- Persist before committing: `add`, `forget`, `clear` and expiry sweeps build
+  the next ledger state, write it, and only then replace memory. A failed write
+  now throws `SNIP_STATE_WRITE_FAILED` and leaves both memory and disk at the
+  previous state instead of letting them diverge.
+- Confirm and test the redaction boundary: `search` only scans stored (already
+  redacted) text, and `forget` leaves no in-memory index or snapshot residue.
+- Add failure-injection tests for a read-only state directory and regression
+  tests for `sourceApp`, search-after-redaction and forget-after-reload.
+
 ## 0.1.0
 
 - Implement `SnipService` with `add`, `list`, `search`, `get`, `forget` and

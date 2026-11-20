@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.1
+
+- Make `expired` terminal for direct decisions: `ack()` and `resolve()` on an
+  expired case now throw `E_STATE` instead of moving it back to an active state.
+  The only in-place way to reopen a case is an explicit `escalate(id, { to })`
+  late page; otherwise raise a new case. A case decided after it expired is
+  still marked `late`.
+- Keep `tick()` from ever re-escalating a `resolved` case (already enforced;
+  now covered by a regression test), and never revive a closed case.
+- Make receipts immutable evidence: stored entries are frozen, append-only and
+  never rewritten; every read and every `tick()` result returns defensive
+  copies, so mutating a returned receipt cannot change the ledger.
+- Add state-machine tests for expired ack/resolve refusal, late pages, and
+  resolved-case ticks.
+
 ## 0.1.0
 
 - Add `RingService` at `ctx.ring`: `raise`, `tick`, `ack`, `escalate`, `resolve`,

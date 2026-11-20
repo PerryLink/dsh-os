@@ -73,6 +73,38 @@ node scripts/test-all.mjs
 node scripts/publish.mjs act allow   # requires NPM_TOKEN
 ```
 
+## CI and release
+
+CI (`.github/workflows/ci.yml`) runs on a Node 22 + 24 matrix with the npm cache
+enabled, and executes four gates in order:
+
+```sh
+node scripts/test-all.mjs
+node scripts/conformance.mjs
+node scripts/pack-smoke.mjs
+node scripts/check-versions.mjs
+```
+
+- `pack-smoke` runs `npm pack --dry-run --json` for every `packages/*` and
+  fails if the tarball lacks `package.json`, `index.js`, `cordis.patch.yml`,
+  `README.md` or `LICENSE`.
+- `check-versions` fails on an invalid `version`, an `engines.dsh` range
+  without an upper bound, a `publishConfig.registry` that is not npmjs, or a
+  non-empty `dependencies`.
+
+The same sequence, including the package tests, runs locally as
+`npm run verify`.
+
+Releases are **never published automatically**. `.github/workflows/release.yml`
+is `workflow_dispatch`-only: it takes a comma-separated `package` input
+(directory names such as `act,allow` or npm names such as `dsh-act`), runs the
+same gates on Node 24, then `npm pack`s only the selected packages and uploads
+the tarballs as a build artifact. Publishing is a manual maintainer step: it
+needs the `NPM_TOKEN` repository secret (a granular npm token allowed to
+publish `dsh-*` and `@perrylink/*`), an approval-protected environment, and an
+explicit `npm publish` of the reviewed tarballs. The workflow never runs
+`npm publish`.
+
 ## License
 
 MIT.

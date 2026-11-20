@@ -2,13 +2,13 @@
 
 > Named, explainable environment profiles for DeepSeek Harness.
 
-**Status: 0.1.1 MVP：环境账本/解释器；注入在 0.2.0。**
+**Status: 0.1.2 MVP：环境账本/解释器；注入在 0.2.0。**
 
-Root 0.1.0 ships the Host service `ctx.env` and five `root_*` agent tools. It
+Root 0.1.2 ships the Host service `ctx.env` and five `root_*` agent tools. It
 records named environment profiles with inheritance, deny rules and per-key
 provenance, and resolves them into a single effective view.
 
-**Root 0.1.0 never reads or writes `process.env`.** Profiles are declarative
+**Root never reads or writes `process.env`.** Profiles are declarative
 ledger entries; resolving one does not apply it to the current process, a
 shell, an agent or a child process. Materialization (launcher/shell injection,
 proxy installation, credential resolution) is planned for 0.2.0. Treat this
@@ -89,14 +89,24 @@ env.explain('acme-dev', 'NODE_ENV')
 }
 ```
 
-- Variable names must match `^[A-Z_][A-Z0-9_]*$`; values must be strings.
+- Variable names must match `^[A-Z_][A-Z0-9_]*$`; values must be single-line
+  strings without control characters.
+- Values in `vars` are screened for secrets (`sk-...`, `ghp_...` /
+  `github_pat_...`, `AKIA...` / `ASIA...`, PEM private keys and
+  `password=...`). A hit fails with `secret_in_vars` and nothing is stored;
+  put a reference in `secretRefs` instead.
 - `vars` and `secretRefs` share one environment namespace, so one profile
   cannot define the same key twice. Inheritance may move a key between the two
   maps; the later layer wins.
 - `secretRefs` values are credential reference names, not secrets. Root never
   resolves them and never stores a value; put secret material in the
   credentials store, not in `vars`.
-- `pathPrepend` entries must be non-empty strings and are de-duplicated.
+- `proxy.http` and `proxy.https` must be single-line URLs without embedded
+  userinfo (`http://user:pass@host` is rejected).
+- `pathPrepend` entries must be non-empty single-line strings and are
+  de-duplicated.
+- `deny` patterns are limited to `A-Z a-z 0-9 _ . * -` (at most 128
+  characters); anything else fails with `invalid_deny`.
 - `inherit` may point to a profile that is registered later; a missing parent
   fails at `resolve`/`explain` time, not at `set` time.
 - Unknown profile fields are rejected so typos do not silently disappear.
@@ -139,9 +149,9 @@ when defined and not denied, `kind` (`var` or `secretRef`), `source`, `trust`,
 `secretRef`. Denied keys never expose their value in `explain`.
 
 Stable error codes include `invalid_profile`, `invalid_var_name`,
-`invalid_secret_ref`, `invalid_proxy`, `invalid_deny`, `invalid_profile_name`,
-`profile_not_found`, `inherit_cycle`, `layer_forbidden`, `invalid_layer`,
-`state_invalid` and `state_write_failed`.
+`invalid_secret_ref`, `secret_in_vars`, `invalid_proxy`, `invalid_deny`,
+`invalid_profile_name`, `profile_not_found`, `inherit_cycle`,
+`layer_forbidden`, `invalid_layer`, `state_invalid` and `state_write_failed`.
 
 ## Persistence
 
@@ -161,25 +171,29 @@ discarding data.
 
 | Tool | Purpose |
 | --- | --- |
-| `root_set` | Create or replace a profile (`name` + `profile`) |
+| `root_set` | Create or replace a profile (`name` + `profile`); always stores `trust: agent`, `scope: agent` |
 | `root_get` | Read one profile; throws `profile_not_found` |
 | `root_list` | List all profiles |
-| `root_resolve` | Resolve one profile, with optional `layer` |
-| `root_explain` | Explain one key's source, overrides or deny decision |
+| `root_resolve` | Resolve one profile at the agent visibility ceiling (no `layer` argument) |
+| `root_explain` | Explain one key's source, overrides or deny decision at the agent ceiling |
 
 All five tools are ledger operations: they never modify `process.env`. The
 plugin injects the `tools` service for registration but the service itself is
-usable without it.
+usable without it. The service API still accepts an explicit `layer` for
+trusted in-process callers; agent tools never accept one.
 
-## Security and limitations (0.1.0)
+## Security and limitations (0.1.2)
 
 - No environment injection, no proxy installation, no credential resolution.
   **Nothing in this release changes what a shell, child process or HTTP client
   sees.**
-- `trust` and `scope` are descriptive metadata, not an enforcement boundary in
-  0.1.0. Do not treat a self-declared `trust: 'user'` as proof of provenance.
-- Only references belong in `secretRefs`. Accidentally putting a secret in
-  `vars` is outside Root's protection.
+- `trust`/`scope` gate visibility for agent tools: `root_resolve` and
+  `root_explain` always apply the `agent` ceiling, and `root_set` cannot create
+  a higher-trust profile. In-process code that calls the service directly can
+  still pass `layer`; that path is trusted host code.
+- Values in `vars` that look like secrets are rejected. Detection is
+  best-effort, so this lowers the chance of a pasted credential landing in the
+  profile snapshot — it is not a substitute for a credential store.
 - No snapshot, diff, CLI, Settings UI, TOFU pinning or team baselines yet.
 
 ## Test

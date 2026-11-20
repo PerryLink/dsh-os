@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { apply, RootService } from '../index.js'
@@ -201,6 +201,83 @@ test('invalid variable names, profiles and inheritance are rejected', () => {
   assert.equal(service.get('defaults').trust, 'user')
   assert.equal(service.get('defaults').scope, 'user')
   assert.equal(service.resolve('custom').vars.CUSTOM_ENV, 'ok')
+})
+
+test('secret-looking vars values are rejected instead of stored', () => {
+  const { service } = setup()
+  const cases = [
+    ['openai-key', `sk-${'a'.repeat(32)}`],
+    ['github-token', `ghp_${'b'.repeat(36)}`],
+    ['aws-access-key', `AKIA${'C'.repeat(16)}`],
+    ['private-key', '-----BEGIN OPENSSH PRIVATE KEY-----'],
+    ['password', 'password=hunter2'],
+  ]
+  for (const [reason, value] of cases) {
+    assert.throws(
+      () => service.set('leaky', profile({ vars: { LEAK: value } })),
+      error => error?.code === 'secret_in_vars' && error?.reason === reason,
+      reason,
+    )
+  }
+  assert.equal(service.get('leaky'), undefined)
+
+  service.set('safe', profile({ vars: { NODE_ENV: 'test', API_BASE: 'https://example.test' } }))
+  service.set('refs', profile({ secretRefs: { OPENAI_API_KEY: 'cred:openai' } }))
+  assert.equal(service.get('safe').vars.NODE_ENV, 'test')
+  assert.equal(service.get('refs').secretRefs.OPENAI_API_KEY, 'cred:openai')
+})
+
+test('proxy, pathPrepend and deny reject unsafe or malformed input', () => {
+  const { service } = setup()
+  for (const http of ['http://user:pass@proxy.test:8080', 'https://token@proxy.test']) {
+    assert.throws(() => service.set('p', profile({ proxy: { http } })), coded('invalid_proxy'), http)
+  }
+  assert.throws(() => service.set('p', profile({ proxy: { http: 'http://proxy.test\r\nX: 1' } })), coded('invalid_proxy'))
+  service.set('proxy-ok', profile({ proxy: { http: 'http://127.0.0.1:7890', noProxy: 'localhost,127.0.0.1' } }))
+  assert.equal(service.get('proxy-ok').proxy.http, 'http://127.0.0.1:7890')
+
+  for (const entry of ['/bin\n/evil', '/bin\r/evil', '/bin\0evil', '   ', 42]) {
+    assert.throws(() => service.set('p', profile({ pathPrepend: [entry] })), coded('invalid_profile'), String(entry))
+  }
+
+  for (const pattern of ['has space', 'bad/pattern', '[abc]', '\n', 'a'.repeat(129), 42]) {
+    assert.throws(() => service.set('p', profile({ deny: [pattern] })), coded('invalid_deny'), String(pattern))
+  }
+  service.set('deny-ok', profile({ vars: { AWS_KEY: 'x' }, deny: ['AWS_*', '*_TOKEN'] }))
+  assert.deepEqual(service.resolve('deny-ok').denied, ['AWS_KEY'])
+})
+
+test('failed state writes roll back set and remove', t => {
+  if (process.platform === 'win32' || (typeof process.getuid === 'function' && process.getuid() === 0)) {
+    return t.skip('needs POSIX write permissions owned by a non-root user')
+  }
+  const dir = mkdtempSync(join(tmpdir(), 'dsh-root-ro-'))
+  try {
+    const stateFile = join(dir, 'state.json')
+    const { service } = setup({ stateFile })
+    service.set('base', profile({ vars: { A: '1' } }))
+    chmodSync(dir, 0o500)
+    try {
+      assert.throws(() => service.set('new', profile({ vars: { B: '2' } })), coded('state_write_failed'))
+      assert.equal(service.get('new'), undefined)
+      assert.throws(
+        () => service.set('base', profile({ vars: { A: 'changed' } })),
+        coded('state_write_failed'),
+      )
+      assert.deepEqual(service.get('base').vars, { A: '1' })
+      assert.throws(() => service.remove('base'), coded('state_write_failed'))
+      assert.deepEqual(service.get('base').vars, { A: '1' })
+    } finally {
+      chmodSync(dir, 0o700)
+    }
+
+    const reloaded = setup({ stateFile }).service
+    assert.deepEqual(reloaded.list().map(item => item.name), ['base'])
+    assert.deepEqual(reloaded.get('base').vars, { A: '1' })
+  } finally {
+    try { chmodSync(dir, 0o700) } catch {}
+    rmSync(dir, { recursive: true, force: true })
+  }
 })
 
 test('missing parents and cycles fail resolution with stable codes', () => {

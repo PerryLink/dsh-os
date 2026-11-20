@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.2
+
+- Reject secret-looking `vars` values instead of storing them: `sk-...`,
+  `ghp_...` / `github_pat_...`, `AKIA...` / `ASIA...`, PEM private keys and
+  `password=...` now fail with `secret_in_vars` and point at `secretRefs`.
+- Reject proxy URLs with embedded userinfo (`http://user:pass@host`) with
+  `invalid_proxy`.
+- Reject control characters in `vars`, `secretRefs`, proxy values and
+  `pathPrepend` entries; `pathPrepend` keeps rejecting empty strings. `deny`
+  continues to allow only `A-Z a-z 0-9 _ . * -` up to 128 characters and now
+  reports malformed patterns with a clearer `invalid_deny` message.
+- Add regression tests for secret-ish vars, proxy userinfo, newline/NUL
+  `pathPrepend`, malformed deny patterns and read-only `stateFile` rollback.
+
 ## 0.1.1
 
 - Agent-facing `root_set` always stores `trust: agent`, `scope: agent`.

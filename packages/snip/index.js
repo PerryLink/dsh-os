@@ -1,7 +1,7 @@
 /**
  * dsh-snip — local-first clipboard ledger for DeepSeek Harness.
  *
- * 0.1.0 records explicit `add` calls only: no clipboard polling, no network,
+ * 0.1.1 records explicit `add` calls only: no clipboard polling, no network,
  * no encryption yet. Secret-looking text is not stored unless the caller
  * explicitly disables `excludeSecrets`.
  * @module dsh-snip
@@ -16,6 +16,8 @@ export const inject = ['tools']
 const DAY_MS = 86_400_000
 const PREVIEW_CHARS = 140
 const HANDLE_PREFIX = 'clipboard://'
+const MAX_SOURCE_APP = 80
+const CONTROL_CHARS = /[\u0000-\u001f\u007f]/
 const KINDS = new Set(['text', 'html', 'link', 'color'])
 const SENSITIVITIES = new Set(['normal', 'sensitive', 'secret'])
 
@@ -93,6 +95,36 @@ export function detectSecret(text) {
   return null
 }
 
+/**
+ * Validate the source application label. Labels are metadata, never a secret
+ * store: anything secret-looking is rejected instead of silently stored.
+ */
+function normalizeSourceApp(value) {
+  if (value === undefined || value === null) return 'unknown'
+  if (typeof value !== 'string') throw fail('SNIP_BAD_SOURCE_APP', 'snip: sourceApp must be a string')
+  const label = value.trim()
+  if (label === '') return 'unknown'
+  if (label.length > MAX_SOURCE_APP) {
+    throw fail('SNIP_BAD_SOURCE_APP', `snip: sourceApp must be at most ${MAX_SOURCE_APP} characters`)
+  }
+  if (CONTROL_CHARS.test(label)) {
+    throw fail('SNIP_BAD_SOURCE_APP', 'snip: sourceApp must not contain control characters')
+  }
+  if (detectSecret(label)) {
+    throw fail('SNIP_BAD_SOURCE_APP', 'snip: sourceApp must not contain secret-looking text')
+  }
+  return label
+}
+
+/** Loading a snapshot tolerates bad metadata: drop it instead of failing mount. */
+function safeSourceApp(value) {
+  try {
+    return normalizeSourceApp(value)
+  } catch {
+    return 'unknown'
+  }
+}
+
 /** In-memory ledger with optional atomic JSON snapshot. */
 export class SnipService {
   #entries = new Map()
@@ -112,7 +144,10 @@ export class SnipService {
     this.#now = typeof config.now === 'function' ? config.now : () => Date.now()
     this.#stateFile = typeof config.stateFile === 'string' && config.stateFile.length > 0 ? config.stateFile : null
     if (this.#stateFile) this.#load()
-    if (this.#sweep() || this.#stateFile) this.#persist()
+    const next = new Map(this.#entries)
+    const swept = this.#sweep(next)
+    if (this.#stateFile) this.#commit(next)
+    else if (swept > 0) this.#entries = next
   }
 
   /** Store one clipping; return its stable handle and metadata. */
@@ -133,8 +168,7 @@ export class SnipService {
     if (typeof sensitivity !== 'string' || !SENSITIVITIES.has(sensitivity)) {
       throw fail('SNIP_BAD_SENSITIVITY', 'snip: unsupported sensitivity')
     }
-    const rawSource = typeof args.sourceApp === 'string' ? args.sourceApp.trim() : ''
-    const sourceApp = (rawSource || 'unknown').slice(0, 80)
+    const sourceApp = normalizeSourceApp(args.sourceApp)
 
     const reason = sensitivity === 'secret'
       ? 'sensitivity'
@@ -153,17 +187,18 @@ export class SnipService {
       redacted: reason !== null,
     }
 
-    this.#sweep()
-    this.#entries.set(entry.id, entry)
-    this.#enforceMax()
-    this.#persist()
+    const next = new Map(this.#entries)
+    this.#sweep(next)
+    next.set(entry.id, entry)
+    this.#enforceMax(next)
+    this.#commit(next)
     return summaryOf(entry)
   }
 
   /** Newest-first summaries, optionally filtered by kind. */
   list(options = {}) {
     const args = options ?? {}
-    if (this.#sweep()) this.#persist()
+    this.#sweepAndCommit()
     const kind = typeof args.kind === 'string' && args.kind.length > 0 ? args.kind : null
     return [...this.#entries.values()]
       .reverse()
@@ -176,7 +211,7 @@ export class SnipService {
   search(query, options = {}) {
     const needle = typeof query === 'string' ? query.trim().toLowerCase() : ''
     if (!needle) throw fail('SNIP_BAD_QUERY', 'snip: query must be a non-empty string')
-    if (this.#sweep()) this.#persist()
+    this.#sweepAndCommit()
     return [...this.#entries.values()]
       .reverse()
       .filter(entry => entry.text.toLowerCase().includes(needle))
@@ -187,7 +222,7 @@ export class SnipService {
   /** Full entry (including text) by id or `clipboard://` handle; null if absent. */
   get(idOrHandle) {
     const id = resolveId(idOrHandle)
-    if (this.#sweep()) this.#persist()
+    this.#sweepAndCommit()
     const entry = this.#entries.get(id)
     if (!entry) return null
     return {
@@ -201,36 +236,43 @@ export class SnipService {
   /** Delete one entry by id or handle; true when it existed. */
   forget(idOrHandle) {
     const id = resolveId(idOrHandle)
-    const swept = this.#sweep()
-    const removed = this.#entries.delete(id)
-    if (removed || swept) this.#persist()
+    const next = new Map(this.#entries)
+    const swept = this.#sweep(next)
+    const removed = next.delete(id)
+    if (removed || swept > 0) this.#commit(next)
     return removed
   }
 
   /** Delete every entry; return the number removed. */
   clear() {
     const removed = this.#entries.size
-    this.#entries.clear()
-    if (removed) this.#persist()
+    if (removed > 0) this.#commit(new Map())
     return removed
   }
 
-  #sweep() {
+  /** Sweep expired/overflowing entries; commit only when something changed. */
+  #sweepAndCommit() {
+    const next = new Map(this.#entries)
+    if (this.#sweep(next) === 0) return
+    this.#commit(next)
+  }
+
+  #sweep(entries = this.#entries) {
     const now = this.#now()
     let removed = 0
-    for (const [id, entry] of this.#entries) {
+    for (const [id, entry] of entries) {
       if (Date.parse(entry.expiresAt) <= now) {
-        this.#entries.delete(id)
+        entries.delete(id)
         removed += 1
       }
     }
-    return removed + this.#enforceMax()
+    return removed + this.#enforceMax(entries)
   }
 
-  #enforceMax() {
+  #enforceMax(entries = this.#entries) {
     let removed = 0
-    while (this.#entries.size > this.#maxEntries) {
-      this.#entries.delete(this.#entries.keys().next().value)
+    while (entries.size > this.#maxEntries) {
+      entries.delete(entries.keys().next().value)
       removed += 1
     }
     return removed
@@ -260,7 +302,7 @@ export class SnipService {
         kind: KINDS.has(raw.kind) ? raw.kind : 'text',
         text,
         preview: previewOf(text),
-        sourceApp: typeof raw.sourceApp === 'string' ? raw.sourceApp : 'unknown',
+        sourceApp: safeSourceApp(raw.sourceApp),
         sensitivity,
         createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : new Date(this.#now()).toISOString(),
         expiresAt: typeof raw.expiresAt === 'string' ? raw.expiresAt : new Date(this.#now() + this.#ttlMs).toISOString(),
@@ -269,9 +311,15 @@ export class SnipService {
     }
   }
 
-  #persist() {
+  /** Write `next` first; only replace live state after the snapshot lands. */
+  #commit(next) {
+    this.#persist(next)
+    this.#entries = next
+  }
+
+  #persist(entries = this.#entries) {
     if (!this.#stateFile) return
-    const payload = `${JSON.stringify({ version: 1, entries: [...this.#entries.values()] }, null, 2)}\n`
+    const payload = `${JSON.stringify({ version: 1, entries: [...entries.values()] }, null, 2)}\n`
     const temp = `${this.#stateFile}.${process.pid}.${randomUUID()}.tmp`
     try {
       mkdirSync(dirname(this.#stateFile), { recursive: true, mode: 0o700 })

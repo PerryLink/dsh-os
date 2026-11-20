@@ -1,0 +1,4 @@
+# fixture: valid patch for dsh-too-long
+- insert:
+    - id: dsh-too-long
+      name: dsh-too-long

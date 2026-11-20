@@ -1,0 +1,4 @@
+# fixture: bundle patch for dsh-good
+- insert:
+    - id: dsh-good
+      name: dsh-good

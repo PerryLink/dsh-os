@@ -1,0 +1,25 @@
+{
+  "name": "dsh-library",
+  "version": "0.1.0",
+  "description": "Conformance fixture: a library with dsh.os but no dsh.bundle.",
+  "type": "module",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24.9.0"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "os": {
+      "service": null,
+      "provides": [],
+      "capabilities": [],
+      "tools": [],
+      "stability": "experimental",
+      "since": "0.1.0"
+    }
+  }
+}

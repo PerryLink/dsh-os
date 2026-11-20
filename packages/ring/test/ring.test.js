@@ -104,8 +104,18 @@ test('illegal transitions throw E_STATE and do not mutate the case', () => {
   assert.equal(state(service, expired.id).state, 'expired')
   assert.throws(() => service.ack(expired.id, { by: 'alice' }), { code: 'E_STATE' })
   assert.throws(() => service.escalate(expired.id), { code: 'E_STATE' })
-  // A late decision is still recorded, and marks the case late.
-  assert.equal(service.resolve(expired.id, { decision: 'unavailable' }).late, true)
+  // Expired is terminal for direct decisions: ack and resolve must not put the
+  // case back into an active state. Only an explicit late page may revive it.
+  assert.throws(() => service.resolve(expired.id, { decision: 'unavailable' }), { code: 'E_STATE' })
+  assert.equal(state(service, expired.id).state, 'expired')
+  assert.equal(service.escalate(expired.id, { to: 1 }).state, 'escalated')
+  const late = service.resolve(expired.id, { decision: 'unavailable' })
+  assert.equal(late.state, 'resolved')
+  assert.equal(late.late, true)
+  assert.deepEqual(service.receipts(expired.id).map(receipt => receipt.kind), [
+    'expiry', 'escalation', 'decision',
+  ])
+  assert.equal(state(service, expired.id).state, 'resolved')
 })
 
 test('tick escalates t1 -> t2 -> t3, then expires at the TTL', () => {
@@ -141,6 +151,47 @@ test('tick escalates t1 -> t2 -> t3, then expires at the TTL', () => {
   assert.deepEqual(service.receipts(kase.id).map(receipt => receipt.kind), [
     'delivery', 'escalation', 'escalation', 'escalation', 'expiry',
   ])
+})
+
+test('tick never re-escalates a resolved case and receipts stay immutable', () => {
+  const { service } = setup()
+  const kase = service.raise({ source: 'approval', ttlMs: TTL })
+  service.tick(T0)
+  service.tick(T1)
+  const handled = service.resolve(kase.id, { decision: 'allowed' })
+  assert.equal(handled.state, 'resolved')
+  const ledger = service.receipts(kase.id)
+  assert.deepEqual(ledger.map(receipt => receipt.kind), ['delivery', 'escalation', 'decision'])
+
+  // A resolved case is closed for tick and for every manual transition.
+  const later = service.tick(T2)
+  assert.deepEqual(later.receipts, [])
+  assert.deepEqual(later.cases, [])
+  const after = service.tick(TTL + T3)
+  assert.deepEqual(after.receipts, [])
+  assert.equal(state(service, kase.id).state, 'resolved')
+  assert.equal(state(service, kase.id).level, 1)
+  assert.deepEqual(service.receipts(kase.id), ledger)
+  assert.throws(() => service.escalate(kase.id, { to: 2 }), { code: 'E_STATE' })
+  assert.throws(() => service.ack(kase.id, { by: 'alice' }), { code: 'E_STATE' })
+  assert.throws(() => service.resolve(kase.id, { decision: 'again' }), { code: 'E_STATE' })
+
+  // Receipts are defensive copies: mutating a returned entry cannot rewrite the
+  // append-only ledger, and each read yields fresh objects.
+  ledger[0].kind = 'mutated'
+  const again = service.receipts(kase.id)
+  assert.equal(again[0].kind, 'delivery')
+  assert.notEqual(again[0], service.receipts(kase.id)[0])
+  again[2].at = -1
+  assert.notEqual(service.receipts(kase.id)[2].at, -1)
+  assert.deepEqual(service.receipts(kase.id).map(receipt => receipt.kind), ['delivery', 'escalation', 'decision'])
+
+  const blocked = service.raise({ source: 'manual', ttlMs: T1 })
+  service.tick(T1)
+  const expiredReceipts = service.receipts(blocked.id)
+  assert.deepEqual(expiredReceipts.map(receipt => receipt.kind), ['expiry'])
+  expiredReceipts[0].kind = 'mutated'
+  assert.deepEqual(service.receipts(blocked.id).map(receipt => receipt.kind), ['expiry'])
 })
 
 test('a large tick jump emits t0 plus one catch-up escalation at the highest due level', () => {
@@ -224,6 +275,18 @@ test('agent tools create, escalate, acknowledge, list and read receipts', async 
   assert.deepEqual((await tools.get('ring_list').execute({ status: 'escalated' })).cases.map(item => item.id), [raised.case.id])
   assert.equal((await tools.get('ring_ack').execute({ id: raised.case.id, by: 'alice' })).case.state, 'acked')
   assert.equal(tools.has('ring_resolve'), false)
+
+  const expired = ctx.get('ring').raise({ source: 'job', ttlMs: 1 })
+  ctx.get('ring').tick(1)
+  await assert.rejects(
+    tools.get('ring_ack').execute({ id: expired.id, by: 'alice' }),
+    { code: 'E_STATE' },
+  )
+  await assert.rejects(
+    tools.get('ring_escalate').execute({ id: expired.id }),
+    { code: 'E_STATE' },
+  )
+  assert.equal((await tools.get('ring_escalate').execute({ id: expired.id, to: 1 })).case.state, 'escalated')
 })
 
 test('an explicitly targeted escalation can record a late page on an expired case', () => {
@@ -231,11 +294,16 @@ test('an explicitly targeted escalation can record a late page on an expired cas
   const kase = service.raise({ source: 'manual', ttlMs: 1000 })
   service.tick(1000)
   assert.equal(state(service, kase.id).state, 'expired')
+  // Expired cannot be acked or resolved directly; only a late page reopens it.
+  assert.throws(() => service.ack(kase.id, { by: 'alice' }), { code: 'E_STATE' })
+  assert.throws(() => service.resolve(kase.id, { decision: 'cancelled' }), { code: 'E_STATE' })
   const revived = service.escalate(kase.id, { to: 1 })
   assert.equal(revived.state, 'escalated')
   assert.equal(service.receipts(kase.id).at(-1).to, 't1')
   assert.equal(service.tick(2000).receipts.length, 0)
-  assert.equal(service.resolve(kase.id, { decision: 'cancelled' }).state, 'resolved')
+  const decided = service.resolve(kase.id, { decision: 'cancelled' })
+  assert.equal(decided.state, 'resolved')
+  assert.equal(decided.late, true)
 })
 
 test('a late page can target any level on a case that expired at t3', () => {

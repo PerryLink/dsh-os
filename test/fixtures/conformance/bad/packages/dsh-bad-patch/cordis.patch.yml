@@ -1,0 +1,4 @@
+# fixture: deliberately names the wrong package
+- insert:
+    - id: dsh-other
+      name: dsh-other

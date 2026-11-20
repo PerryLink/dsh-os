@@ -124,13 +124,18 @@ export class StageService {
     this._topology = null
     this._layouts = new Map()
     this._history = []
+    this._undone = new Map()
     this._sequence = 0
   }
 
   _record(entry) {
     const record = { id: `h${++this._sequence}`, at: now(), ...entry }
     this._history.push(record)
-    if (this._history.length > MAX_HISTORY) this._history.splice(0, this._history.length - MAX_HISTORY)
+    if (this._history.length > MAX_HISTORY) {
+      for (const dropped of this._history.splice(0, this._history.length - MAX_HISTORY)) {
+        this._undone.delete(dropped.id)
+      }
+    }
     return record
   }
 
@@ -221,7 +226,7 @@ export class StageService {
     }))
     this._record({
       type: 'apply', name: layout.name, displayId: display.id, layout: clone(layout),
-      assignments: clone(assignments), topologyHash: this._topology.topologyHash, undone: false,
+      assignments: clone(assignments), topologyHash: this._topology.topologyHash,
     })
     return { layout: clone(layout), assignments: clone(assignments) }
   }
@@ -231,17 +236,42 @@ export class StageService {
     if (!Number.isInteger(limit) || limit < 1 || limit > MAX_HISTORY) {
       throw fail('invalid_limit', `history limit must be an integer from 1 to ${MAX_HISTORY}`)
     }
-    return clone(this._history.slice(-limit).reverse())
+    return clone(this._history.slice(-limit).reverse().map(entry => (
+      entry.type === 'apply' && this._undone.has(entry.id)
+        ? { ...entry, undone: true, undoneAt: this._undone.get(entry.id) }
+        : entry.type === 'apply' ? { ...entry, undone: false } : entry
+    )))
   }
 
-  /** Mark the latest not-yet-undone apply as undone and return its receipt. */
+  /**
+   * Mark the latest not-yet-undone apply as undone and return its receipt.
+   *
+   * The apply records the topology hash it was computed against. If the
+   * topology has changed since, the recorded rectangles are stale, so undo
+   * refuses with `{ ok: false, code: 'stale_topology' }` and changes nothing;
+   * re-apply the layout on the current topology and undo that record instead.
+   */
   undo() {
-    const entry = [...this._history].reverse().find(item => item.type === 'apply' && item.undone !== true)
+    const entry = [...this._history].reverse()
+      .find(item => item.type === 'apply' && !this._undone.has(item.id))
     if (entry === undefined) throw fail('nothing_to_undo', 'no applied layout is available to undo')
-    entry.undone = true
-    entry.undoneAt = now()
-    this._record({ type: 'undo', applyId: entry.id, name: entry.name, displayId: entry.displayId })
+    const topologyHash = this._topology === null ? null : this._topology.topologyHash
+    if (entry.topologyHash !== topologyHash) {
+      return {
+        ok: false,
+        code: 'stale_topology',
+        message: 'the topology changed after this layout was applied; re-apply the layout and undo the new record',
+        applyId: entry.id,
+        recordedTopologyHash: entry.topologyHash,
+        topologyHash,
+      }
+    }
+    this._undone.set(entry.id, now())
+    this._record({
+      type: 'undo', applyId: entry.id, name: entry.name, displayId: entry.displayId, topologyHash,
+    })
     return {
+      ok: true,
       schema: SCHEMAS.undo,
       undone: { id: entry.id, at: entry.at, layout: clone(entry.layout), assignments: clone(entry.assignments) },
     }

@@ -3,14 +3,14 @@
 > A local-first clipboard ledger for DeepSeek Harness with secret exclusion and
 > `clipboard://` agent handles.
 
-**Status: 0.1.0 (MVP). A ledger, not a background listener.** Snip records a
+**Status: 0.1.1 (MVP). A ledger, not a background listener.** Snip records a
 clipping only when a caller explicitly invokes `snip.add(...)` or the `snip_add`
-agent tool. 0.1.0 has no OS clipboard polling, no `snip_capture`, no network
+agent tool. 0.1.1 has no OS clipboard polling, no `snip_capture`, no network
 access and no encryption yet. Secret-looking text is excluded by default.
 Everything stays on this machine: entries live in process memory, plus an
 optional local JSON snapshot when `stateFile` is configured.
 
-In one sentence: **0.1.0 is a ledger, not a background listener; it excludes
+In one sentence: **0.1.1 is a ledger, not a background listener; it excludes
 secrets by default and stores clippings locally.**
 
 **Not affiliated with DeepSeek.** DeepSeek and DeepSeek Harness are trademarks
@@ -43,7 +43,10 @@ snip.clear()               // number removed
 Supported kinds are `text`, `html`, `link` and `color`; sensitivities are
 `normal`, `sensitive` and `secret` (`secret` always redacts). Handles are
 `clipboard://<id>` and are accepted anywhere an id is accepted. `get()` returns
-`null` for an unknown, expired or forgotten id.
+`null` for an unknown, expired or forgotten id. `sourceApp` is trimmed, limited
+to 80 characters and rejected with `SNIP_BAD_SOURCE_APP` when it is not a
+string, contains control characters or matches a secret pattern; an empty label
+becomes `unknown`.
 
 ## Agent tools
 
@@ -87,12 +90,21 @@ Expiry and the entry cap are applied automatically on `add`, `list`, `search`,
   API keys.
 - Detection is best-effort, not a guarantee. Set `excludeSecrets: false` to
   opt out (not recommended). `sensitivity: 'secret'` is a caller-side override
-  that always redacts.
+  that always redacts. `sourceApp` is metadata, not a secret store: labels are
+  screened for the same patterns and rejected when they look like a secret,
+  independently of `excludeSecrets`.
+- `search` only scans the stored text, so a redacted secret's original value
+  can never be found through search; `get` returns only `[redacted:<reason>]`.
+  `forget` deletes the map entry and the next snapshot, so no index residue or
+  on-disk copy remains.
 - When `stateFile` is set, each mutation writes the snapshot through a
-  temporary file and `rename` (atomic replace, mode `0600`). The snapshot is
-  plain JSON and is **not encrypted in 0.1.0** — protect it like any local
-  secret. A snapshot written with detection disabled is re-screened on load.
-- 0.1.0 performs no network I/O and does not read the OS clipboard. There is no
+  temporary file and `rename` (atomic replace, mode `0600`) **before** the
+  in-memory ledger is updated. If the write fails, the call throws
+  `SNIP_STATE_WRITE_FAILED` and both memory and disk keep the previous state.
+  The snapshot is plain JSON and is **not encrypted in 0.1.1** — protect it
+  like any local secret. A snapshot written with detection disabled is
+  re-screened on load, and bad `sourceApp` metadata is replaced with `unknown`.
+- 0.1.1 performs no network I/O and does not read the OS clipboard. There is no
   background capture, watcher or timer.
 
 ## Development

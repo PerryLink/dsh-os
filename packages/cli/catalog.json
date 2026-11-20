@@ -1,0 +1,151 @@
+[
+  {
+    "name": "dsh-act",
+    "product": "Act",
+    "service": "act",
+    "version": "0.1.1",
+    "stability": "experimental",
+    "description": "Typed action registry and natural-language action panel for DeepSeek Harness.",
+    "install": "dsh plugin --profile web add dsh-act"
+  },
+  {
+    "name": "dsh-allow",
+    "product": "Allow",
+    "service": "allow",
+    "version": "0.1.2",
+    "stability": "experimental",
+    "description": "Revocable capability grants and an audit-ready permission center for DeepSeek Harness.",
+    "install": "dsh plugin --profile web add dsh-allow"
+  },
+  {
+    "name": "dsh-snip",
+    "product": "Snip",
+    "service": "snip",
+    "version": "0.1.1",
+    "stability": "experimental",
+    "description": "Local-first, searchable clipboard ledger for DeepSeek Harness with secret exclusion and clipboard:// agent handles.",
+    "install": "dsh plugin --profile web add dsh-snip"
+  },
+  {
+    "name": "@perrylink/dsh-check",
+    "product": "Check",
+    "service": "check",
+    "version": "0.1.1",
+    "stability": "experimental",
+    "description": "Paired-environment regression canary for DeepSeek Harness upgrades, model changes and plugin updates.",
+    "install": "dsh plugin --profile web add @perrylink/dsh-check"
+  },
+  {
+    "name": "dsh-nest",
+    "product": "Nest",
+    "service": "nest",
+    "version": "0.1.0",
+    "stability": "experimental",
+    "description": "Versioned workspace profiles for DeepSeek Harness: context, permissions, environment and defaults.",
+    "install": "dsh plugin --profile web add dsh-nest"
+  },
+  {
+    "name": "dsh-trigger",
+    "product": "Trigger",
+    "service": "triggers",
+    "version": "0.1.0",
+    "stability": "experimental",
+    "description": "In-memory event-to-action trigger fabric for DeepSeek Harness: condition DSL, cooldown and a run ledger.",
+    "install": "dsh plugin --profile web add dsh-trigger"
+  },
+  {
+    "name": "dsh-seek",
+    "product": "Seek",
+    "service": "evidence",
+    "version": "0.1.1",
+    "stability": "experimental",
+    "description": "Cross-source evidence search for DeepSeek Harness with verifiable refs and freshness.",
+    "install": "dsh plugin --profile web add dsh-seek"
+  },
+  {
+    "name": "@perrylink/dsh-trace",
+    "product": "Trace",
+    "service": "trace",
+    "version": "0.1.0",
+    "stability": "experimental",
+    "description": "Auditable long-term memory governance for DeepSeek Harness: provenance, expiry, conflict and forget.",
+    "install": "dsh plugin --profile web add @perrylink/dsh-trace"
+  },
+  {
+    "name": "dsh-stage",
+    "product": "Stage",
+    "service": "stage",
+    "version": "0.1.1",
+    "stability": "experimental",
+    "description": "Display, window and space topology protocol for DeepSeek Harness agents, with normalized, reversible layouts.",
+    "install": "dsh plugin --profile web add dsh-stage"
+  },
+  {
+    "name": "dsh-ring",
+    "product": "Ring",
+    "service": "ring",
+    "version": "0.1.1",
+    "stability": "experimental",
+    "description": "Approval SLA and escalation receipts for DeepSeek Harness: ack, escalate, audit.",
+    "install": "dsh plugin --profile web add dsh-ring"
+  },
+  {
+    "name": "@perrylink/dsh-root",
+    "product": "Root",
+    "service": "env",
+    "version": "0.1.2",
+    "stability": "experimental",
+    "description": "Named, explainable and snapshot-able environment profiles for DeepSeek Harness.",
+    "install": "dsh plugin --profile web add @perrylink/dsh-root"
+  },
+  {
+    "name": "dsh-help",
+    "product": "Help",
+    "service": "help",
+    "version": "0.0.0",
+    "stability": "experimental",
+    "description": "Optional install doctor and first-run wizard for DeepSeek Harness.",
+    "install": "dsh plugin --profile web add dsh-help",
+    "optional": true
+  },
+  {
+    "name": "dsh-context",
+    "product": "Context",
+    "service": "context",
+    "version": "0.0.0",
+    "stability": "experimental",
+    "description": "Optional active app, window and selection context provider for DeepSeek Harness.",
+    "install": "dsh plugin --profile web add dsh-context",
+    "optional": true
+  },
+  {
+    "name": "dsh-cost",
+    "product": "Cost",
+    "service": "cost",
+    "version": "0.0.0",
+    "stability": "experimental",
+    "description": "Optional cost adapter for dsh-cost-meter; it ships no new meter.",
+    "install": "dsh plugin --profile web add dsh-cost",
+    "optional": true
+  },
+  {
+    "name": "dsh-backup",
+    "product": "Backup",
+    "service": "backup",
+    "version": "0.0.0",
+    "stability": "experimental",
+    "description": "Optional workspace snapshot and restore for DeepSeek Harness.",
+    "install": "dsh plugin --profile web add dsh-backup",
+    "optional": true
+  },
+  {
+    "name": "dsh-notify",
+    "product": "Notify",
+    "service": "notify",
+    "version": "0.0.0",
+    "stability": "experimental",
+    "description": "Optional attention router and notification inbox for DeepSeek Harness.",
+    "install": "dsh plugin --profile web add dsh-notify",
+    "optional": true
+  }
+]

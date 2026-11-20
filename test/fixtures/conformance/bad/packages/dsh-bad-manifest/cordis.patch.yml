@@ -1,0 +1,4 @@
+# fixture: valid patch for dsh-bad-manifest
+- insert:
+    - id: dsh-bad-manifest
+      name: dsh-bad-manifest
