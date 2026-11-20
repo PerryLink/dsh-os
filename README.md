@@ -1,9 +1,14 @@
 # dsh-os
 
-A family of **OS-level primitives for DeepSeek Harness**. Eleven 0.1.0 MVPs
-(protocol/service implementations; native adapters land in 0.2.0): actions, grants, clipboard, workspace
-profiles, environment profiles, regression canaries, triggers, evidence
-search, memory governance, window topology and approval escalation.
+A family of **OS-level primitives for DeepSeek Harness**: 11 core modules
+(Act, Allow, Snip, Check, Nest, Trigger, Seek, Trace, Stage, Ring, Root), 5
+optional modules (Help, Context, Cost, Backup, Notify), plus a thin contract,
+an optional UI shell, a catalog CLI and a dependency-only kit.
+
+The modules stay small and independent: one Host service, ≤6 agent tools,
+zero runtime dependencies, independent semver, no cross-module imports. The
+contract (`@perrylink/dsh-os-contract`) and the optional shell are the only
+shared layers; the kit contains no business code.
 
 > **Not affiliated with DeepSeek.** DeepSeek and DeepSeek Harness are
 > trademarks of their respective owners. These are independent community
@@ -24,24 +29,38 @@ needs only Node 22+; nothing is installed or published.
 
 | Product | Package | Status | Design |
 |---|---|---|---|
-| **Act** | `dsh-act` | 0.1.0 MVP | [design](docs/design/01-act.md) |
-| **Allow** | `dsh-allow` | 0.1.0 MVP | [design](docs/design/02-allow.md) |
-| **Snip** | `dsh-snip` | 0.1.0 MVP | [design](docs/design/03-snip.md) |
-| **Check** | `@perrylink/dsh-check` | 0.1.0 MVP (diff engine; runner in 0.2.0) | [design](docs/design/04-check.md) |
+| **Act** | `dsh-act` | 0.1.1 MVP | [design](docs/design/01-act.md) |
+| **Allow** | `dsh-allow` | 0.1.2 MVP (security hardening) | [design](docs/design/02-allow.md) |
+| **Snip** | `dsh-snip` | 0.1.1 MVP | [design](docs/design/03-snip.md) |
+| **Check** | `@perrylink/dsh-check` | 0.1.1 MVP (diff engine; runner in 0.2.0) | [design](docs/design/04-check.md) |
 | **Nest** | `dsh-nest` | 0.1.0 MVP | [design](docs/design/05-nest.md) |
 | **Trigger** | `dsh-trigger` | 0.1.0 protocol MVP | [design](docs/design/06-trigger.md) |
-| **Seek** | `dsh-seek` | 0.1.0 protocol MVP | [design](docs/design/07-seek.md) |
+| **Seek** | `dsh-seek` | 0.1.1 protocol MVP | [design](docs/design/07-seek.md) |
 | **Trace** | `@perrylink/dsh-trace` | 0.1.0 protocol MVP | [design](docs/design/08-trace.md) |
-| **Stage** | `dsh-stage` | 0.1.0 protocol MVP | [design](docs/design/09-stage.md) |
-| **Ring** | `dsh-ring` | 0.1.0 protocol MVP | [design](docs/design/10-ring.md) |
-| **Root** | `@perrylink/dsh-root` | 0.1.0 MVP | [design](docs/design/11-root.md) |
+| **Stage** | `dsh-stage` | 0.1.1 protocol MVP | [design](docs/design/09-stage.md) |
+| **Ring** | `dsh-ring` | 0.1.1 protocol MVP | [design](docs/design/10-ring.md) |
+| **Root** | `@perrylink/dsh-root` | 0.1.2 MVP | [design](docs/design/11-root.md) |
+| **Help** | `dsh-help` | 0.1.0 optional | install doctor / first run |
+| **Context** | `@perrylink/dsh-context` | 0.1.0 optional | context provider protocol |
+| **Cost** | `@perrylink/dsh-cost` | 0.1.0 optional | adapter for `dsh-cost-meter` |
+| **Backup** | `@perrylink/dsh-backup` | 0.1.0 optional | snapshot manifest / restore plan |
+| **Notify** | `@perrylink/dsh-notify` | 0.1.0 optional | channel registry / attention router |
+| **Shell** | `@perrylink/dsh-os-shell` | 0.1.0 optional | view registry + minimal HTML card |
+| **CLI** | `@perrylink/dsh-os-cli` | 0.1.0 tool | `dsh-os list/doctor/install` |
+| **Contract** | `@perrylink/dsh-os-contract` | 0.1.0 library | constants, refs, manifest/tool validation |
+| **Kit** | `dsh-os-kit` | 0.1.0 meta bundle | installs Act + Allow + Snip + Check |
 
-`Check`, `Trace` and `Root` use the `@perrylink/` scope because npm's
-name-similarity protection rejects the unscoped names.
+`Check`, `Trace`, `Root`, `Context`, `Cost`, `Backup`, `Notify`, `Shell`, `CLI`
+and `Contract` use the `@perrylink/` scope where npm's name-similarity rules
+require it; the product names stay bare.
 
 ## Install
 
 ```sh
+# one-shot: the four core modules
+dsh plugin --profile web add dsh-os-kit
+
+# or individually
 dsh plugin --profile web add dsh-act
 dsh plugin --profile web add dsh-allow
 dsh plugin --profile web add dsh-snip
@@ -53,12 +72,20 @@ dsh plugin --profile web add dsh-ring
 dsh plugin --profile web add @perrylink/dsh-check
 dsh plugin --profile web add @perrylink/dsh-root
 dsh plugin --profile web add @perrylink/dsh-trace
+
+# optional small modules
+dsh plugin --profile web add dsh-help
+dsh plugin --profile web add @perrylink/dsh-context
+dsh plugin --profile web add @perrylink/dsh-cost
+dsh plugin --profile web add @perrylink/dsh-backup
+dsh plugin --profile web add @perrylink/dsh-notify
+dsh plugin --profile web add @perrylink/dsh-os-shell
+
+# catalog CLI (no network, prints install plans)
+npm i -g @perrylink/dsh-os-cli
+dsh-os list
+dsh-os doctor
 ```
-
-> `@perrylink/dsh-trace` is scoped because npm rejects the unscoped `dsh-trace`
-> as too similar to `dd-trace`. The normal scoped install above is the
-> supported path; 0.1.0 is the current version.
-
 
 ## Repository layout
 
@@ -71,11 +98,12 @@ scripts/     scaffold, test and publish helpers
 
 ## Status
 
-All eleven packages ship a 0.1.0 MVP: services, agent tools, tests and a
-bundle manifest. Native/OS adapters (AX/Win32, real clipboard capture, DSH
-headless runner, fs/webhook/agent trigger sources, locator/library/memento
-providers) are scheduled for 0.2.0. `node scripts/test-all.mjs` runs 102 tests
-across 12 suites.
+All twenty packages ship a 0.1.x MVP: services, agent tools, tests and a bundle
+manifest (libraries/CLI where applicable). Native/OS adapters (AX/Win32, real
+clipboard capture, DSH headless runner, fs/webhook/agent trigger sources,
+locator/library/memento providers, real notification channels) are 0.2.0 work.
+`node scripts/test-all.mjs` runs 21 suites; `npm run verify` runs the full
+four-gate release check.
 
 ## Development
 
