@@ -2,6 +2,8 @@
 
 > **范围：** 官方 GitHub Discussions、`awesome-dsh-plugin` 收录、`dsh-market` 上架。
 > **本文只写文档，不发帖、不私信、不提交 PR。** 所有对外动作由维护者在核对后手动执行。
+>
+> ⚠️ **官方 Discussions 展示帖属于用户已停投动作（AGENTS.md §1）**：§1 只保留草稿，不要发布；不要私信维护者。
 > **基线日期：** 2026-11-20（仓库与 npm 包的实际状态以执行当天为准）。
 > **一句话原则：** **没有可运行 demo 就不发；不是官方就显著写清楚；一个项目一条讨论；不刷票。**
 
@@ -35,7 +37,7 @@
 
 ---
 
-## 1. 官方 Discussions 帖（Show Your Plugins!）
+## 1. 官方 Discussions 帖（草稿，不投）
 
 ### 1.1 发在哪里、遵守什么
 
@@ -472,7 +474,7 @@ curl -s https://awesome-dsh-plugin.com/plugins.json | grep -o 'PerryLink/dsh-os#
 | 周 | 日期 | 主题 | 交付物 | 进入下一周的门槛 |
 |---|---|---|---|---|
 | **W1** | 2026-11-23 – 11-29 | **Demo** | 90 秒演示（GIF/MP4）+ 终端 PNG；两个 demo 在 Node 22 和 24 各跑一次；3 个锚点包在干净 profile 安装成功 | `demo.mjs` 6/6；`run-check-demo.sh` PASS；GIF ≤10 MB；画面无 token/路径/用户名 |
-| **W2** | 2026-11-30 – 12-06 | **官方 Discussions** | §1 的帖子 + 首评；48 小时评论响应 | 仓库 public；demo 链接 200；标题符合 `DSH｜…｜…`；正文含非官方声明；只发 1 帖 |
+| **W2** | 2026-11-30 – 12-06 | **不投官方 Discussions**（用户已停投） | 改为 1:1 邀约 10 个设计伙伴 + 复盘 | 3 个安装、1 个真实 case、5 条反馈 |
 | **W3** | 2026-12-07 – 12-13 | **awesome PR** | §2 的 1 条 YAML + PR；合并后检查 dsh-market | 仓库满 1 天；`dsh.bundle` 通过；干净 profile 安装成功；只 1 条；不手改 README |
 | **W4** | 2026-12-14 – 12-20 | **复盘** | 一页复盘：数据、问题、决定 | 复盘写完并决定：继续投 Act/Trigger / 先修 0.2.0 / 暂停 |
 

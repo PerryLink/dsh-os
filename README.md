@@ -22,6 +22,8 @@ two dependency-free demos — Allow + Act + Snip (deny → 30-minute Grant → a
 needs only Node 22+; nothing is installed or published.
 
 **Docs:** [Quickstart](docs/quickstart.md) ·
+[Validation plan](docs/validation/PLAN.md) ·
+[0.2.0 smoke](docs/validation/SMOKE.md) ·
 [Recipes](docs/recipes/) (CI gate, agent writes, clipboard) ·
 [Troubleshooting](docs/troubleshooting.md).
 
