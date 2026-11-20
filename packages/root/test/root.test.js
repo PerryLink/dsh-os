@@ -221,9 +221,10 @@ test('layer is an optional trust ceiling', () => {
   service.set('agent', profile({ inherit: 'base', trust: 'agent', scope: 'agent', vars: { AGENT_ONLY: '1' } }))
 
   assert.deepEqual(service.resolve('agent').vars, { USER_ONLY: '1', AGENT_ONLY: '1' })
-  assert.deepEqual(service.resolve('agent', { layer: 'agent' }).vars, { USER_ONLY: '1', AGENT_ONLY: '1' })
-  assert.deepEqual(service.resolve('base', { layer: 'workspace' }).vars, { USER_ONLY: '1' })
-  assert.throws(() => service.resolve('agent', { layer: 'workspace' }), coded('layer_forbidden'))
+  // Agent-facing callers see only agent-trust profiles; user-trust stays hidden.
+  assert.deepEqual(service.resolve('agent', { layer: 'agent' }).vars, { AGENT_ONLY: '1' })
+  assert.deepEqual(service.resolve('agent', { layer: 'user' }).vars, { USER_ONLY: '1', AGENT_ONLY: '1' })
+  assert.throws(() => service.resolve('base', { layer: 'workspace' }), coded('layer_forbidden'))
   assert.throws(() => service.resolve('base', { layer: 'root' }), coded('invalid_layer'))
 })
 
@@ -279,4 +280,21 @@ test('the ledger never mutates process.env', () => {
   service.resolve('probe')
   service.explain('probe', 'ROOT_MVP_PROBE')
   assert.equal(process.env.ROOT_MVP_PROBE, before)
+})
+
+test('agent-facing root_set cannot create a user-trust profile', async () => {
+  const { ctx, service } = setup()
+  const setTool = ctx._tools.get('root_set')
+  const created = await setTool.execute({
+    name: 'prod',
+    profile: { vars: { API_KEY: 'v' }, trust: 'user', scope: 'user' },
+  })
+  assert.equal(created.profile.trust, 'agent')
+  assert.equal(created.profile.scope, 'agent')
+
+  service.set('human-only', profile({ vars: { TOKEN: 'secret' }, trust: 'user', scope: 'user' }))
+  await assert.rejects(
+    () => ctx._tools.get('root_resolve').execute({ name: 'human-only' }),
+    coded('layer_forbidden'),
+  )
 })

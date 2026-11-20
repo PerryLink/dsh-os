@@ -2,7 +2,7 @@
 
 > Typed action registry and agent-facing action bus for DeepSeek Harness.
 
-**Status: 0.1.0 MVP：服务/tools；UI/CLI 下一版**
+**Status: 0.1.1 MVP：服务/tools；UI/CLI 下一版**
 
 0.1.0 ships the Host service `ctx.act` and the `act_list` / `act_invoke` agent
 tools. The action panel, natural-language router, preview/undo/audit pipeline

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+- CLI labels warning findings as `WARN` instead of `REGRESSION`; warnings keep
+  exit code 0.
+
 ## 0.1.0
 
 - Add the dependency-free four-dimension diff engine: result, trajectory,

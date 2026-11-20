@@ -62,3 +62,39 @@ test('read actions run without a grant', async () => {
   const echoed = await act.invoke('echo', { text: 'hello' }, { subject: 'session-2' })
   assert.deepEqual(echoed, { ok: true, actionId: 'echo', result: { text: 'hello' } })
 })
+
+test('an agent cannot mint its own Grant through the default tool surface', async () => {
+  const ctx = fakeContext()
+  const allow = applyAllow(ctx)
+  const act = applyAct(ctx)
+
+  assert.equal(ctx._tools.has('allow_issue'), false)
+  assert.equal(ctx._tools.has('allow_revoke'), false)
+
+  act.register({
+    id: 'write.self',
+    title: 'Self write',
+    risk: 'write',
+    execute: async () => 'should not run',
+  })
+
+  const denied = await act.invoke('write.self', {}, { subject: 'session-1' })
+  assert.equal(denied.ok, false)
+  assert.equal(denied.code, 'grant_required')
+
+  // The host (human-facing client) can still issue a grant directly via the service.
+  const grant = allow.issue({ subject: 'session-1', capability: 'act:invoke:write.self' })
+  const allowed = await act.invoke('write.self', {}, { subject: 'session-1' })
+  assert.equal(allowed.ok, true)
+  allow.revoke(grant.id)
+})
+
+test('missing subject fails closed instead of sharing an anonymous identity', async () => {
+  const ctx = fakeContext()
+  applyAllow(ctx)
+  const act = applyAct(ctx)
+  act.register({ id: 'write.nobody', title: 'No subject', risk: 'write', execute: async () => 'no' })
+  const denied = await act.invoke('write.nobody', {})
+  assert.equal(denied.ok, false)
+  assert.equal(denied.code, 'grant_required')
+})

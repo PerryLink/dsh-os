@@ -2,7 +2,7 @@
 
 > Revocable capability grants and an audit-ready permission center for DeepSeek Harness.
 
-**Status: 0.1.0 MVP.** Host seam `ctx.allow` + four agent tools, in-memory by
+**Status: 0.1.1 MVP.** Host seam `ctx.allow` + a read-only agent tool, in-memory by
 default, optional atomic JSON state.
 
 > **控制面不是沙箱；out-of-turn 授权由 Grant 承担。**
@@ -101,17 +101,22 @@ Grant scope may be a string or an array; a requested array must be fully covered
 
 ## Agent tools
 
-Plain object `ToolDefinition`s, no `@deepseek-ai/dsh-tools` import:
+Plain object `ToolDefinition`s, no `@deepseek-ai/dsh-tools` import.
 
-- `allow_issue` — issue a grant (`subject`, `capability` required).
-- `allow_check` — check a concrete subject/capability/scope.
-- `allow_revoke` — revoke by grant id.
-- `allow_list` — list grants with optional exact filters; returns `{ grants }`.
+**Default surface: `allow_check` only.** Issuing, revoking or listing every
+subject are human-facing operations. Exposing them to the model lets an agent
+mint its own Grant and bypass Act's write gate, so they stay off unless a
+human-facing client sets `exposeAdminTools: true` in the plugin config.
 
-The bundled issue/revoke tools are an MVP integration seam, not an authentication
-boundary. This package cannot tell a human caller from a same-process agent; a
-production profile should expose issue/revoke only to human-facing clients and
-keep `check`/`list` for agents.
+- `allow_check` — check a concrete subject/capability/scope (`scope` optional;
+  omitted means "any active grant for this capability").
+- `allow_issue` (opt-in) — issue a grant (`subject`, `capability` required).
+- `allow_revoke` (opt-in) — revoke by grant id.
+- `allow_list` (opt-in) — list grants with optional exact filters.
+
+This package is a control plane, not a sandbox: it records and answers
+out-of-turn authorization questions and cannot stop same-process code from
+bypassing it. Do not expose the admin tools to untrusted agents.
 
 ## Persistence
 

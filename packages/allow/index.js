@@ -37,8 +37,7 @@ function text(value, field, code, max) {
   return trimmed
 }
 
-function objectInput(value) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+function objectInput(value) {  if (!value || typeof value !== 'object' || Array.isArray(value)) {
     fail('E_INPUT', 'input must be an object')
   }
   return value
@@ -89,6 +88,22 @@ function cloneEvidence(evidence) {
  * Durable-enough local state: an in-memory Map by default, or an atomically
  * written JSON file when `config.stateFile` is set.
  */
+/** Reject persisted grants that cannot be interpreted safely (fail closed). */
+function validGrant(grant) {
+  if (!grant || typeof grant !== 'object') return false
+  if (typeof grant.id !== 'string' || grant.id === '') return false
+  if (typeof grant.subject !== 'string' || grant.subject === '') return false
+  if (typeof grant.capability !== 'string' || grant.capability === '') return false
+  if (!['active', 'revoked', 'expired'].includes(grant.status)) return false
+  if (!Number.isFinite(grant.createdAt)) return false
+  if (grant.expiresAt !== null && !Number.isFinite(grant.expiresAt)) return false
+  const scopeOk = typeof grant.scope === 'string'
+    || (Array.isArray(grant.scope) && grant.scope.length > 0 && grant.scope.every(scope => typeof scope === 'string'))
+  if (!scopeOk) return false
+  if (typeof grant.approver !== 'string' || grant.approver === '') return false
+  return true
+}
+
 export class GrantStore {
   constructor(config = {}) {
     this.clock = typeof config.now === 'function' ? config.now : () => Date.now()
@@ -120,11 +135,13 @@ export class GrantStore {
     if (!raw || typeof raw !== 'object' || !Array.isArray(raw.grants) || !Array.isArray(raw.audit)) {
       fail('E_STATE', `invalid state file ${this.stateFile}`)
     }
+    if (raw.version !== STATE_VERSION) {
+      fail('E_STATE', `unsupported state version ${String(raw.version)} in ${this.stateFile}`)
+    }
     for (const grant of raw.grants) {
-      if (!grant || typeof grant.id !== 'string' || typeof grant.subject !== 'string' || typeof grant.capability !== 'string') {
-        fail('E_STATE', `invalid grant record in ${this.stateFile}`)
-      }
-      this.grants.set(grant.id, grant)
+      // Unknown fields are tolerated; records that cannot be evaluated safely
+      // are dropped so a corrupted file cannot create a permanent grant.
+      if (validGrant(grant)) this.grants.set(grant.id, grant)
     }
     this.auditLog = raw.audit.slice(-MAX_AUDIT_ENTRIES)
     this.nextSeq = this.auditLog.reduce((max, entry) => Math.max(max, Number(entry?.seq) || 0), 0) + 1
@@ -213,7 +230,12 @@ export class AllowService {
     if (evidence !== undefined) grant.evidence = evidence
     this.store.grants.set(grant.id, grant)
     this.store.record('issued', grant, { approver, expiresAt: grant.expiresAt })
-    this.store.save()
+    try {
+      this.store.save()
+    } catch (error) {
+      this.store.grants.delete(grant.id)
+      throw error
+    }
     return clone(grant)
   }
 
@@ -221,18 +243,18 @@ export class AllowService {
     const args = objectInput(input)
     const subject = text(args.subject, 'subject', 'E_SUBJECT', MAX_SUBJECT_LENGTH)
     const capability = text(args.capability, 'capability', 'E_CAPABILITY', MAX_CAPABILITY_LENGTH)
-    const requestedScope = normalizeScope(args.scope)
-    const requested = Array.isArray(requestedScope) ? requestedScope : [requestedScope]
+    const requestedScope = args.scope === undefined ? null : normalizeScope(args.scope)
+    const requested = requestedScope === null ? null : (Array.isArray(requestedScope) ? requestedScope : [requestedScope])
     const now = this.sweep()
     const candidates = [...this.store.grants.values()]
       .filter(grant => grant.subject === subject && grant.capability === capability)
     const active = candidates.filter(grant => grant.status === 'active')
-    const matched = active.find(grant => requested.every(scope => scopeCovers(grant.scope, scope)))
+    const matched = active.find(grant => requested === null
+      || requested.every(scope => scopeCovers(grant.scope, scope)))
 
     if (matched) {
       matched.usedAt = now
       this.store.record('allowed', matched)
-      this.store.save()
       return { allowed: true, grant: clone(matched), reason: 'allowed' }
     }
 
@@ -253,11 +275,10 @@ export class AllowService {
     this.store.record('denied', null, {
       subject,
       capability,
-      scope: clone(requestedScope),
+      scope: requested === null ? '*' : clone(requestedScope),
       reason,
       ...(grant ? { grantId: grant.id } : {}),
     })
-    this.store.save()
     return grant
       ? { allowed: false, grant: clone(grant), reason }
       : { allowed: false, reason }
@@ -269,9 +290,15 @@ export class AllowService {
     if (!grant) fail('E_GRANT_NOT_FOUND', `unknown grant: ${grantId}`)
     this.sweep()
     if (grant.status !== 'active') return clone(grant)
+    const previous = grant.status
     grant.status = 'revoked'
     this.store.record('revoked', grant)
-    this.store.save()
+    try {
+      this.store.save()
+    } catch (error) {
+      grant.status = previous
+      throw error
+    }
     return clone(grant)
   }
 
@@ -311,8 +338,8 @@ const SCOPE_SCHEMA = {
 }
 
 /** Plain ToolDefinition objects; no dependency on `@deepseek-ai/dsh-tools`. */
-export function createTools(service) {
-  return [
+export function createTools(service, options = {}) {
+  const tools = [
     {
       name: 'allow_issue',
       description: 'Issue a revocable capability grant and return it. Grants expire (default 24h, max 30 days).',
@@ -386,14 +413,23 @@ export function createTools(service) {
       },
     },
   ]
+  // Issuing, revoking and listing every subject are human-facing operations.
+  // Exposing them to the model would let an agent mint its own Grant and
+  // bypass Act's write gate, so they stay off unless a human-facing client
+  // explicitly opts in.
+  return options.exposeAdminTools === true
+    ? tools
+    : tools.filter(tool => tool.name === 'allow_check')
 }
 
-/** Mount the service at `ctx.allow` and register the four agent tools. */
+/** Mount the service at `ctx.allow`; only the read-only check tool is public. */
 export function apply(ctx, config = {}) {
   const service = new AllowService(ctx, config)
   ctx.provide('allow', service)
   if (ctx.tools && typeof ctx.tools.register === 'function') {
-    for (const tool of createTools(service)) ctx.tools.register(tool)
+    for (const tool of createTools(service, { exposeAdminTools: config.exposeAdminTools === true })) {
+      ctx.tools.register(tool)
+    }
   }
   return service
 }

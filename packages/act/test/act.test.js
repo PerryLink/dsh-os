@@ -100,7 +100,6 @@ test('an authorized write runs and the grant request carries subject and scope',
   assert.deepEqual(checks, [{
     subject: 'tester',
     capability: 'act:invoke:danger.action',
-    scope: { path: '/tmp' },
   }])
 })
 
@@ -115,8 +114,9 @@ test('denied and throwing checks fail closed; sessionId is the subject fallback'
   const { service } = setup(allow)
   service.register({ id: 'write.one', title: 'One', risk: 'write', execute: () => 'ran' })
   assert.equal((await service.invoke('write.one', {}, { sessionId: 'session-1' })).code, 'grant_required')
+  // Missing subject fails closed: no shared 'anonymous' identity is created.
   assert.equal((await service.invoke('write.one')).code, 'grant_required')
-  assert.deepEqual(seen, ['session-1', 'anonymous'])
+  assert.deepEqual(seen, ['session-1'])
   assert.equal((await service.invoke('echo', { text: 'read still runs' })).ok, true)
 
   const broken = setup({ check: async () => { throw new Error('ledger unavailable') } })

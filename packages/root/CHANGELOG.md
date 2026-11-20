@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1
+
+- Agent-facing `root_set` always stores `trust: agent`, `scope: agent`.
+- `root_resolve` and `root_explain` use the agent visibility ceiling and no
+  longer accept a caller-supplied layer.
+- Layer rank fixed: user-trust profiles are hidden from agent callers.
+
 ## 0.1.0
 
 - Add `RootService` exposed as the Host service `ctx.env` with

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.1
+
+- Security: only `allow_check` is registered by default. `allow_issue`,
+  `allow_revoke` and `allow_list` require `exposeAdminTools: true` for a
+  human-facing client; exposing them to the model allowed an agent to mint its
+  own Grant and bypass Act's write gate.
+- `check()` accepts an omitted scope (any active grant) and no longer rewrites
+  the state file on every read.
+- Persisted grants with invalid fields (for example a non-numeric `expiresAt`)
+  are dropped, and unsupported state versions fail with `E_STATE`.
+- `issue()` and `revoke()` roll back in-memory state when persistence fails.
+
 ## 0.1.0 — 2026-11-20
 
 First functional MVP.

@@ -118,7 +118,6 @@ function granted(decision) {
     || decision.permitted === true
     || decision.decision === 'allow'
     || decision.status === 'allow'
-    || decision.ok === true
 }
 
 /** Typed action registry exposed to other plugins as `ctx.act`. */
@@ -207,9 +206,12 @@ export class ActService {
   async #authorized(capability, meta) {
     const allow = typeof this.#ctx?.get === 'function' ? this.#ctx.get('allow') : undefined
     if (allow === undefined || allow === null || typeof allow.check !== 'function') return false
-    const subject = meta?.subject ?? meta?.sessionId ?? 'anonymous'
+    // A missing subject must fail closed: a shared 'anonymous' identity would
+    // let one grant authorize every background/plugin call.
+    const subject = meta?.subject ?? meta?.sessionId
+    if (typeof subject !== 'string' || subject === '') return false
     try {
-      return granted(await allow.check({ subject, capability, scope: meta?.scope }))
+      return granted(await allow.check({ subject, capability }))
     } catch {
       return false
     }

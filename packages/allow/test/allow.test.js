@@ -159,8 +159,17 @@ test('evidence is cloned, not aliased', () => {
   assert.equal(service.list()[0].evidence.sessionId, 'session-1')
 })
 
-test('apply provides ctx.allow and registers four plain tool definitions', async () => {
+test('default apply exposes only the read-only check tool (no self-grant)', async () => {
   const { ctx, service } = fakeContext()
+  assert.equal(ctx.get('allow'), service)
+  assert.deepEqual([...ctx._tools.keys()], ['allow_check'])
+  assert.equal(ctx._tools.get('allow_issue'), undefined)
+  assert.equal(ctx._tools.get('allow_revoke'), undefined)
+  assert.equal(ctx._tools.get('allow_list'), undefined)
+})
+
+test('human-facing clients can opt into the admin tools', async () => {
+  const { ctx, service } = fakeContext({ exposeAdminTools: true })
   assert.equal(ctx.get('allow'), service)
   assert.deepEqual([...ctx._tools.keys()].sort(), ['allow_check', 'allow_issue', 'allow_list', 'allow_revoke'])
 
@@ -209,6 +218,25 @@ test('stateFile round-trips grants and audit through atomic JSON writes', () => 
     assert.equal(empty.service.list().length, 0)
   } finally {
     assert.ok(dir.startsWith(tmpdir()))
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('a persisted grant with a non-numeric expiresAt is dropped (fail closed)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'dsh-allow-corrupt-'))
+  const stateFile = join(dir, 'state.json')
+  try {
+    writeFileSync(stateFile, JSON.stringify({
+      version: 1,
+      grants: [{
+        id: 'g1', subject: 's', capability: 'c', scope: '*', status: 'active',
+        createdAt: 1, expiresAt: 'never', approver: 'user',
+      }],
+      audit: [],
+    }))
+    const { service } = fakeContext({ stateFile })
+    assert.deepEqual(service.check({ subject: 's', capability: 'c' }), { allowed: false, reason: 'no-grant' })
+  } finally {
     rmSync(dir, { recursive: true, force: true })
   }
 })

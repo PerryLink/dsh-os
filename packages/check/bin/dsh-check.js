@@ -66,7 +66,7 @@ function format(result) {
       + `${summary.regressions} regression(s), ${summary.warnings} warning(s), ${summary.ignored} ignored`,
   ]
   for (const task of result.tasks) {
-    const label = task.ignored ? 'IGNORED' : task.verdict.toUpperCase()
+    const label = task.ignored ? 'IGNORED' : task.verdict === 'warning' ? 'WARN' : task.verdict.toUpperCase()
     if (task.diffs.length === 0) lines.push(`  ${label} ${task.id}`)
     for (const diff of task.diffs) {
       lines.push(`  ${label} ${task.id} [${diff.dimension}/${diff.severity}] ${diff.message}`)

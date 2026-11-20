@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1
+
+- Missing subject fails closed instead of falling back to a shared `anonymous`
+  identity.
+- Grant decisions no longer treat `{ ok: true }` as allow (fail closed).
+- `allow.check` is called without a scope, so narrow grants can authorize.
+
 ## 0.1.0
 
 - Add `ActService` (`register` / `unregister` / `get` / `list` / `invoke`) exposed

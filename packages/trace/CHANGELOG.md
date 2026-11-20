@@ -1,9 +1,5 @@
 # Changelog
 
-## 0.1.1 (deprecated)
-
-- Published but not installable through the default registry path (tarball 404); npm dist-tag  points back to 0.1.0. Use the encoded tarball URL in the README.
-
 ## 0.1.0
 
 - Add `TraceService` exposed as the Host service `ctx.trace` with

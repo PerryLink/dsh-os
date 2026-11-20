@@ -19,7 +19,9 @@ export const name = 'dsh-root'
 export const inject = ['tools']
 
 const LAYERS = ['user', 'workspace', 'agent']
-const LAYER_RANK = { user: 0, workspace: 1, agent: 2 }
+// Privilege order: user is the most restricted visibility, agent the least.
+// A caller at `layer` sees profiles with rank <= rank(layer).
+const LAYER_RANK = { agent: 0, workspace: 1, user: 2 }
 const VAR_NAME = /^[A-Z_][A-Z0-9_]*$/
 const PROFILE_NAME = /^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,127}$/
 const DENY_PATTERN = /^[A-Za-z0-9_.*-]{1,128}$/
@@ -237,9 +239,16 @@ export class RootService {
   }
 
   /** Explain where an effective key came from, or why deny removed it. */
-  explain(name, key) {
+  explain(name, key, options = {}) {
     if (typeof key !== 'string' || key === '') fail('invalid_key', 'key must be a non-empty string')
-    const chain = this.#chain(name)
+    if (!plain(options)) fail('invalid_arguments', 'explain options must be an object')
+    const { layer } = options
+    if (layer !== undefined && !LAYERS.includes(layer)) fail('invalid_layer', `layer must be one of ${LAYERS.join(', ')}`)
+    const fullChain = this.#chain(name)
+    const chain = layer === undefined
+      ? fullChain
+      : fullChain.filter(profile => LAYER_RANK[profile.trust] <= LAYER_RANK[layer])
+    if (!chain.some(profile => profile.name === name)) fail('layer_forbidden', `profile "${name}" is above the ${layer} layer`)
     const definitions = []
     const deny = []
     for (const profile of chain) {
@@ -364,9 +373,9 @@ function tool(name, description, parameters, execute) {
 /** Plain ToolDefinition objects; no dependency on `@deepseek-ai/dsh-tools`. */
 export function createTools(service) {
   return [
-    tool('root_set', 'Create or replace a Root environment profile (ledger only; does not modify process.env).',
+    tool('root_set', 'Create or replace a Root environment profile (ledger only; does not modify process.env). Agent-created profiles are always trust=agent.',
       argsSchema({ name: { type: 'string', description: 'Profile name, e.g. "acme-dev".' }, profile: PROFILE_SCHEMA }, ['name', 'profile']),
-      async args => ({ profile: service.set(args?.name, args?.profile) })),
+      async args => ({ profile: service.set(args?.name, { ...args?.profile, trust: 'agent', scope: 'agent' }) })),
     tool('root_get', 'Read one Root profile by name. Only secret references are ever stored.',
       argsSchema({ name: { type: 'string' } }, ['name']),
       async args => {
@@ -376,15 +385,12 @@ export function createTools(service) {
       }),
     tool('root_list', 'List all Root environment profiles in insertion order.',
       argsSchema({}), async () => ({ profiles: service.list() })),
-    tool('root_resolve', 'Resolve a profile with its inheritance chain: vars, secretRefs, proxy, pathPrepend, sources and denied keys.',
-      argsSchema({
-        name: { type: 'string' },
-        layer: { type: 'string', enum: LAYERS, description: 'Optional visibility ceiling: omit profiles with a higher trust level.' },
-      }, ['name']),
-      async args => service.resolve(args?.name, args?.layer === undefined ? {} : { layer: args.layer })),
-    tool('root_explain', 'Explain the effective source of one key (and overridden profiles), or why deny removed it.',
+    tool('root_resolve', 'Resolve a profile with its inheritance chain: vars, secretRefs, proxy, pathPrepend, sources and denied keys. The visibility ceiling is always the agent layer.',
+      argsSchema({ name: { type: 'string' } }, ['name']),
+      async args => service.resolve(args?.name, { layer: 'agent' })),
+    tool('root_explain', 'Explain the effective source of one key (and overridden profiles), or why deny removed it. The visibility ceiling is always the agent layer.',
       argsSchema({ name: { type: 'string' }, key: { type: 'string' } }, ['name', 'key']),
-      async args => service.explain(args?.name, args?.key)),
+      async args => service.explain(args?.name, args?.key, { layer: 'agent' })),
   ]
 }
 

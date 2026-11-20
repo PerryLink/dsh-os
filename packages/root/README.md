@@ -2,7 +2,7 @@
 
 > Named, explainable environment profiles for DeepSeek Harness.
 
-**Status: 0.1.0 MVP：环境账本/解释器；注入在 0.2.0。**
+**Status: 0.1.1 MVP：环境账本/解释器；注入在 0.2.0。**
 
 Root 0.1.0 ships the Host service `ctx.env` and five `root_*` agent tools. It
 records named environment profiles with inheritance, deny rules and per-key

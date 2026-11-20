@@ -20,7 +20,7 @@ search, memory governance, window topology and approval escalation.
 | **Nest** | `dsh-nest` | 0.1.0 MVP | [design](docs/design/05-nest.md) |
 | **Trigger** | `dsh-trigger` | 0.1.0 protocol MVP | [design](docs/design/06-trigger.md) |
 | **Seek** | `dsh-seek` | 0.1.0 protocol MVP | [design](docs/design/07-seek.md) |
-| **Trace** | `@perrylink/dsh-trace` | 0.1.0 protocol MVP (install via encoded tarball URL) | [design](docs/design/08-trace.md) |
+| **Trace** | `@perrylink/dsh-trace` | 0.1.0 protocol MVP | [design](docs/design/08-trace.md) |
 | **Stage** | `dsh-stage` | 0.1.0 protocol MVP | [design](docs/design/09-stage.md) |
 | **Ring** | `dsh-ring` | 0.1.0 protocol MVP | [design](docs/design/10-ring.md) |
 | **Root** | `@perrylink/dsh-root` | 0.1.0 MVP | [design](docs/design/11-root.md) |
@@ -41,12 +41,12 @@ dsh plugin --profile web add dsh-stage
 dsh plugin --profile web add dsh-ring
 dsh plugin --profile web add @perrylink/dsh-check
 dsh plugin --profile web add @perrylink/dsh-root
-dsh plugin --profile web add 'https://registry.npmjs.org/@perrylink%2Fdsh-trace/-/dsh-trace-0.1.0.tgz'
+dsh plugin --profile web add @perrylink/dsh-trace
 ```
 
 > `@perrylink/dsh-trace` is scoped because npm rejects the unscoped `dsh-trace`
-> as too similar to `dd-trace`. If pnpm cannot resolve its tarball from your
-> configured mirror, use the encoded tarball URL above.
+> as too similar to `dd-trace`. The normal scoped install above is the
+> supported path; 0.1.0 is the current version.
 
 
 ## Repository layout

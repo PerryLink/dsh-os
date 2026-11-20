@@ -3,7 +3,7 @@
 > **Upgrade canary, not an update checker.** Compare two paired runs across
 > result, trajectory, cost and approvals, then fail CI only on a real regression.
 
-**Status: 0.1.0 MVP — diff engine only.** Check does not launch DSH, call a
+**Status: 0.1.1 MVP — diff engine only.** Check does not launch DSH, call a
 model or read session logs yet. A runner (isolated `DSH_HOME`, headless
 `--json`, session capture and baselines) is planned for **0.2.0**. In 0.1.0 you
 bring two run JSON files produced by any harnessable run of the same tasks.
