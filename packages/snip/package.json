@@ -1,7 +1,7 @@
 {
   "name": "dsh-snip",
-  "version": "0.0.1",
-  "description": "Encrypted, searchable clipboard ledger for DeepSeek Harness with secret exclusion and agent handles.",
+  "version": "0.1.0",
+  "description": "Local-first, searchable clipboard ledger for DeepSeek Harness with secret exclusion and clipboard:// agent handles.",
   "type": "module",
   "main": "index.js",
   "exports": {
@@ -14,11 +14,16 @@
     "README.md",
     "CHANGELOG.md"
   ],
+  "scripts": {
+    "test": "node --test"
+  },
   "keywords": [
     "dsh",
     "dsh-plugin",
     "deepseek-harness",
     "agent-os",
+    "clipboard",
+    "clipboard-history",
     "snip"
   ],
   "license": "MIT",

@@ -1,6 +1,6 @@
 {
   "name": "dsh-allow",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Revocable capability grants and an audit-ready permission center for DeepSeek Harness.",
   "type": "module",
   "main": "index.js",
@@ -44,5 +44,8 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "scripts": {
+    "test": "node --test"
   }
 }

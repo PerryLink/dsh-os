@@ -1,0 +1,214 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+import { apply, DEFAULT_TTL_MS, MAX_TTL_MS } from '../index.js'
+
+const HOUR = 60 * 60 * 1000
+
+function fakeContext(config = {}) {
+  const clock = { t: 1_700_000_000_000 }
+  const tools = new Map()
+  const services = new Map()
+  const ctx = {
+    tools: { register: tool => (tools.set(tool.name, tool), () => tools.delete(tool.name)) },
+    provide: (name, value) => services.set(name, value),
+    get: name => services.get(name),
+    _tools: tools,
+    _services: services,
+  }
+  const service = apply(ctx, { ...config, now: () => clock.t })
+  return { ctx, clock, service }
+}
+
+test('issue then check allows a matching grant and records usedAt', () => {
+  const { service, clock } = fakeContext()
+  const grant = service.issue({ subject: 'agent:planner', capability: 'fs.write', scope: 'repo:src' })
+
+  assert.equal(grant.status, 'active')
+  assert.equal(grant.subject, 'agent:planner')
+  assert.equal(grant.capability, 'fs.write')
+  assert.equal(grant.scope, 'repo:src')
+  assert.equal(grant.approver, 'user')
+  assert.equal(grant.createdAt, clock.t)
+  assert.equal(grant.expiresAt, clock.t + DEFAULT_TTL_MS)
+
+  const result = service.check({ subject: 'agent:planner', capability: 'fs.write', scope: 'repo:src' })
+  assert.equal(result.allowed, true)
+  assert.equal(result.reason, 'allowed')
+  assert.equal(result.grant.id, grant.id)
+  assert.equal(result.grant.usedAt, clock.t)
+})
+
+test('scope patterns: *, prefix:* and arrays', () => {
+  const { service } = fakeContext()
+  const any = service.issue({ subject: 's', capability: 'c', scope: '*' })
+  assert.equal(service.check({ subject: 's', capability: 'c', scope: 'anything' }).allowed, true)
+
+  const prefix = service.issue({ subject: 's', capability: 'repo.read', scope: 'repo:*' })
+  assert.equal(service.check({ subject: 's', capability: 'repo.read', scope: 'repo:src/a.js' }).allowed, true)
+  assert.equal(service.check({ subject: 's', capability: 'repo.read', scope: 'repo:src' }).allowed, true)
+  assert.equal(service.check({ subject: 's', capability: 'repo.read', scope: 'repositories' }).allowed, false)
+  assert.equal(prefix.scope, 'repo:*')
+
+  const exact = service.issue({ subject: 's', capability: 'exact', scope: 'a:b' })
+  assert.equal(service.check({ subject: 's', capability: 'exact', scope: 'a:b' }).allowed, true)
+  assert.equal(service.check({ subject: 's', capability: 'exact', scope: 'a:b:c' }).allowed, false)
+  assert.equal(exact.scope, 'a:b')
+
+  service.issue({ subject: 's', capability: 'array', scope: ['one', 'two:*'] })
+  assert.equal(service.check({ subject: 's', capability: 'array', scope: 'one' }).allowed, true)
+  assert.equal(service.check({ subject: 's', capability: 'array', scope: 'two:deep' }).allowed, true)
+  assert.equal(service.check({ subject: 's', capability: 'array', scope: 'three' }).allowed, false)
+  assert.equal(any.scope, '*')
+})
+
+test('check denies unknown subjects, capabilities and scope mismatches', () => {
+  const { service } = fakeContext()
+  assert.deepEqual(
+    service.check({ subject: 'nobody', capability: 'fs.write', scope: 'x' }),
+    { allowed: false, reason: 'no-grant' },
+  )
+
+  service.issue({ subject: 's', capability: 'fs.write', scope: 'repo:src' })
+  const wrongCapability = service.check({ subject: 's', capability: 'fs.delete', scope: 'repo:src' })
+  assert.equal(wrongCapability.allowed, false)
+  assert.equal(wrongCapability.reason, 'no-grant')
+
+  const wrongScope = service.check({ subject: 's', capability: 'fs.write', scope: 'repo:other' })
+  assert.equal(wrongScope.allowed, false)
+  assert.equal(wrongScope.reason, 'scope-mismatch')
+  assert.equal(wrongScope.grant.status, 'active')
+})
+
+test('expiry is evaluated with the clock and materialized in status/list/audit', () => {
+  const { service, clock } = fakeContext()
+  const grant = service.issue({ subject: 's', capability: 'c', scope: '*', ttlMs: 1000 })
+
+  clock.t += 999
+  assert.equal(service.check({ subject: 's', capability: 'c', scope: 'x' }).allowed, true)
+  clock.t += 1
+
+  const result = service.check({ subject: 's', capability: 'c', scope: 'x' })
+  assert.equal(result.allowed, false)
+  assert.equal(result.reason, 'expired')
+  assert.equal(result.grant.id, grant.id)
+  assert.equal(result.grant.status, 'expired')
+  assert.equal(service.list({ status: 'active' }).length, 0)
+  assert.equal(service.list({ status: 'expired' }).length, 1)
+  assert.equal(service.audit().filter(entry => entry.event === 'expired').length, 1)
+})
+
+test('revoke is immediate and idempotent', () => {
+  const { service } = fakeContext()
+  const grant = service.issue({ subject: 's', capability: 'c', scope: '*' })
+
+  const revoked = service.revoke(grant.id)
+  assert.equal(revoked.status, 'revoked')
+  const again = service.revoke(grant.id)
+  assert.equal(again.status, 'revoked')
+
+  const result = service.check({ subject: 's', capability: 'c', scope: 'x' })
+  assert.equal(result.allowed, false)
+  assert.equal(result.reason, 'revoked')
+  assert.equal(result.grant.id, grant.id)
+})
+
+test('list filters and audit ordering/limits', () => {
+  const { service } = fakeContext()
+  const first = service.issue({ subject: 'a', capability: 'c1', scope: '*', approver: 'cli' })
+  const second = service.issue({ subject: 'b', capability: 'c2', scope: '*', approver: 'user' })
+  service.check({ subject: 'a', capability: 'c1', scope: 'x' })
+  service.revoke(second.id)
+
+  assert.equal(service.list().length, 2)
+  assert.deepEqual(service.list({ subject: 'a' }).map(grant => grant.id), [first.id])
+  assert.deepEqual(service.list({ capability: 'c2' }).map(grant => grant.id), [second.id])
+  assert.deepEqual(service.list({ approver: 'cli' }).map(grant => grant.id), [first.id])
+  assert.deepEqual(service.list({ status: 'revoked' }).map(grant => grant.id), [second.id])
+
+  const audit = service.audit()
+  assert.deepEqual(audit.slice(0, 4).map(entry => entry.event), ['revoked', 'allowed', 'issued', 'issued'])
+  assert.equal(service.audit(2).length, 2)
+  assert.equal(service.audit(2)[0].event, 'revoked')
+  assert.throws(() => service.audit(0), { code: 'E_LIMIT' })
+})
+
+test('validates subject, capability, scope, approver and ttl', () => {
+  const { service } = fakeContext()
+  assert.throws(() => service.issue({ capability: 'c' }), { code: 'E_SUBJECT' })
+  assert.throws(() => service.issue({ subject: '   ', capability: 'c' }), { code: 'E_SUBJECT' })
+  assert.throws(() => service.issue({ subject: 's', capability: ' ' }), { code: 'E_CAPABILITY' })
+  assert.throws(() => service.issue({ subject: 's'.repeat(257), capability: 'c' }), { code: 'E_SUBJECT' })
+  assert.throws(() => service.issue({ subject: 's', capability: 'c', scope: [] }), { code: 'E_SCOPE' })
+  assert.throws(() => service.issue({ subject: 's', capability: 'c', scope: ['ok', 1] }), { code: 'E_SCOPE' })
+  assert.throws(() => service.issue({ subject: 's', capability: 'c', ttlMs: 0 }), { code: 'E_TTL' })
+  assert.throws(() => service.issue({ subject: 's', capability: 'c', ttlMs: MAX_TTL_MS + 1 }), { code: 'E_TTL' })
+  assert.throws(() => service.issue({ subject: 's', capability: 'c', approver: '' }), { code: 'E_APPROVER' })
+  assert.throws(() => service.revoke('grant_missing'), { code: 'E_GRANT_NOT_FOUND' })
+})
+
+test('evidence is cloned, not aliased', () => {
+  const { service } = fakeContext()
+  const evidence = { sessionId: 'session-1', callId: 'call-1' }
+  const grant = service.issue({ subject: 's', capability: 'c', evidence })
+  evidence.sessionId = 'mutated'
+  assert.equal(grant.evidence.sessionId, 'session-1')
+  assert.equal(service.list()[0].evidence.sessionId, 'session-1')
+})
+
+test('apply provides ctx.allow and registers four plain tool definitions', async () => {
+  const { ctx, service } = fakeContext()
+  assert.equal(ctx.get('allow'), service)
+  assert.deepEqual([...ctx._tools.keys()].sort(), ['allow_check', 'allow_issue', 'allow_list', 'allow_revoke'])
+
+  const issueTool = ctx._tools.get('allow_issue')
+  assert.equal(issueTool.parameters.type, 'object')
+  assert.equal(issueTool.parameters.required[0], 'subject')
+  assert.deepEqual(issueTool.output.render({}, { ok: true }), [{ type: 'text', text: '{"ok":true}' }])
+
+  const grant = await issueTool.execute({ subject: 'agent:tool', capability: 'fs.write', scope: 'repo:*' })
+  const checked = await ctx._tools.get('allow_check').execute({
+    subject: 'agent:tool',
+    capability: 'fs.write',
+    scope: 'repo:file.js',
+  })
+  assert.equal(checked.allowed, true)
+
+  const listed = await ctx._tools.get('allow_list').execute({ subject: 'agent:tool' })
+  assert.equal(listed.grants.length, 1)
+  assert.equal(listed.grants[0].id, grant.id)
+
+  const revoked = await ctx._tools.get('allow_revoke').execute({ id: grant.id })
+  assert.equal(revoked.status, 'revoked')
+})
+
+test('stateFile round-trips grants and audit through atomic JSON writes', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'dsh-allow-test-'))
+  try {
+    const stateFile = join(dir, 'state.json')
+    const first = fakeContext({ stateFile })
+    const grant = first.service.issue({ subject: 's', capability: 'c', scope: 'repo:*' })
+
+    const raw = readFileSync(stateFile, 'utf8')
+    assert.match(raw, new RegExp(grant.id))
+    assert.deepEqual(readdirSync(dir), ['state.json'])
+
+    const second = fakeContext({ stateFile })
+    assert.equal(second.service.list().length, 1)
+    const result = second.service.check({ subject: 's', capability: 'c', scope: 'repo:a' })
+    assert.equal(result.allowed, true)
+    assert.equal(second.service.audit().some(entry => entry.event === 'allowed'), true)
+
+    writeFileSync(stateFile, '{not json')
+    assert.throws(() => fakeContext({ stateFile }), { code: 'E_STATE' })
+    rmSync(stateFile)
+    const empty = fakeContext({ stateFile })
+    assert.equal(empty.service.list().length, 0)
+  } finally {
+    assert.ok(dir.startsWith(tmpdir()))
+    rmSync(dir, { recursive: true, force: true })
+  }
+})

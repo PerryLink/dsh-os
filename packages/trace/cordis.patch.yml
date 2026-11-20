@@ -1,4 +1,4 @@
 # @perrylink/dsh-trace bundle patch: mount the plugin.
 - insert:
-    - id: @perrylink/dsh-trace
-      name: @perrylink/dsh-trace
+    - id: '@perrylink/dsh-trace'
+      name: '@perrylink/dsh-trace'

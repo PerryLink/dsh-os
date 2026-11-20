@@ -22,5 +22,13 @@ for (const dir of packages) {
   process.stderr.write(result.stderr || '')
   if (result.status !== 0) failed += 1
 }
+
+if (existsSync(join(ROOT, 'test'))) {
+  ran += 1
+  const result = spawnSync('node', ['--test'], { cwd: ROOT, encoding: 'utf8' })
+  process.stdout.write(result.stdout || '')
+  process.stderr.write(result.stderr || '')
+  if (result.status !== 0) failed += 1
+}
 console.log(`\ntest: ${ran} package(s), ${failed} failed`)
 if (failed > 0) process.exit(1)

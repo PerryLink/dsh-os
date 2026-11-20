@@ -1,4 +1,4 @@
 # @perrylink/dsh-check bundle patch: mount the plugin.
 - insert:
-    - id: @perrylink/dsh-check
-      name: @perrylink/dsh-check
+    - id: '@perrylink/dsh-check'
+      name: '@perrylink/dsh-check'
