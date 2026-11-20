@@ -24,14 +24,22 @@ function setup() {
 const coded = code => error => error?.code === code
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
-test('apply provides ctx.trace and registers four plain-object tools', async () => {
+test('apply provides ctx.trace and registers seven plain-object tools', async () => {
   const { ctx, service } = setup()
   assert.ok(ctx.get('trace') instanceof TraceService)
   assert.equal(service.protocol, 'dsh-memory-protocol/v1')
   assert.equal(service.profile, 'trace/1')
   assert.deepEqual(
     [...ctx._tools.keys()],
-    ['trace_remember', 'trace_search', 'trace_forget', 'trace_list'],
+    [
+      'trace_remember',
+      'trace_search',
+      'trace_forget',
+      'trace_list',
+      'trace_import_memento',
+      'trace_export_memento',
+      'trace_adapter_status',
+    ],
   )
   for (const tool of ctx._tools.values()) {
     assert.equal(Object.getPrototypeOf(tool), Object.prototype)
@@ -161,4 +169,40 @@ test('invalid drafts and limits fail with stable codes', () => {
   assert.throws(() => service.search('x', { limit: 0 }), coded('invalid_limit'))
   assert.throws(() => service.list({ limit: 1.5 }), coded('invalid_limit'))
   assert.equal(service.forget('not-there'), false)
+})
+
+test('restore preserves createdAt/expiresAt and never forces a higher-confidence record', () => {
+  const { service } = setup()
+  const high = service.remember({ key: 'tool:pnpm', text: 'Use pnpm.', confidence: 0.9 })
+  assert.throws(
+    () => service.restore({
+      key: 'tool:pnpm',
+      text: 'Use npm.',
+      confidence: 0.2,
+      createdAt: 1_700_000_000_000,
+    }),
+    coded('trace_confidence_too_low'),
+  )
+  assert.equal(service.get('tool:pnpm').id, high.id)
+
+  const restored = service.restore({
+    key: 'imported:decision',
+    text: 'Adopt pnpm workspaces.',
+    source: 'memento',
+    scope: 'user',
+    confidence: 0.7,
+    createdAt: 1_700_000_000_000,
+    expiresAt: 1_800_000_000_000,
+  })
+  assert.equal(restored.provenance.createdAt, 1_700_000_000_000)
+  assert.equal(restored.provenance.updatedAt, 1_700_000_000_000)
+  assert.equal(restored.expiresAt, 1_800_000_000_000)
+  assert.equal(service.get('imported:decision').id, restored.id)
+
+  assert.throws(() => service.restore({ key: 'x', text: 'x', force: true }), coded('invalid_arguments'))
+  assert.throws(() => service.restore({ key: 'x', text: 'x', createdAt: 1.5 }), coded('invalid_created_at'))
+  assert.throws(
+    () => service.restore({ key: 'x', text: 'x', createdAt: 10, expiresAt: 10 }),
+    coded('invalid_expires_at'),
+  )
 })

@@ -31,21 +31,21 @@ needs only Node 22+; nothing is installed or published.
 |---|---|---|---|
 | **Act** | `dsh-act` | 0.1.1 MVP | [design](docs/design/01-act.md) |
 | **Allow** | `dsh-allow` | 0.1.2 MVP (security hardening) | [design](docs/design/02-allow.md) |
-| **Snip** | `dsh-snip` | 0.1.1 MVP | [design](docs/design/03-snip.md) |
-| **Check** | `@perrylink/dsh-check` | 0.1.1 MVP (diff engine; runner in 0.2.0) | [design](docs/design/04-check.md) |
+| **Snip** | `dsh-snip` | 0.2.0 (Win/mac/Linux capture) | [design](docs/design/03-snip.md) |
+| **Check** | `@perrylink/dsh-check` | 0.2.0 (headless runner + diff) | [design](docs/design/04-check.md) |
 | **Nest** | `dsh-nest` | 0.1.0 MVP | [design](docs/design/05-nest.md) |
-| **Trigger** | `dsh-trigger` | 0.1.0 protocol MVP | [design](docs/design/06-trigger.md) |
-| **Seek** | `dsh-seek` | 0.1.1 protocol MVP | [design](docs/design/07-seek.md) |
-| **Trace** | `@perrylink/dsh-trace` | 0.1.0 protocol MVP | [design](docs/design/08-trace.md) |
-| **Stage** | `dsh-stage` | 0.1.1 protocol MVP | [design](docs/design/09-stage.md) |
-| **Ring** | `dsh-ring` | 0.1.1 protocol MVP | [design](docs/design/10-ring.md) |
+| **Trigger** | `dsh-trigger` | 0.2.0 (agent/fs/webhook sources) | [design](docs/design/06-trigger.md) |
+| **Seek** | `dsh-seek` | 0.2.0 (locator + memento providers) | [design](docs/design/07-seek.md) |
+| **Trace** | `@perrylink/dsh-trace` | 0.2.0 (memento adapter) | [design](docs/design/08-trace.md) |
+| **Stage** | `dsh-stage` | 0.2.0 (macOS/Windows adapters) | [design](docs/design/09-stage.md) |
+| **Ring** | `dsh-ring` | 0.2.0 (webhook/ntfy/console) | [design](docs/design/10-ring.md) |
 | **Root** | `@perrylink/dsh-root` | 0.1.2 MVP | [design](docs/design/11-root.md) |
 | **Help** | `dsh-help` | 0.1.0 optional | install doctor / first run |
 | **Context** | `@perrylink/dsh-context` | 0.1.0 optional | context provider protocol |
 | **Cost** | `@perrylink/dsh-cost` | 0.1.0 optional | adapter for `dsh-cost-meter` |
 | **Backup** | `@perrylink/dsh-backup` | 0.1.0 optional | snapshot manifest / restore plan |
 | **Notify** | `@perrylink/dsh-notify` | 0.1.0 optional | channel registry / attention router |
-| **Shell** | `@perrylink/dsh-os-shell` | 0.1.0 optional | view registry + minimal HTML card |
+| **Shell** | `@perrylink/dsh-os-shell` | 0.2.0 optional | React client (Act/Snip/Check tabs) |
 | **CLI** | `@perrylink/dsh-os-cli` | 0.1.0 tool | `dsh-os list/doctor/install` |
 | **Contract** | `@perrylink/dsh-os-contract` | 0.1.0 library | constants, refs, manifest/tool validation |
 | **Kit** | `dsh-os-kit` | 0.1.0 meta bundle | installs Act + Allow + Snip + Check |
@@ -98,10 +98,11 @@ scripts/     scaffold, test and publish helpers
 
 ## Status
 
-All twenty packages ship a 0.1.x MVP: services, agent tools, tests and a bundle
-manifest (libraries/CLI where applicable). Native/OS adapters (AX/Win32, real
-clipboard capture, DSH headless runner, fs/webhook/agent trigger sources,
-locator/library/memento providers, real notification channels) are 0.2.0 work.
+Twenty packages ship a 0.1.x/0.2.x MVP: services, agent tools, tests and a bundle
+manifest (libraries/CLI where applicable). 0.2.0 adds the first real adapters:
+Check headless runner, Snip clipboard capture, Trigger agent/fs/webhook sources,
+Seek locator/memento providers, Stage macOS/Windows windows, Trace memento
+adapter, Ring webhook/ntfy/console channels and the React shell.
 `node scripts/test-all.mjs` runs 21 suites; `npm run verify` runs the full
 four-gate release check.
 
@@ -148,7 +149,7 @@ explicit `npm publish` of the reviewed tarballs. The workflow never runs
 ## Community, RFCs and feedback
 
 - **Launch and support notes:** [docs/community/launch.md](docs/community/launch.md)
-  — what works today, what is still 0.2.0, and the official post / directory
+  — what works today, what is still 0.3.0, and the official post / directory
   submission drafts.
 - **Upstream RFCs (suggestions, not requirements):**
   [`ctx.actions`](docs/rfcs/ctx-actions.md),

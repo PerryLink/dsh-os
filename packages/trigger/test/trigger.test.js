@@ -34,6 +34,7 @@ test('apply provides ctx.triggers, four plain tools, and works without a tool re
   assert.equal(ctx.get('triggers'), service)
   assert.deepEqual([...ctx._tools.keys()], [
     'trigger_register', 'trigger_list', 'trigger_fire', 'trigger_runs',
+    'trigger_sources', 'trigger_source_start', 'trigger_source_stop',
   ])
   for (const definition of makeTools(service)) {
     assert.equal(typeof definition.name, 'string')

@@ -9,6 +9,8 @@
  * @module @perrylink/dsh-os-shell
  */
 
+import { registerBridge } from './bridge.js'
+
 export const name = 'dsh-os-shell'
 
 /** The optional shell still uses the host tool registry when it is present. */
@@ -19,6 +21,7 @@ const MODULE_PATTERN = /^(@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/
 const MAX_TITLE = 80
 const MAX_MODULE = 214
 const MAX_HISTORY = 50
+const SNAPSHOT_LIMIT = 50
 const VIEW_FIELDS = new Set(['id', 'title', 'module', 'mount'])
 
 function fail(code, message) {
@@ -83,6 +86,21 @@ function publicView(view) {
   return { ...rest, mountable: typeof mount === 'function' }
 }
 
+/** JSON-safe action summary; execute/parameters never cross the HTTP boundary. */
+function summarizeAction(action) {
+  const summary = { id: action.id, title: action.title, risk: action.risk }
+  if (typeof action.description === 'string') summary.description = action.description
+  return summary
+}
+
+/** Map a check report verdict to the CLI exit code. */
+function exitCodeOf(report) {
+  if (!isPlainObject(report)) return null
+  if (report.verdict === 'regression') return 1
+  if (report.verdict === 'pass' || report.verdict === 'warning') return 0
+  return null
+}
+
 /**
  * Host seam `ctx.osShell`: an in-memory view registry plus open/close history.
  *
@@ -95,10 +113,22 @@ export class OsShellService {
   #open = new Set()
   #history = []
   #now
+  #getService
 
-  constructor({ now = Date.now } = {}) {
+  constructor({ now = Date.now, getService = () => undefined } = {}) {
     if (typeof now !== 'function') fail('E_INVALID_ARGUMENT', 'now must be a function')
+    if (typeof getService !== 'function') fail('E_INVALID_ARGUMENT', 'getService must be a function')
     this.#now = now
+    this.#getService = getService
+  }
+
+  /** Read an optional peer service; a missing or throwing lookup is absent. */
+  #service(name) {
+    try {
+      return this.#getService(name)
+    } catch {
+      return undefined
+    }
   }
 
   registerView(input) {
@@ -155,6 +185,96 @@ export class OsShellService {
   render() {
     return render(this.listViews())
   }
+
+  /**
+   * Aggregate the optional Act, Snip and Check services for the client page.
+   * Each section is `{ available: false }` when its Host service is absent;
+   * the shell itself never requires any of them.
+   */
+  async snapshot() {
+    const act = this.#service('act')
+    const snip = this.#service('snip')
+    const sections = await Promise.all([this.#actSection(act), this.#snipSection(snip), this.checkLast()])
+    return { act: sections[0], snip: sections[1], check: sections[2] }
+  }
+
+  async #actSection(act) {
+    if (act === undefined || act === null || typeof act.list !== 'function') return { available: false }
+    try {
+      const actions = act.list()
+      return {
+        available: true,
+        actions: Array.isArray(actions) ? actions.map(summarizeAction) : [],
+      }
+    } catch (error) {
+      return { available: false, error: messageOf(error) }
+    }
+  }
+
+  async #snipSection(snip) {
+    if (snip === undefined || snip === null || typeof snip.list !== 'function') return { available: false }
+    try {
+      const entries = snip.list({ limit: SNAPSHOT_LIMIT })
+      return {
+        available: true,
+        entries: Array.isArray(entries) ? entries.map(entry => ({ ...entry })) : [],
+      }
+    } catch (error) {
+      return { available: false, error: messageOf(error) }
+    }
+  }
+
+  /**
+   * The most recent Check report, from `check.last()` when the 0.2 service
+   * exposes it, otherwise a `last`/`lastReport` value; null when none exists.
+   * Exit codes follow the CLI contract (regression 1, pass/warning 0).
+   */
+  async checkLast() {
+    const check = this.#service('check')
+    if (check === undefined || check === null) return { available: false }
+    let value
+    try {
+      if (typeof check.last === 'function') value = await check.last()
+      else value = check.last ?? check.lastReport ?? (Array.isArray(check.history) ? check.history.at(-1) ?? null : null)
+    } catch (error) {
+      return { available: true, last: null, exitCode: null, error: messageOf(error) }
+    }
+    if (value === undefined || value === null) return { available: true, last: null, exitCode: null }
+    const envelope = isPlainObject(value) && isPlainObject(value.report)
+    const report = envelope ? value.report : value
+    const exitCode = envelope && Number.isInteger(value.exitCode) ? value.exitCode : exitCodeOf(report)
+    return { available: true, last: report, exitCode }
+  }
+
+  /** Invoke an Act action as the fixed UI subject; `available: false` when absent. */
+  async invokeAction(id, actionArgs) {
+    const act = this.#service('act')
+    if (act === undefined || act === null || typeof act.invoke !== 'function') return { available: false }
+    const result = await act.invoke(id, actionArgs, { subject: 'ui:os-shell', origin: 'ui' })
+    return { available: true, result }
+  }
+
+  /** Snip search (or newest-first list when empty) with full text for copying;
+   * redacted entries only ever carry their `[redacted:*]` placeholder. */
+  async searchSnips(query = '', limit = SNAPSHOT_LIMIT) {
+    const snip = this.#service('snip')
+    if (snip === undefined || snip === null
+      || typeof snip.list !== 'function' || typeof snip.search !== 'function') {
+      return { available: false }
+    }
+    const text = typeof query === 'string' ? query.trim() : ''
+    const rows = text === '' ? snip.list({ limit }) : snip.search(text, { limit })
+    const entries = (Array.isArray(rows) ? rows : []).map(entry => {
+      if (typeof snip.get !== 'function') return { ...entry }
+      try {
+        const full = snip.get(entry.id)
+        return typeof full?.text === 'string' ? { ...entry, text: full.text } : { ...entry }
+      } catch {
+        return { ...entry }
+      }
+    })
+    return { available: true, entries }
+  }
 }
 
 const OUTPUT = {
@@ -202,15 +322,25 @@ export function createTools(service) {
 }
 
 /**
- * Mount dsh-os-shell: provide `ctx.osShell` and, when available, register the
- * three agent tools. The shell is optional; no other dsh-os module depends on
- * it, and no `ui/index.js` code is imported here.
+ * Mount dsh-os-shell: provide `ctx.osShell`, register the three agent tools
+ * when a tool registry exists, and expose the four JSON routes when the
+ * profile has a web server. The shell is optional; no other dsh-os module
+ * depends on it, and no `ui/index.js` code is imported here.
  */
 export function apply(ctx, config = {}) {
-  const service = new OsShellService(config)
+  const getService = name => (typeof ctx.get === 'function' ? ctx.get(name) : undefined)
+  const service = new OsShellService({ ...config, getService })
   ctx.provide('osShell', service)
   if (ctx.tools && typeof ctx.tools.register === 'function') {
     for (const tool of createTools(service)) ctx.tools.register(tool)
+  }
+  if (ctx.webServer) {
+    const register = () => registerBridge(ctx.webServer, service)
+    if (typeof ctx.effect === 'function') ctx.effect(register, 'dsh-os-shell: routes')
+    else register()
+  } else if (typeof ctx.inject === 'function') {
+    // Headless profiles never resolve this child; late Web servers still get routes.
+    ctx.inject({ webServer: null }, child => child.effect(() => registerBridge(child.webServer, service)))
   }
   return service
 }

@@ -21,16 +21,16 @@
     "name": "dsh-snip",
     "product": "Snip",
     "service": "snip",
-    "version": "0.1.1",
+    "version": "0.2.0",
     "stability": "experimental",
-    "description": "Local-first, searchable clipboard ledger for DeepSeek Harness with secret exclusion and clipboard:// agent handles.",
+    "description": "Local-first, searchable clipboard ledger for DeepSeek Harness with explicit OS clipboard capture, secret exclusion and clipboard:// agent handles.",
     "install": "dsh plugin --profile web add dsh-snip"
   },
   {
     "name": "@perrylink/dsh-check",
     "product": "Check",
     "service": "check",
-    "version": "0.1.1",
+    "version": "0.2.0",
     "stability": "experimental",
     "description": "Paired-environment regression canary for DeepSeek Harness upgrades, model changes and plugin updates.",
     "install": "dsh plugin --profile web add @perrylink/dsh-check"
@@ -48,45 +48,45 @@
     "name": "dsh-trigger",
     "product": "Trigger",
     "service": "triggers",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "stability": "experimental",
-    "description": "In-memory event-to-action trigger fabric for DeepSeek Harness: condition DSL, cooldown and a run ledger.",
+    "description": "Event-to-action trigger fabric for DeepSeek Harness: condition DSL, cooldown, run ledger and real agent / fs / webhook event sources.",
     "install": "dsh plugin --profile web add dsh-trigger"
   },
   {
     "name": "dsh-seek",
     "product": "Seek",
     "service": "evidence",
-    "version": "0.1.1",
+    "version": "0.2.0",
     "stability": "experimental",
-    "description": "Cross-source evidence search for DeepSeek Harness with verifiable refs and freshness.",
+    "description": "Cross-source evidence search for DeepSeek Harness with verifiable refs, freshness and real locator/memento providers.",
     "install": "dsh plugin --profile web add dsh-seek"
   },
   {
     "name": "@perrylink/dsh-trace",
     "product": "Trace",
     "service": "trace",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "stability": "experimental",
-    "description": "Auditable long-term memory governance for DeepSeek Harness: provenance, expiry, conflict and forget.",
+    "description": "Auditable long-term memory governance for DeepSeek Harness: provenance, expiry, conflict, forget, and a read-only dsh-memento bridge.",
     "install": "dsh plugin --profile web add @perrylink/dsh-trace"
   },
   {
     "name": "dsh-stage",
     "product": "Stage",
     "service": "stage",
-    "version": "0.1.1",
+    "version": "0.2.0",
     "stability": "experimental",
-    "description": "Display, window and space topology protocol for DeepSeek Harness agents, with normalized, reversible layouts.",
+    "description": "Display, window and space topology protocol for DeepSeek Harness agents, with native macOS/Windows adapters and reversible layouts.",
     "install": "dsh plugin --profile web add dsh-stage"
   },
   {
     "name": "dsh-ring",
     "product": "Ring",
     "service": "ring",
-    "version": "0.1.1",
+    "version": "0.2.0",
     "stability": "experimental",
-    "description": "Approval SLA and escalation receipts for DeepSeek Harness: ack, escalate, audit.",
+    "description": "Approval SLA and escalation receipts for DeepSeek Harness: ack, escalate, audit and opt-in webhook/ntfy delivery.",
     "install": "dsh plugin --profile web add dsh-ring"
   },
   {
@@ -152,9 +152,9 @@
     "name": "@perrylink/dsh-os-shell",
     "product": "Shell",
     "service": null,
-    "version": "0.1.0",
+    "version": "0.2.0",
     "stability": "experimental",
-    "description": "Optional UI shell for dsh-os: a view contribution registry, open history and a minimal HTML renderer.",
+    "description": "Optional UI shell for dsh-os: a view contribution registry, an owner-only JSON bridge and a minimal React client for Act, Snip and Check.",
     "install": "dsh plugin --profile web add @perrylink/dsh-os-shell",
     "optional": true
   },

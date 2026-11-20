@@ -1,7 +1,7 @@
 {
   "name": "dsh-trigger",
-  "version": "0.1.0",
-  "description": "In-memory event-to-action trigger fabric for DeepSeek Harness: condition DSL, cooldown and a run ledger.",
+  "version": "0.2.0",
+  "description": "Event-to-action trigger fabric for DeepSeek Harness: condition DSL, cooldown, run ledger and real agent / fs / webhook event sources.",
   "type": "module",
   "main": "index.js",
   "exports": {
@@ -10,6 +10,7 @@
   },
   "files": [
     "index.js",
+    "lib",
     "cordis.patch.yml",
     "README.md",
     "CHANGELOG.md"
@@ -19,7 +20,9 @@
     "dsh-plugin",
     "deepseek-harness",
     "agent-os",
-    "trigger"
+    "trigger",
+    "webhook",
+    "filesystem"
   ],
   "license": "MIT",
   "author": "PerryLink contributors",
@@ -46,12 +49,18 @@
       "provides": [
         "triggers"
       ],
-      "capabilities": [],
+      "capabilities": [
+        "fs.read",
+        "net"
+      ],
       "tools": [
         "trigger_register",
         "trigger_list",
         "trigger_fire",
-        "trigger_runs"
+        "trigger_runs",
+        "trigger_sources",
+        "trigger_source_start",
+        "trigger_source_stop"
       ],
       "ui": null,
       "stability": "experimental",

@@ -1,7 +1,7 @@
 {
   "name": "dsh-ring",
-  "version": "0.1.1",
-  "description": "Approval SLA and escalation receipts for DeepSeek Harness: ack, escalate, audit.",
+  "version": "0.2.0",
+  "description": "Approval SLA and escalation receipts for DeepSeek Harness: ack, escalate, audit and opt-in webhook/ntfy delivery.",
   "type": "module",
   "main": "index.js",
   "exports": {
@@ -10,6 +10,7 @@
   },
   "files": [
     "index.js",
+    "lib",
     "cordis.patch.yml",
     "README.md",
     "CHANGELOG.md"
@@ -47,14 +48,17 @@
         "ring"
       ],
       "capabilities": [
-        "notify"
+        "notify",
+        "net"
       ],
       "tools": [
         "ring_raise",
         "ring_ack",
         "ring_escalate",
         "ring_list",
-        "ring_receipts"
+        "ring_receipts",
+        "ring_channels",
+        "ring_notify"
       ],
       "ui": null,
       "stability": "experimental",

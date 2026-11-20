@@ -1,7 +1,7 @@
 {
   "name": "@perrylink/dsh-trace",
-  "version": "0.1.0",
-  "description": "Auditable long-term memory governance for DeepSeek Harness: provenance, expiry, conflict and forget.",
+  "version": "0.2.0",
+  "description": "Auditable long-term memory governance for DeepSeek Harness: provenance, expiry, conflict, forget, and a read-only dsh-memento bridge.",
   "type": "module",
   "main": "index.js",
   "exports": {
@@ -10,6 +10,7 @@
   },
   "files": [
     "index.js",
+    "lib",
     "cordis.patch.yml",
     "README.md",
     "CHANGELOG.md"
@@ -20,6 +21,9 @@
     "deepseek-harness",
     "agent-os",
     "trace",
+    "memento",
+    "migration",
+    "memory-adapter",
     "memory",
     "memory-governance",
     "provenance",
@@ -57,7 +61,10 @@
         "trace_remember",
         "trace_search",
         "trace_forget",
-        "trace_list"
+        "trace_list",
+        "trace_import_memento",
+        "trace_export_memento",
+        "trace_adapter_status"
       ],
       "ui": null,
       "stability": "experimental",

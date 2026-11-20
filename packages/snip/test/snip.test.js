@@ -243,12 +243,13 @@ function fakeContext() {
   }
 }
 
-test('apply provides ctx.snip and registers six plain-object tools', async () => {
+test('apply provides ctx.snip and registers nine plain-object tools', async () => {
   const ctx = fakeContext()
   const service = apply(ctx, { now: () => T0 })
   assert.equal(ctx.get('snip'), service)
   assert.deepEqual([...ctx._tools.keys()].sort(), [
-    'snip_add', 'snip_clear', 'snip_forget', 'snip_get', 'snip_list', 'snip_search',
+    'snip_add', 'snip_capture', 'snip_clear', 'snip_forget', 'snip_get',
+    'snip_list', 'snip_search', 'snip_watch_start', 'snip_watch_stop',
   ])
   for (const definition of ctx._tools.values()) {
     assert.equal(typeof definition.description, 'string')

@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.2.0
+
+- Add opt-in notification channels under `lib/channels/`: `webhook`, `ntfy`
+  and `console`. Nothing is enabled by default and no network I/O happens until
+  `configureChannels()` is called; the `net` capability is declared but inert.
+- `webhook`: `POST` one JSON payload with `AbortSignal.timeout(5000)`, optional
+  HMAC-SHA256 signature in `X-Ring-Signature`, and `E_UNAVAILABLE` for non-2xx,
+  timeout or network failure. The URL and secret never appear in payloads,
+  receipts, errors or logs.
+- `ntfy`: `POST https://ntfy.sh/<topic>` (or a self-hosted `baseUrl`) with
+  `Priority`, `Title` and optional `Actions` headers. Topics are treated as
+  bearer secrets: URL-safe only, no credential syntax or password, default off.
+- `console`: one local stdout line for tests and self-hosted setups; a `write`
+  hook keeps tests off the real stream.
+- Add `RingService.configureChannels()`, `channels()` and `notify()`. `tick()`
+  is now **async** (`await ctx.ring.tick(now)`): when a configured channel
+  matches the due escalation step it is called best-effort, failures are
+  returned in `tick().deliveries`, and unconfigured steps stay receipt-only.
+- Add the `ring_channels` and `ring_notify` agent tools. They expose names and
+  deliveries only; no URL or secret is returned.
+- Add channel tests with a mocked global `fetch` covering success, non-2xx,
+  timeout, HMAC, ntfy headers, console output, default-off behaviour and
+  delivery failures during a tick.
+- README: document the opt-in channel configuration and that v0 still never
+  approves remotely.
+
 ## 0.1.1
 
 - Make `expired` terminal for direct decisions: `ack()` and `resolve()` on an

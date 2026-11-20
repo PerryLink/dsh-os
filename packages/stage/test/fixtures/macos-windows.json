@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "windows": [
+    { "pid": 100, "app": "Editor", "index": 0, "x": 10, "y": 10, "w": 600, "h": 400, "focused": true, "minimized": false, "fullscreen": false },
+    { "pid": 100, "app": "Editor", "index": 1, "x": 700, "y": 100, "w": 500, "h": 300, "focused": false, "minimized": false, "fullscreen": false },
+    { "pid": 101, "app": "Browser", "index": 0, "x": 1700, "y": 0, "w": 400, "h": 900, "focused": false, "minimized": false, "fullscreen": false },
+    { "pid": 102, "app": "Hidden", "index": 0, "x": 0, "y": 0, "w": 100, "h": 100, "focused": false, "minimized": true, "fullscreen": false },
+    { "pid": 103, "app": "Game", "index": 0, "x": 0, "y": 0, "w": 1600, "h": 1000, "focused": false, "minimized": false, "fullscreen": true },
+    { "pid": 101, "app": "Browser", "index": 1, "x": 1200, "y": 200, "w": 900, "h": 700, "focused": false, "minimized": false, "fullscreen": false }
+  ]
+}

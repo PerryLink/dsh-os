@@ -3,10 +3,13 @@
 > **Upgrade canary, not an update checker.** Compare two paired runs across
 > result, trajectory, cost and approvals, then fail CI only on a real regression.
 
-**Status: 0.1.1 MVP — diff engine only.** Check does not launch DSH, call a
-model or read session logs yet. A runner (isolated `DSH_HOME`, headless
-`--json`, session capture and baselines) is planned for **0.2.0**. In 0.1.0 you
-bring two run JSON files produced by any harnessable run of the same tasks.
+**Status: 0.2.0 — real headless runner + diff engine.** `dsh-check run`
+launches `dsh --profile headless --json "<task>"` once per task, maps the four
+dimensions, and writes one diffable `run-<id>.json` per task. A real runner
+needs a **DSH checkout (or installed CLI) and a model key**; CI should pin
+`--profile headless` (the default). Without those, keep using `diff` on run JSON
+files produced by any other harnessable run. The 0.1.1 diff engine is unchanged.
+（真 runner 需要 DSH checkout 与模型 key；CI 里用 `--profile headless`。）
 
 **Not affiliated with DeepSeek.** DeepSeek and DeepSeek Harness are trademarks
 of their respective owners.
@@ -29,6 +32,15 @@ Requires Node 22.19+ (or Node 24.9+). No runtime dependencies.
 ## CLI
 
 ```sh
+# Run a real headless suite. Needs a DSH checkout/CLI and a model key.
+# Writes one run-<id>.json per task under --out.
+dsh-check run --tasks check.tasks.json --out runs/baseline \
+  --dsh-bin /home/me/deepseek-harness/apps/cli/lib/bin.js
+
+# CI: profile headless is the default; --timeout is milliseconds (default 600000).
+dsh-check run --tasks check.tasks.json --out runs/candidate \
+  --dsh-bin node_modules/.bin/dsh --profile headless --timeout 600000 --json
+
 # Diff a baseline run against a candidate run.
 dsh-check diff --old baseline.json --new candidate.json
 dsh-check diff --old baseline.json --new candidate.json --json
@@ -46,15 +58,73 @@ dsh-check list --file check.tasks.json
 dsh-check list --file check.tasks.json --json
 ```
 
+`--dsh-bin` is the JavaScript entry you would pass to `node` (for example
+`node_modules/.bin/dsh` or `apps/cli/lib/bin.js`), not the tool name `dsh`.
+Without it, `run` prints `需要 DSH checkout` and exits `2` before spawning
+anything. `--json` prints a `dsh.check.run-summary/v1` summary; the per-task
+files stay on disk.
+
 Exit codes:
 
 | Code | Meaning |
 |---|---|
-| `0` | `pass` or `warning` — warnings are advisory, not a gate failure |
-| `1` | `regression` — at least one non-flaky task regressed |
-| `2` | usage or input error (missing flag, unreadable file, invalid JSON, invalid run shape) |
+| `0` | `pass` / `warning`, or every `run` task succeeded |
+| `1` | `regression`, or at least one `run` task failed |
+| `2` | usage or input error (missing flag, unreadable file, invalid JSON, invalid run shape, no `--dsh-bin`) |
 
 `init` refuses to overwrite an existing `check.tasks.json`.
+
+## Runner
+
+`run` executes each task in its own `dsh` process:
+
+```sh
+node <dsh-bin> --profile <profile> --json "<task.prompt>"
+```
+
+It captures stdout/stderr, parses the NDJSON event stream, and maps:
+
+| Field | Source |
+|---|---|
+| `result.text` | the `final.text` event (empty when no `final` arrived) |
+| `trajectory.steps` | number of `status` events with `phase: "step_end"` |
+| `trajectory.toolCalls` | number of `tool_call` events |
+| `trajectory.errors` | `tool_result.status: "error"` + out-of-turn `error` events + an error `final.reason` |
+| `cost.tokens` | sum of `step_end.usage.totalTokens` (falling back to input + output) |
+| `cost.usd` | always `0`: DSH reports tokens, not USD; bring your own pricing |
+| `approvals` | `--json` does not project approval events, so counts stay `0` (or `rejected` is inferred from `SANDBOX_ESCALATION_REJECTED` / `APPROVAL_REJECTED` tool results, with `raw.approvalsSource: "inferred"`) |
+
+Timeout is owned by the runner because headless `dsh` has no `--timeout`: on
+timeout it sends `SIGINT`, waits a 5 s grace period, then sends `SIGKILL`.
+`SIGTERM` is deliberately not used — a DSH process can exit `0` on `SIGTERM`,
+which would look like success.
+
+Programmatic use:
+
+```js
+import { CheckRunner } from '@perrylink/dsh-check/runner'
+
+const runner = new CheckRunner({
+  dshBin: '/home/me/deepseek-harness/apps/cli/lib/bin.js', // default: DSH_BIN or node_modules/.bin/dsh
+  profile: 'headless',
+  timeoutMs: 600_000,
+})
+const record = await runner.run({ id: 'repo-status', prompt: 'Report git status.' })
+// { ok, code, taskId, result, trajectory, cost, approvals, exitCode, raw }
+```
+
+`run` never throws for a failed task: it resolves `{ ok: false, code }` with
+`code` one of `invalid_task`, `aborted`, `spawn_error`, `timeout`, `signaled`,
+`exit_nonzero`, `invalid_json`, `no_final` or `not_completed`. On success
+`ok: true` and `code: null`. `raw` carries `sessionId`, `finalReason`, event
+counts, stderr, duration, `timedOut`, `usageComplete` and provenance flags.
+
+Known runner limits: the child inherits the host's `DSH_HOME`, cwd and
+credentials (no per-task isolation yet); no `--session-id` replay (it appends a
+new turn and bills again); no `--max-steps` (wrap the call in your own timeout);
+approvals are not in the `--json` stream; and DSH reports no USD price. Requires
+`dsh >= 0.2.2-alpha.2` (the version this runner is tested against; `--json`
+itself landed in `0.2.0-rc.2`).
 
 ## Run JSON
 
@@ -80,14 +150,20 @@ A run is one environment's execution of the same task suite:
 }
 ```
 
+`dsh-check run` writes this shape with exactly one task per
+`run-<id>.json`, plus `ok`, `code` and `exitCode` metadata. Those extra
+top-level fields are ignored by the diff engine, so a `run-*.json` file can be
+passed straight to `diff`.
+
 - `tasks` is required and task ids must be unique and non-empty. `environment`
-  is optional metadata and does not affect the verdict in 0.1.0.
+  is optional metadata and does not affect the verdict in 0.2.0.
 - `result` is any JSON value and is compared by deep equality. Object key order
-  is ignored; an omitted result compares as missing.
+  is ignored; an omitted result compares as missing. `run` omits `result` when
+  no `final` event arrived.
 - `trajectory.steps`, `trajectory.toolCalls` and `trajectory.errors` are
   non-negative numbers, default `0`.
 - `cost.usd` is a non-negative number, default `0`. `cost.tokens` is
-  informational and does not gate in 0.1.0.
+  informational and does not gate. The runner always writes `usd: 0`.
 - `approvals.asked` and `approvals.rejected` are non-negative numbers,
   default `0`.
 - A task present in the old run but missing from the new run is a regression.
@@ -151,7 +227,7 @@ regression returns `1`.
 
 ## Tasks file
 
-`check.tasks.json` is the suite seed for the 0.2.0 runner:
+`check.tasks.json` is the suite input for the runner:
 
 ```json
 {
@@ -166,8 +242,9 @@ regression returns `1`.
 ```
 
 `init` writes three example tasks (`session-token-summary`, `repo-status`,
-`test-failure-triage`). `list` validates ids and prints id plus prompt. Running
-these prompts is intentionally out of scope for 0.1.0.
+`test-failure-triage`). `list` validates ids and prints id plus prompt. `run`
+additionally requires a non-empty prompt on every task; `list` keeps accepting
+prompt-less tasks for backward compatibility.
 
 ## Cordis plugin
 
@@ -184,12 +261,28 @@ It also registers the plain-object agent tool `check_compare`, with `old` and
 usable without the tool registry, so tests and other plugins can call it
 directly.
 
+To enable the real runner, give the plugin a DSH binary or an injected runner:
+
+```js
+apply(ctx, { dshBin: '/home/me/deepseek-harness/apps/cli/lib/bin.js' })
+```
+
+Then `ctx.check.run({ id, prompt }, { timeoutMs })` resolves the runner record
+described above, and the optional `check_run` agent tool is registered. A runner
+can also be injected: `apply(ctx, { runner: myRunner })` or
+`ctx.check.run(task, { runner: myRunner })`. With neither `dshBin` nor a runner,
+`run` resolves `{ ok: false, code: 'no_runner' }` and `check_run` is not
+registered.
+
 ## Roadmap
 
-- **0.1.0 (this release):** four-dimension diff engine, CLI (`diff`, `init`,
-  `list`), `ctx.check`, `check_compare`, exit codes.
-- **0.2.0:** paired runner with two isolated `DSH_HOME`s, headless `--json`,
-  session-to-task capture, baselines, Markdown/JUnit reports and GitHub Action.
+- **0.1.0 / 0.1.1:** four-dimension diff engine, CLI (`diff`, `init`, `list`),
+  `ctx.check`, `check_compare`, exit codes.
+- **0.2.0 (this release):** real headless runner (`run`, `CheckRunner`,
+  `ctx.check.run`, optional `check_run`), NDJSON mapping, SIGINT → SIGKILL
+  timeout, per-task run files.
+- **Next:** isolated `DSH_HOME`/overlay per task, approvals from the session
+  log, optional pricing tables, Markdown/JUnit reports and a GitHub Action.
 
 ## License
 

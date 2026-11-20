@@ -1,15 +1,17 @@
 {
   "name": "dsh-stage",
-  "version": "0.1.1",
-  "description": "Display, window and space topology protocol for DeepSeek Harness agents, with normalized, reversible layouts.",
+  "version": "0.2.0",
+  "description": "Display, window and space topology protocol for DeepSeek Harness agents, with native macOS/Windows adapters and reversible layouts.",
   "type": "module",
   "main": "index.js",
   "exports": {
     ".": "./index.js",
+    "./adapters": "./lib/adapters/index.js",
     "./package.json": "./package.json"
   },
   "files": [
     "index.js",
+    "lib",
     "cordis.patch.yml",
     "README.md",
     "CHANGELOG.md"
@@ -47,14 +49,18 @@
         "stage"
       ],
       "capabilities": [
-        "ui"
+        "ui",
+        "spawn"
       ],
       "tools": [
         "stage_topology",
         "stage_layout_set",
         "stage_layout_apply",
         "stage_layout_list",
-        "stage_undo"
+        "stage_undo",
+        "stage_live_topology",
+        "stage_live_move",
+        "stage_live_resize"
       ],
       "ui": null,
       "stability": "experimental",

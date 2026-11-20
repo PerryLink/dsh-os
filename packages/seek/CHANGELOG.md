@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.2.0
+
+- Add two real first-party providers, auto-registered at mount when their host
+  services exist:
+  - `locator`: calls dsh-locator's `locator_find` tool in `content` mode with
+    `pathPrefix` set to the caller's cwd, maps file/session hits to
+    `dsh://locator/<workspace-relative-path>`, carries the locator freshness
+    object, drops `permissions.read === "denied"` hits, and normalizes/encodes
+    path segments (backslashes, spaces, `#`, `?`, `.`/`..`).
+  - `memento`: calls dsh-memento's `ctx.memory.query` with
+    `scope: "user-global"` and the caller's normalized `agentKey`, maps entries
+    to `dsh://memento/<id>` with unknown freshness, and never queries workspace
+    scope.
+- Missing optional plugins are reported as `unavailable` in `seek_providers`,
+  not thrown at mount. Add `seek_register_defaults` to retry registration after
+  `dsh-locator`/`dsh-memento` mounts later; it is idempotent.
+- Pass the caller context (`exec.agent`, cwd, `agentKey`) from `seek_search`
+  through `search()` to every provider. Providers without a required cwd/agent
+  fail closed with `E_UNAUTHORIZED`; missing tools/services fail with
+  `E_UNAVAILABLE`.
+- Provider errors with a stable `E_*` code now keep that code in the per-source
+  `errors` entry instead of collapsing to `provider_failed`.
+- `seek_providers` now returns `{ providers, sources }`, where `sources`
+  includes ready providers plus unavailable defaults with a reason. Existing
+  `providers` remains.
+- `SeekService` gains `noteSource()`/`sources()` for provider availability.
+- Tests cover locator/memento hit mapping, empty results, timeouts, missing
+  tools/services, ACL refusals, ref normalization/encoding, caller passthrough,
+  registration retries and `seek_register_defaults`.
+- No new runtime dependencies. `lib/` is now included in the published files.
+
 ## 0.1.1
 
 - Add per-provider deadlines. `search(query, { timeoutMs })` defaults to 10 s

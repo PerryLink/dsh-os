@@ -1,17 +1,16 @@
 # Snip · `dsh-snip`
 
-> A local-first clipboard ledger for DeepSeek Harness with secret exclusion and
-> `clipboard://` agent handles.
+> A local-first clipboard ledger for DeepSeek Harness with opt-in OS clipboard
+> capture, secret exclusion and `clipboard://` agent handles.
 
-**Status: 0.1.1 (MVP). A ledger, not a background listener.** Snip records a
-clipping only when a caller explicitly invokes `snip.add(...)` or the `snip_add`
-agent tool. 0.1.1 has no OS clipboard polling, no `snip_capture`, no network
-access and no encryption yet. Secret-looking text is excluded by default.
-Everything stays on this machine: entries live in process memory, plus an
-optional local JSON snapshot when `stateFile` is configured.
+**Status: 0.2.0.** Snip records a clipping only when a caller explicitly calls
+`snip.add(...)`, `snip.capture(...)`, or one of the agent tools. **Clipboard
+capture is off by default**: mounting the plugin never reads the OS clipboard,
+never starts a watcher and never enables a timer. Set `capture.enabled: true`
+to allow `snip_capture` / `snip_watch_start`; nothing else turns capture on.
 
-In one sentence: **0.1.1 is a ledger, not a background listener; it excludes
-secrets by default and stores clippings locally.**
+In one sentence: **0.2.0 reads the clipboard only when explicitly asked,
+redacts secrets by default, and stores clippings locally.**
 
 **Not affiliated with DeepSeek.** DeepSeek and DeepSeek Harness are trademarks
 of their respective owners.
@@ -24,88 +23,127 @@ dsh plugin --profile web add dsh-snip
 
 The bundle patch mounts the plugin and provides `ctx.snip`.
 
+## Platform support
+
+| Platform | `snip_capture` (one read) | `snip_watch_start` | Permissions and limits |
+| --- | --- | --- | --- |
+| Windows 10/11 | Text through WinRT `Clipboard.GetContent()` in Windows PowerShell 5.1; if WinRT fails it falls back to `Get-Clipboard -Raw`. Images/files are only classified, not read. | Polling, experimental (default 700 ms). Each poll starts `powershell.exe`, so a read blocks the host event loop for roughly 0.3–0.6 s. | No clipboard-read consent dialog. `ExcludeClipboardContentFromMonitorProcessing` is honored on a best-effort basis; Windows clipboard history is **not** imported. |
+| macOS | `pbpaste` text. Images and source/marker formats are not visible to `pbpaste`. | Polling, experimental. **Not recommended:** each programmatic read can trigger a pasteboard permission prompt on macOS 15.4+. | A prompt is expected for programmatic reads; the user-initiated paste path is always allowed. A denied or timed-out one-shot read is not retried automatically; an enabled watcher does poll again, so do not start one if access was denied. |
+| Linux | `wl-paste --no-newline` on Wayland, otherwise `xclip -selection clipboard -o` on X11. | Polling, experimental. | Needs `WAYLAND_DISPLAY` + `wl-paste`, or `DISPLAY` + `xclip`. WSL is treated as Linux, not as Windows; the Windows clipboard is not bridged. |
+
+`snip_watch_start` is never called automatically and no watcher is created on
+mount. Call `snip_watch_stop` (or unload the plugin) when done. Because the
+default runner is `spawnSync`-based, polling on Windows blocks the event loop;
+keep intervals at the default or above and stop the watcher after the task.
+
+`capture.enabled` is a host-wide opt-in: once it is on, the agent can call
+`snip_capture` and read whatever is on the clipboard (secret-looking text is
+still redacted before storage). Enable it only in profiles where that is
+acceptable. Capture runs in the DSH host process: if the GUI is served from
+another machine, it reads the **server's** clipboard, not the browser's — keep
+capture disabled for remote profiles and paste manually.
+
 ## Host service
 
 ```js
 const snip = ctx.get('snip')
 
-const clip = snip.add({ text: 'SELECT * FROM users', sourceApp: 'psql' })
-// { id, handle: 'clipboard://<id>', kind: 'text', preview, createdAt, expiresAt, redacted }
+snip.add({ text: 'SELECT * FROM users', sourceApp: 'psql' })
+snip.capture({ sourceApp: 'editor' }) // explicit one-shot clipboard read
+snip.watch({ intervalMs: 1000 })      // explicit opt-in polling
+snip.stopWatch()
 
-snip.get(clip.handle).text // original text, or '[redacted:<reason>]'
-snip.search('select')      // newest-first summaries
+snip.get('clipboard://<id>').text
+snip.search('select')
 snip.list({ kind: 'text', limit: 20 })
-snip.forget(clip.id)       // true when it existed
-snip.clear()               // number removed
+snip.forget('clipboard://<id>')
+snip.clear()
 ```
 
 `add()` accepts `{ text, kind = 'text', sourceApp = 'unknown', sensitivity = 'normal' }`.
 Supported kinds are `text`, `html`, `link` and `color`; sensitivities are
 `normal`, `sensitive` and `secret` (`secret` always redacts). Handles are
-`clipboard://<id>` and are accepted anywhere an id is accepted. `get()` returns
-`null` for an unknown, expired or forgotten id. `sourceApp` is trimmed, limited
-to 80 characters and rejected with `SNIP_BAD_SOURCE_APP` when it is not a
-string, contains control characters or matches a secret pattern; an empty label
-becomes `unknown`.
+`clipboard://<id>` and are accepted anywhere an id is accepted.
+
+`capture()` is disabled unless `capture.enabled` is true. It reads once,
+applies the same secret screening and TTL as `add()`, and returns a safe
+summary without the clipboard text:
+
+```js
+// captured text: { ok: true, kind: 'text', captured: true, duplicate: false,
+//   id, handle, redacted, bytes, expiresAt }
+// unchanged/duplicate text: { ok: true, kind: 'text', captured: false,
+//   duplicate: true, handle, redacted }
+// empty/image/file: { ok: true, kind: 'empty' | 'image' | 'file',
+//   captured: false }
+```
+
+Repeated identical content is deduplicated by an in-memory SHA-256 of the raw
+text (the hash is never persisted). A redacted secret still gets one ledger
+entry containing only `[redacted:<reason>]`, and the original value is never
+stored or returned. `watch()` requires `capture.enabled`, is idempotent while
+running, and records only the error code of a failed poll in
+`stopWatch().lastError` (never clipboard content).
 
 ## Agent tools
 
-The plugin registers six plain-object tools (no `@deepseek-ai/dsh-tools`
+The plugin registers nine plain-object tools (no `@deepseek-ai/dsh-tools`
 dependency):
 
 | Tool | Arguments | Result |
 | --- | --- | --- |
 | `snip_add` | `text` (required), `kind`, `sourceApp`, `sensitivity` | `{ id, handle, kind, preview, createdAt, expiresAt, redacted }` |
+| `snip_capture` | `sourceApp` | safe capture summary; **no text or preview** |
+| `snip_watch_start` | `intervalMs` | `{ ok, watching, intervalMs }` |
+| `snip_watch_stop` | none | `{ ok, watching, stopped, lastError }` |
 | `snip_search` | `query` (required), `limit` | `{ query, entries }` |
 | `snip_get` | `id` (id or `clipboard://` handle) | full entry including `text` |
 | `snip_list` | `kind`, `limit` | `{ entries }` |
 | `snip_forget` | `id` | `{ ok, removed }` |
 | `snip_clear` | none | `{ removed }` |
 
-`entries` are newest-first summaries (`id`, `handle`, `kind`, `preview`,
-`createdAt`, `expiresAt`, `redacted`). `snip_get` returns the full text, which
+`entries` are newest-first summaries. `snip_get` returns the full text, which
 then becomes part of the append-only conversation session log — read only what
-you need.
+you need. `snip_capture` intentionally returns a handle and metadata only.
 
 ## Configuration
 
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `excludeSecrets` | `true` | Detect secrets and store only the redaction marker. |
-| `ttlMs` | `86400000` (24 h) | Entry lifetime; expired entries are swept on access. |
+| `ttlMs` | `86400000` (24 h) | Entry lifetime, including captured entries. |
 | `maxEntries` | `200` | Oldest entries are evicted when the cap is exceeded. |
-| `maxBytes` | `65536` (64 KiB) | Larger `add()` calls fail with `SNIP_TOO_LARGE`. |
+| `maxBytes` | `65536` (64 KiB) | Larger `add()`/capture calls fail with `SNIP_TOO_LARGE`. |
 | `stateFile` | unset | Optional JSON snapshot path, written atomically. |
+| `capture.enabled` | `false` | Master switch; `snip_capture`, `watch()` and `snip_watch_start` fail with `SNIP_CAPTURE_DISABLED` when false. |
+| `capture.intervalMs` | `700` | Default polling interval. |
+| `capture.timeoutMs` | `5000` | Hard per-read timeout; a timeout fails with `SNIP_CLIPBOARD_TIMEOUT`. |
+| `capture.maxChars` | `65536` | Reads longer than this are truncated and marked `truncated`. |
+| `capture.platform`, `capture.backend`, `capture.runner`, `capture.adapter` | host/auto | Test and embedding seams; normally unset. |
 
-Expiry and the entry cap are applied automatically on `add`, `list`, `search`,
-`get`, `forget` and on mount.
+## Capture security
 
-## Secret exclusion and local storage
-
-- With `excludeSecrets` on (the default), a hit is **not stored at all**: the
-  ledger keeps only `[redacted:<reason>]` as the text/preview and marks
-  `redacted: true`. Supported patterns include `sk-...`, `ghp_...` /
-  `github_pat_...`, `AKIA...` / `ASIA...`, PEM/PGP private keys,
-  `password=...`, `api_key=...`, bearer tokens, JWTs, Slack, Stripe and Google
-  API keys.
-- Detection is best-effort, not a guarantee. Set `excludeSecrets: false` to
-  opt out (not recommended). `sensitivity: 'secret'` is a caller-side override
-  that always redacts. `sourceApp` is metadata, not a secret store: labels are
-  screened for the same patterns and rejected when they look like a secret,
-  independently of `excludeSecrets`.
-- `search` only scans the stored text, so a redacted secret's original value
-  can never be found through search; `get` returns only `[redacted:<reason>]`.
-  `forget` deletes the map entry and the next snapshot, so no index residue or
-  on-disk copy remains.
-- When `stateFile` is set, each mutation writes the snapshot through a
-  temporary file and `rename` (atomic replace, mode `0600`) **before** the
-  in-memory ledger is updated. If the write fails, the call throws
-  `SNIP_STATE_WRITE_FAILED` and both memory and disk keep the previous state.
-  The snapshot is plain JSON and is **not encrypted in 0.1.1** — protect it
-  like any local secret. A snapshot written with detection disabled is
-  re-screened on load, and bad `sourceApp` metadata is replaced with `unknown`.
-- 0.1.1 performs no network I/O and does not read the OS clipboard. There is no
-  background capture, watcher or timer.
+- **Fixed argv, no shell.** Windows runs
+  `powershell.exe -NoProfile -NonInteractive -Command <constant script>`; the
+  script only emits `TEXT:<base64>`, `EMPTY`, `IMAGE`, `FILE` or `EXCLUDED`.
+  macOS runs `pbpaste`; Linux runs `wl-paste --no-newline` or
+  `xclip -selection clipboard -o`. Clipboard text never becomes an argument.
+- **Scrubbed environment.** The child environment drops `DSH_*` variables and
+  anything matching `KEY`, `TOKEN`, `SECRET`, `PASSWORD` or `CREDENTIAL`.
+- **Timeouts and size caps.** Every read has a 5 s timeout and a capped output
+  buffer; stderr and raw process errors are mapped to stable codes and are not
+  returned to the model.
+- **No text in tool results or logs.** Capture returns a handle, byte count and
+  redaction flag. The plugin does not log clipboard content.
+- **Secret screening is best-effort.** With `excludeSecrets` on (default), a hit
+  is not stored: the ledger keeps only `[redacted:<reason>]` and marks
+  `redacted: true`. Set `excludeSecrets: false` to opt out (not recommended).
+  `sensitivity: 'secret'` is a caller-side override that always redacts.
+- **No network I/O.** 0.2.0 makes no network requests and has no encryption;
+  a `stateFile` snapshot is plain JSON at mode `0600` and should be protected
+  like any local secret. This version does not import Windows clipboard
+  history, does not OCR images, does not copy files and does not read
+  `org.nspasteboard.*` markers on macOS.
 
 ## Development
 
@@ -115,6 +153,9 @@ node --test
 ```
 
 Pure ESM JavaScript, Node 22+, no runtime dependencies and no build step.
+Tests inject a fake runner; they never read the real clipboard. Adapter code
+lives in `lib/capture.js`, the ledger and capture orchestration in
+`lib/ledger.js`; `index.js` stays a small tool/registration entry.
 
 ## License
 

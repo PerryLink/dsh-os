@@ -142,7 +142,7 @@ test('Trigger + Act + Ring: build.failed runs an Act action and Ring records esc
   const kase = ring.raise({ source: 'build', risk: 'write' })
   assert.equal(kase.state, 'pending')
 
-  const ticked = ring.tick(T1)
+  const ticked = await ring.tick(T1)
   assert.deepEqual(ticked.receipts.map(receipt => receipt.kind), ['delivery', 'escalation'])
   const escalated = ring.get(kase.id)
   assert.equal(escalated.state, 'escalated')

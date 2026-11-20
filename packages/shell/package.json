@@ -1,17 +1,20 @@
 {
   "name": "@perrylink/dsh-os-shell",
-  "version": "0.1.0",
-  "description": "Optional UI shell for dsh-os: a view contribution registry, open history and a minimal HTML renderer.",
+  "version": "0.2.0",
+  "description": "Optional UI shell for dsh-os: a view contribution registry, an owner-only JSON bridge and a minimal React client for Act, Snip and Check.",
   "type": "module",
   "main": "index.js",
   "exports": {
     ".": "./index.js",
     "./ui": "./ui/index.js",
+    "./client": "./ui/client.js",
     "./package.json": "./package.json"
   },
   "files": [
     "index.js",
+    "bridge.js",
     "ui/index.js",
+    "ui/client.js",
     "cordis.patch.yml",
     "README.md",
     "CHANGELOG.md"
@@ -43,6 +46,9 @@
     "manifestVersion": 1,
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
     },
     "os": {
       "service": null,

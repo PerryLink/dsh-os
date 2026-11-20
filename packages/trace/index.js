@@ -1,13 +1,15 @@
 /**
  * dsh-trace — auditable long-term memory governance for DeepSeek Harness.
  *
- * 0.1.0 MVP: Host service `ctx.trace` with remember / search / forget / list /
+ * 0.2.0: Host service `ctx.trace` with remember / search / forget / list /
  * export, provenance, TTL expiry, confidence-aware supersede chains and secret
- * redaction. Four plain-object agent tools. Plain ESM, Node.js 22+, no runtime
- * dependencies and no network access.
+ * redaction, plus the `dsh-memory-protocol/v1` bridge to `dsh-memento`
+ * (read-only import, data-only export, adapter availability). Seven plain-object
+ * agent tools. Plain ESM, Node.js 22+, no runtime dependencies, no network.
  * @module dsh-trace
  */
 import { randomUUID } from 'node:crypto'
+import { createMementoBridge } from './lib/memento.js'
 
 /** Cordis plugin name. */
 export const name = 'dsh-trace'
@@ -27,6 +29,9 @@ const SCOPES = ['user', 'workspace', 'preset', 'team']
 const SENSITIVITIES = ['normal', 'public', 'internal', 'private', 'secret']
 const REMEMBER_FIELDS = new Set([
   'key', 'text', 'source', 'scope', 'confidence', 'ttlMs', 'sensitivity', 'force',
+])
+const RESTORE_FIELDS = new Set([
+  'key', 'text', 'source', 'scope', 'confidence', 'sensitivity', 'createdAt', 'expiresAt',
 ])
 const DEFAULT_LIMIT = 20
 const MAX_LIMIT = 100
@@ -96,8 +101,39 @@ function normalizeDraft(input) {
   }
 }
 
+/**
+ * Validate one migration draft. Unlike `remember`, callers may pin the
+ * original `createdAt` and an absolute `expiresAt`, and may not force a
+ * higher-confidence record away: imports must obey the normal supersede rule.
+ */
+function normalizeRestore(input) {
+  if (!plain(input)) fail('invalid_arguments', 'restore input must be an object')
+  for (const field of Object.keys(input)) {
+    if (!RESTORE_FIELDS.has(field)) fail('invalid_arguments', `unknown restore field "${field}"`)
+  }
+  const draft = normalizeDraft({
+    key: input.key,
+    text: input.text,
+    ...(input.source === undefined ? {} : { source: input.source }),
+    ...(input.scope === undefined ? {} : { scope: input.scope }),
+    ...(input.confidence === undefined ? {} : { confidence: input.confidence }),
+    ...(input.sensitivity === undefined ? {} : { sensitivity: input.sensitivity }),
+  })
+  const createdAt = input.createdAt ?? Date.now()
+  if (!Number.isInteger(createdAt) || createdAt < 0) {
+    fail('invalid_created_at', 'createdAt must be a non-negative integer')
+  }
+  const expiresAt = input.expiresAt ?? null
+  if (expiresAt !== null
+    && (!Number.isInteger(expiresAt) || expiresAt <= createdAt)) {
+    fail('invalid_expires_at', 'expiresAt must be an integer after createdAt')
+  }
+  return { draft, createdAt, expiresAt }
+}
+
 /** Build one active record. Secret text never reaches the record. */
-function makeRecord(draft, now, previous) {
+function makeRecord(draft, now, previous, times = {}) {
+  const createdAt = times.createdAt ?? now
   const record = {
     id: randomUUID(),
     key: draft.key,
@@ -107,10 +143,11 @@ function makeRecord(draft, now, previous) {
     sensitivity: draft.sensitivity,
     status: 'active',
     supersedes: previous === undefined ? [] : [previous.id],
-    provenance: { source: draft.source, createdAt: now, updatedAt: now },
+    provenance: { source: draft.source, createdAt, updatedAt: times.updatedAt ?? createdAt },
   }
   if (draft.sensitivity === 'secret') record.redacted = true
-  if (draft.ttlMs !== null) record.expiresAt = now + draft.ttlMs
+  if (times.expiresAt !== undefined) record.expiresAt = times.expiresAt
+  else if (draft.ttlMs !== null) record.expiresAt = now + draft.ttlMs
   return record
 }
 
@@ -147,14 +184,8 @@ export class TraceService {
     }
   }
 
-  /**
-   * Store one claim under a normalized key. A newer claim supersedes the
-   * previous one unless the previous record has higher confidence and `force`
-   * is not set, in which case a `trace_confidence_too_low` error is thrown.
-   * Secret text is replaced with `[redacted]` before storage.
-   */
-  remember(input) {
-    const draft = normalizeDraft(input)
+  /** Shared write path for remember and restore. */
+  #commit(draft, times = {}) {
     const now = Date.now()
     this.#sweep(now)
     const previous = this.#records.get(draft.key)
@@ -165,10 +196,42 @@ export class TraceService {
         { current: clone(previous) },
       )
     }
-    const record = makeRecord(draft, now, previous)
+    const record = makeRecord(draft, now, previous, times)
     if (previous !== undefined) this.#retire(previous, 'superseded', now, record.id)
     this.#records.set(record.key, record)
     return clone(record)
+  }
+
+  /**
+   * Store one claim under a normalized key. A newer claim supersedes the
+   * previous one unless the previous record has higher confidence and `force`
+   * is not set, in which case a `trace_confidence_too_low` error is thrown.
+   * Secret text is replaced with `[redacted]` before storage.
+   */
+  remember(input) {
+    return this.#commit(normalizeDraft(input))
+  }
+
+  /**
+   * Migration/import path: like `remember`, but preserves the original
+   * `createdAt` and an absolute `expiresAt`. `force` is deliberately not
+   * accepted, so an import can never overwrite a higher-confidence record.
+   * Stored text is still redacted when `sensitivity` is `secret`.
+   */
+  restore(input) {
+    const { draft, createdAt, expiresAt } = normalizeRestore(input)
+    return this.#commit(draft, {
+      createdAt,
+      ...(expiresAt === null ? {} : { expiresAt }),
+    })
+  }
+
+  /** Read one active record by key; expired records are swept first. */
+  get(key) {
+    const normalized = checkKey(key)
+    this.#sweep(Date.now())
+    const record = this.#records.get(normalized)
+    return record === undefined ? null : clone(record)
   }
 
   /**
@@ -262,7 +325,15 @@ function tool(name, description, parameters, execute) {
 }
 
 /** Plain ToolDefinition objects; no dependency on `@deepseek-ai/dsh-tools`. */
-export function createTools(service) {
+export function createTools(service, memento) {
+  const bridge = async operation => {
+    try {
+      return { ok: true, ...operation() }
+    } catch (error) {
+      if (error?.code !== 'E_UNAVAILABLE') throw error
+      return { ok: false, code: error.code, message: error.message }
+    }
+  }
   return [
     tool(
       'trace_remember',
@@ -310,19 +381,52 @@ export function createTools(service) {
       }),
       async args => ({ records: service.list({ limit: args?.limit }) }),
     ),
+    tool(
+      'trace_import_memento',
+      'Import memories from a mounted dsh-memento (read-only on the memento side) into Trace. '
+        + 'Existing higher-confidence records are never overwritten; such entries are reported as skipped.',
+      argsSchema({
+        scope: {
+          type: 'string',
+          enum: ['user', 'workspace'],
+          description: 'Memento layer: user (user-global, default) or workspace (warned: no workspaceKey filter).',
+        },
+        agentKey: { type: 'string', description: 'Optional memento agentKey visibility filter.' },
+        limit: { type: 'integer', minimum: 1, maximum: MAX_LIMIT, description: 'Defaults to 20.' },
+      }),
+      async args => bridge(() => memento.importFromMemento(args ?? {})),
+    ),
+    tool(
+      'trace_export_memento',
+      'Export active Trace records as trace-memento-v1 JSON for dsh-memento import. '
+        + 'Pure data conversion; nothing is written to memento and its approval gate is not bypassed.',
+      argsSchema({
+        scope: { type: 'string', enum: SCOPES, description: 'Optional Trace scope filter.' },
+      }),
+      async args => bridge(() => memento.exportToMemento(args ?? {})),
+    ),
+    tool(
+      'trace_adapter_status',
+      'Report whether dsh-memento services are available and whether the opt-in Trace adapter is registered.',
+      argsSchema({}),
+      async () => memento.status(),
+    ),
   ]
 }
 
 /**
- * Mount dsh-trace: provide `ctx.trace` and register the four agent tools.
+ * Mount dsh-trace: provide `ctx.trace`, probe memento without requiring it,
+ * and register the seven agent tools.
  * @param {object} ctx - Cordis context.
- * @param {object} [_config] - Reserved; the 0.1.0 ledger is in-memory only.
+ * @param {object} [_config] - Reserved; the ledger is in-memory in 0.2.0.
  */
 export function apply(ctx, _config = {}) {
   const service = new TraceService()
   ctx.provide('trace', service)
+  const memento = createMementoBridge(ctx, service)
+  service.memento = memento
   if (ctx.tools && typeof ctx.tools.register === 'function') {
-    for (const tool of createTools(service)) ctx.tools.register(tool)
+    for (const tool of createTools(service, memento)) ctx.tools.register(tool)
   }
   return service
 }

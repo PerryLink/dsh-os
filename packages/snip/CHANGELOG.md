@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.2.0
+
+- Add opt-in OS clipboard capture in `lib/capture.js`: `ClipboardAdapter` with
+  `available`, `read`, `watch` and `stop`, plus Windows, macOS and Linux
+  adapters. Windows prefers WinRT `Clipboard.GetContent()` through Windows
+  PowerShell 5.1 and falls back to `Get-Clipboard -Raw`; macOS uses `pbpaste`;
+  Linux uses `wl-paste --no-newline` or `xclip -selection clipboard -o`.
+  Every read uses fixed argv, no shell, a 5 s timeout and an environment
+  scrubbed of `DSH_*` and token-looking variables.
+- Add `SnipService.capture({ sourceApp })`, `watch({ intervalMs })` and
+  `stopWatch()`. Capture is **off by default** (`capture.enabled`); mounting
+  never reads the clipboard or starts a timer. Captured text goes through the
+  existing secret redaction and TTL, and identical content is deduplicated by
+  an in-memory SHA-256 hash.
+- Add `snip_capture`, `snip_watch_start` and `snip_watch_stop` tools. Capture
+  results contain a handle and metadata, never the clipboard text. Watching
+  starts only on an explicit `snip_watch_start` call.
+- Honor `ExcludeClipboardContentFromMonitorProcessing` on Windows on a
+  best-effort basis; classify images/files without reading them.
+- Update the bundle manifest (`files` now ships `lib/`, `spawn` capability,
+  three new tools), README and platform/permission matrix.
+- Add `test/capture.test.js`: fake-runner text/empty/image/file/excluded/
+  secret/timeout cases, fixed-argv and environment checks, default-off and
+  availability checks, fake-timer watch/dedupe/stop coverage, and tool tests.
+
 ## 0.1.1
 
 - Screen `sourceApp` for secrets and validate it: non-strings, control

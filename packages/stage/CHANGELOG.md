@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.2.0
+
+- Add `lib/adapters/` with a default in-memory `mock` adapter, a macOS JXA
+  adapter and a Windows PowerShell/C# adapter. No native binaries and no
+  runtime dependencies; the OS programs are fixed strings inside the package.
+- macOS: enumerate displays through `NSScreen` (AppKit-to-AX coordinate
+  conversion, `visibleFrame` work areas, Retina scale as `dpi` metadata) and
+  windows through System Events/AX (`mac:<pid>:<index>`, minimized/fullscreen
+  filtered, no titles). Move/resize re-read the window, refuse stale bounds and
+  verify the result. Accessibility and Automation failures map to `E_DENIED`.
+- Windows: one `powershell.exe` process calls `Add-Type` with user32/
+  dwmapi/shcore P/Invoke (`EnumWindows`, `GetWindowRect`, `SetWindowPos`,
+  `ShowWindow`, `EnumDisplayMonitors`, DWM extended frame), opts into PMv2
+  before any window API, compensates the invisible border inset before
+  `SetWindowPos`, and verifies the visible bounds within 1 px. UIPI/UWP access
+  denial maps to `E_DENIED`; no UAC.
+- Add `StageService.adapters()`, `useAdapter(name)`, `topologyLive()`,
+  `moveLive()` and `resizeLive()`. The service keeps the mock selected but
+  disarmed by default; `adapter` config or `useAdapter()` is required before
+  any live call. Unknown/unavailable adapters fail closed with `E_UNAVAILABLE`.
+- Add agent tools `stage_live_topology`, `stage_live_move` and
+  `stage_live_resize`. Live writes accept only one explicit id from the
+  observed topology; `all`, `*`, empty and malformed ids are `E_DENIED`, and an
+  id that was never observed is refused as `unobserved_window`.
+- Add adapter tests and fixtures for macOS/Windows parsing, negative
+  coordinates, mixed DPI, DWM inset compensation, stale/snapshot handling,
+  permission denial, wildcard refusal and the opt-in service/tool paths.
+- Document the platform matrix, TCC/UIPI permissions, DPI/coordinate rules,
+  privacy boundaries and adapter API in the README.
+
 ## 0.1.1
 
 - Make `undo()` topology-aware: every apply already records the `topologyHash`

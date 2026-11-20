@@ -1,12 +1,16 @@
 /**
  * dsh-check — paired-environment regression canary for DeepSeek Harness.
  *
- * 0.1.0 MVP: a dependency-free four-dimension diff engine (result,
- * trajectory, cost, approvals), the `ctx.check` service and the
- * `check_compare` agent tool. Running DSH headless is planned for 0.2.0.
+ * 0.2.0 adds a real headless runner on top of the dependency-free
+ * four-dimension diff engine (result, trajectory, cost, approvals): the
+ * `ctx.check.run()` seam and the optional `check_run` agent tool. The runner
+ * needs a DSH checkout/bin and a model key; the diff engine does not.
  * @module dsh-check
  */
 import { isDeepStrictEqual } from 'node:util'
+import { CheckRunner } from './lib/runner.js'
+
+export { CheckRunner, DEFAULT_TIMEOUT_MS, parseOutput, summarizeEvents } from './lib/runner.js'
 
 /** Cordis plugin name. */
 export const name = 'dsh-check'
@@ -182,11 +186,61 @@ export function compareRuns(oldRun, newRun, options = {}) {
   }
 }
 
+const NO_RUNNER = task => ({
+  ok: false,
+  code: 'no_runner',
+  taskId: typeof task?.id === 'string' && task.id ? task.id : null,
+  result: { text: '' },
+  trajectory: { steps: 0, toolCalls: 0, errors: 0 },
+  cost: { tokens: 0, usd: 0 },
+  approvals: { asked: 0, rejected: 0 },
+  exitCode: null,
+  raw: { ok: false, hint: 'configure the plugin with dshBin or runner to enable check_run' },
+})
+
 /** Host seam exposed as `ctx.check`. */
 export class CheckService {
+  /**
+   * @param {object} [options]
+   * @param {object} [options.runner] Injected runner exposing `run(task, opts)`.
+   * @param {string} [options.dshBin] DSH CLI entry; lazily builds a CheckRunner.
+   */
+  constructor(options = {}) {
+    this.options = isObject(options) ? options : {}
+    this.runner = this.options.runner ?? null
+    this.dshBin = this.options.dshBin
+  }
+
   /** @see compareRuns */
   compare(oldRun, newRun, options = {}) {
     return compareRuns(oldRun, newRun, options)
+  }
+
+  /**
+   * Run one task through a real DSH headless process. A runner can be injected
+   * per call (`{ runner }`) or configured on the service; without either this
+   * resolves to `{ ok: false, code: 'no_runner' }` instead of throwing.
+   */
+  async run(task, options = {}) {
+    const { runner, ...runOptions } = isObject(options) ? options : {}
+    const active = runner ?? this.runner ?? this.lazyRunner()
+    if (!active) return NO_RUNNER(task)
+    return active.run(task, runOptions)
+  }
+
+  lazyRunner() {
+    if (this.runner || typeof this.dshBin !== 'string' || this.dshBin.trim() === '') {
+      return this.runner
+    }
+    this.runner = new CheckRunner({
+      dshBin: this.dshBin,
+      profile: this.options.profile,
+      cwd: this.options.cwd,
+      timeoutMs: this.options.timeoutMs,
+      env: this.options.env,
+      spawn: this.options.spawn,
+    })
+    return this.runner
   }
 }
 
@@ -222,13 +276,64 @@ function compareTool(check) {
   }
 }
 
+function runTool(check) {
+  return {
+    name: 'check_run',
+    description: 'Run one task through the real DSH headless CLI (configured dshBin) and '
+      + 'return its four-dimension record. Requires a DSH checkout and a model key.',
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        prompt: { type: 'string', description: 'Task prompt passed to `dsh --json`.' },
+        id: { type: 'string', description: 'Optional task id for the returned record.' },
+        timeoutMs: { type: 'number', description: 'Optional per-task timeout in milliseconds.' },
+      },
+      required: ['prompt'],
+    },
+    output: {
+      schema: { type: 'object', additionalProperties: true },
+      render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
+    },
+    async execute(args) {
+      if (!isObject(args) || typeof args.prompt !== 'string' || args.prompt.trim() === '') {
+        throw fail('invalid_arguments', 'check_run requires a non-empty prompt')
+      }
+      if (args.id !== undefined && (typeof args.id !== 'string' || args.id.trim() === '')) {
+        throw fail('invalid_arguments', 'check_run id must be a non-empty string when provided')
+      }
+      if (args.timeoutMs !== undefined
+        && (typeof args.timeoutMs !== 'number' || !Number.isFinite(args.timeoutMs) || args.timeoutMs <= 0)) {
+        throw fail('invalid_arguments', 'check_run timeoutMs must be a positive finite number')
+      }
+      return check.run({ id: args.id ?? 'task', prompt: args.prompt }, { timeoutMs: args.timeoutMs })
+    },
+  }
+}
+
 /**
- * Mount dsh-check: provide `ctx.check` and register the `check_compare` tool.
+ * Mount dsh-check: provide `ctx.check` and register `check_compare`; register
+ * the optional `check_run` tool only when the host supplies `dshBin`/`runner`.
  * @param {object} ctx - Cordis context.
+ * @param {object} [config] - `{runner, dshBin, profile, cwd, timeoutMs, env, spawn}`.
  */
-export function apply(ctx) {
-  const check = new CheckService()
+export function apply(ctx, config = {}) {
+  const options = isObject(config) ? config : {}
+  const check = new CheckService({
+    runner: options.runner,
+    dshBin: options.dshBin ?? process.env.DSH_BIN,
+    profile: options.profile,
+    cwd: options.cwd,
+    timeoutMs: options.timeoutMs,
+    env: options.env,
+    spawn: options.spawn,
+  })
   ctx.provide('check', check)
-  if (ctx.tools && typeof ctx.tools.register === 'function') ctx.tools.register(compareTool(check))
+  if (ctx.tools && typeof ctx.tools.register === 'function') {
+    ctx.tools.register(compareTool(check))
+    if (check.runner || (typeof check.dshBin === 'string' && check.dshBin.trim() !== '')) {
+      ctx.tools.register(runTool(check))
+    }
+  }
   return check
 }

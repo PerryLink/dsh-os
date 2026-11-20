@@ -1,12 +1,15 @@
 /**
  * dsh-seek — cross-source evidence search for DeepSeek Harness.
  *
- * 0.1.0 is the provider protocol MVP: `ctx.evidence` fans one query out to
- * named providers, normalizes and deduplicates their hits, and returns a
- * partial result plus per-provider errors. First-party locator / library /
- * memento / web adapters are intentionally out of scope until 0.2.0.
+ * `ctx.evidence` fans one query out to named providers, normalizes and
+ * deduplicates their hits, and returns a partial result plus per-provider
+ * errors. 0.2.0 ships two optional first-party providers: `locator` (through
+ * dsh-locator's `locator_find` tool) and `memento` (through `ctx.memory`).
  * @module dsh-seek
  */
+
+import { agentKeyOf } from './lib/providers/util.js'
+import { registerDefaultProviders } from './lib/providers/index.js'
 
 /** Cordis plugin name. */
 export const name = 'dsh-seek'
@@ -112,16 +115,17 @@ function scoreOf(hit) {
 
 /**
  * Call one provider under a hard per-provider budget. The provider receives
- * `{ limit, signal, timeoutMs }`; `signal` is the caller's signal combined with
- * `AbortSignal.timeout(timeoutMs)`, so a cooperative provider can stop its own
- * work, and racing that signal bounds even a provider that ignores it.
+ * `{ limit, signal, timeoutMs, cwd, agentKey, agent }`; `signal` is the caller's
+ * signal combined with `AbortSignal.timeout(timeoutMs)`, so a cooperative
+ * provider can stop its own work, and racing that signal bounds even a provider
+ * that ignores it.
  */
-async function askProvider(provider, text, { limit, timeoutMs, signal }) {
+async function askProvider(provider, text, { limit, timeoutMs, signal, cwd, agentKey, agent }) {
   const deadline = AbortSignal.timeout(timeoutMs)
   const budget = signal === undefined ? deadline : AbortSignal.any([deadline, signal])
   const timedOut = () => fail('provider_timeout', `seek: provider "${provider.name}" timed out after ${timeoutMs} ms`)
   if (budget.aborted) throw deadline.aborted ? timedOut() : abortedError()
-  const work = Promise.resolve().then(() => provider.search(text, { limit, signal: budget, timeoutMs }))
+  const work = Promise.resolve().then(() => provider.search(text, { limit, signal: budget, timeoutMs, cwd, agentKey, agent }))
   const failure = new Promise((_, reject) => {
     budget.addEventListener('abort', () => reject(deadline.aborted ? timedOut() : abortedError()), { once: true })
   })
@@ -131,6 +135,7 @@ async function askProvider(provider, text, { limit, timeoutMs, signal }) {
 /** Named provider registry and fan-out search exposed to plugins as `ctx.evidence`. */
 export class SeekService {
   #providers = new Map()
+  #unavailable = new Map()
 
   /**
    * Register `{ name, search(query, opts) }`. Returns a disposer.
@@ -152,7 +157,25 @@ export class SeekService {
 
     const entry = Object.freeze({ name: provider.name, search: provider.search.bind(provider) })
     this.#providers.set(entry.name, entry)
+    this.#unavailable.delete(entry.name)
     return () => (this.#providers.get(entry.name) === entry ? this.#providers.delete(entry.name) : false)
+  }
+
+  /**
+   * Record (or, with `reason === undefined`, clear) why a first-party source is
+   * unavailable, so `seek_providers` can explain missing dependencies.
+   */
+  noteSource(name, reason) {
+    if (typeof name !== 'string' || name === '') return
+    if (reason === undefined) this.#unavailable.delete(name)
+    else this.#unavailable.set(name, Object.freeze({ name, status: 'unavailable', reason: String(reason) }))
+  }
+
+  /** Ready providers first, then unavailable first-party sources with reasons. */
+  sources() {
+    const ready = this.providers().map(name => ({ name, status: 'ready' }))
+    const missing = [...this.#unavailable.values()].filter(source => !this.#providers.has(source.name))
+    return [...ready, ...missing]
   }
 
   /** Remove a provider by name; true when it existed. */
@@ -169,15 +192,17 @@ export class SeekService {
    * Query selected providers in parallel.
    *
    * Every provider is bounded by `timeoutMs` (default 10 s): it receives
-   * `{ limit, signal, timeoutMs }`, where `signal` aborts at the deadline or
-   * when the caller aborts. A provider that times out, rejects, aborts or
-   * returns a malformed shape only adds one `errors` entry; it never blocks the
-   * merged result. Hits are keyed by `ref`; the highest-scoring duplicate wins.
+   * `{ limit, signal, timeoutMs, cwd, agentKey, agent }`, where `signal` aborts
+   * at the deadline or when the caller aborts. A provider that times out,
+   * rejects, aborts or returns a malformed shape only adds one `errors` entry;
+   * it never blocks the merged result. Hits are keyed by `ref`; the
+   * highest-scoring duplicate wins.
    * The merged list is sorted by score descending and then source, and
    * truncated to `limit`.
    *
    * @param {string} query
-   * @param {{ sources?: string[], limit?: number, timeoutMs?: number, signal?: AbortSignal }} [options]
+   * @param {{ sources?: string[], limit?: number, timeoutMs?: number, signal?: AbortSignal,
+   *   cwd?: string, agentKey?: string, agent?: object }} [options]
    * @returns {Promise<{ query: string, hits: object[], total: number, errors: object[] }>}
    */
   async search(query, options = {}) {
@@ -193,9 +218,14 @@ export class SeekService {
     const timeoutMs = timeoutOf(options.timeoutMs)
     const signal = signalOf(options.signal)
     if (signal !== undefined && signal.aborted) throw abortedError()
+    const caller = {
+      cwd: typeof options.cwd === 'string' && options.cwd !== '' ? options.cwd : undefined,
+      agentKey: typeof options.agentKey === 'string' ? options.agentKey : undefined,
+      agent: options.agent,
+    }
     const selected = this.#select(options.sources)
     const settled = await Promise.allSettled(
-      selected.map(provider => askProvider(provider, text, { limit, timeoutMs, signal })),
+      selected.map(provider => askProvider(provider, text, { limit, timeoutMs, signal, ...caller })),
     )
     if (signal !== undefined && signal.aborted) throw abortedError()
 
@@ -204,9 +234,12 @@ export class SeekService {
     settled.forEach((outcome, index) => {
       const source = selected[index].name
       if (outcome.status === 'rejected') {
+        const code = outcome.reason?.code
         errors.push({
           source,
-          code: outcome.reason?.code === 'provider_timeout' ? 'provider_timeout' : 'provider_failed',
+          code: code === 'provider_timeout' || (typeof code === 'string' && code.startsWith('E_'))
+            ? code
+            : 'provider_failed',
           message: messageOf(outcome.reason),
         })
         return
@@ -295,33 +328,63 @@ function searchTool(service) {
         },
       },
     },
-    async (args, exec) => service.search(args?.query, {
-      sources: args?.sources,
-      limit: args?.limit,
-      signal: exec?.signal,
-    }),
+    async (args, exec) => {
+      const session = exec?.agent?.session
+      return service.search(args?.query, {
+        sources: args?.sources,
+        limit: args?.limit,
+        signal: exec?.signal,
+        agent: exec?.agent,
+        cwd: session?.header?.cwd,
+        agentKey: session === undefined ? undefined : agentKeyOf(session.header?.agentPreset),
+      })
+    },
   )
 }
 
-/** `seek_providers` tool: provider discovery for agents. */
+/** Compact provider/source report shared by `seek_providers` and `seek_register_defaults`. */
+function providerReport(service) {
+  return { providers: service.providers(), sources: service.sources() }
+}
+
+/** `seek_providers` tool: provider discovery, including unavailable reasons. */
 function providersTool(service) {
   return tool(
     'seek_providers',
-    'List the names of registered Seek evidence providers.',
+    'List Seek evidence providers and whether each first-party source is ready or unavailable, with the reason.',
     { type: 'object', additionalProperties: false, properties: {} },
-    async () => ({ providers: service.providers() }),
+    async () => providerReport(service),
+  )
+}
+
+/** `seek_register_defaults` tool: retry first-party registration after plugins mount. */
+function registerDefaultsTool(ctx, service) {
+  return tool(
+    'seek_register_defaults',
+    'Register the first-party locator and memento providers when their host services are available. Safe to call repeatedly; missing dependencies are reported in sources, not thrown.',
+    { type: 'object', additionalProperties: false, properties: {} },
+    async () => {
+      registerDefaultProviders(ctx, service)
+      return providerReport(service)
+    },
   )
 }
 
 /**
- * Mount dsh-seek: provide `ctx.evidence` and register the two agent tools.
+ * Mount dsh-seek: provide `ctx.evidence`, auto-register available first-party
+ * providers (missing optional plugins are reported, not fatal), and register
+ * the three agent tools.
  * @param {object} ctx - Cordis context with `provide` and `tools.register`.
- * @param {object} [_config] - Reserved for 0.2.0; unused by the MVP.
+ * @param {object} [_config] - Reserved; unused in 0.2.0.
  */
 export function apply(ctx, _config = {}) {
   const service = new SeekService()
   ctx.provide('evidence', service)
+  registerDefaultProviders(ctx, service)
   ctx.tools.register(searchTool(service))
   ctx.tools.register(providersTool(service))
+  ctx.tools.register(registerDefaultsTool(ctx, service))
   return service
 }
+
+export { registerDefaultProviders }

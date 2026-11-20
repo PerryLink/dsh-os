@@ -1,13 +1,18 @@
 /**
  * dsh-trigger — in-memory event-to-action trigger fabric for DeepSeek Harness.
  *
- * 0.1.0 MVP: `ctx.triggers`, a small condition DSL, per-trigger cooldown, an
- * in-memory run ledger and four agent tools. Source adapters (fs/webhook/agent)
- * are planned for 0.2.0; this package does not subscribe to host events.
+ * 0.2.0: `ctx.triggers`, a small condition DSL, per-trigger cooldown, an
+ * in-memory run ledger, seven agent tools and three real event sources —
+ * agent (`session/event` + `agent/*`), fs (`fs.watch` invalidation + snapshot
+ * diff) and webhook (loopback HTTP when `ctx.webServer` exists).
  * @module dsh-trigger
  */
 import { randomUUID } from 'node:crypto'
 import { isDeepStrictEqual } from 'node:util'
+import { createAgentSource } from './lib/sources/agent.js'
+import { createFsSource } from './lib/sources/fs.js'
+import { createWebhookSource } from './lib/sources/webhook.js'
+import { makeSourceTools } from './lib/source-tools.js'
 
 /** Cordis plugin name. */
 export const name = 'dsh-trigger'
@@ -18,6 +23,13 @@ export const inject = ['tools']
 const TRIGGER_ID = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$/
 const FIELD = /^(?:payload\.)?[A-Za-z0-9_$]+(?:\.[A-Za-z0-9_$]+)*$/
 const DEFAULT_MAX_RUNS = 1000
+
+/** The real event sources shipped by 0.2.0, keyed by `startSource` type. */
+const SOURCE_FACTORIES = Object.freeze({
+  agent: createAgentSource,
+  fs: createFsSource,
+  webhook: createWebhookSource,
+})
 
 const TOOL_OUTPUT = {
   schema: { type: 'object', additionalProperties: true },
@@ -119,6 +131,11 @@ export function summarize({ id, event, cooldownMs, actionId, condition }) {
   }
 }
 
+/** JSON-safe source view; `info` is adapter-specific and never contains secrets. */
+export function summarizeSource({ id, type, startedAt, lastEventAt, events, dropped, info }) {
+  return { id, type, startedAt, lastEventAt, events, dropped, info: info ?? null }
+}
+
 /**
  * In-memory trigger registry exposed to other plugins as `ctx.triggers`.
  * Actions may be functions or one of the built-in demo ids `record` / `echo`.
@@ -126,12 +143,15 @@ export function summarize({ id, event, cooldownMs, actionId, condition }) {
 export class TriggerService {
   #triggers = new Map()
   #runs = []
+  #sources = new Map()
   #lastFired = new Map()
   #actions = new Map()
+  #ctx
   #now
   #maxRuns
 
   constructor(options = {}) {
+    this.#ctx = options.ctx ?? null
     this.#now = typeof options.now === 'function' ? options.now : Date.now
     this.#maxRuns = Number.isSafeInteger(options.maxRuns) && options.maxRuns > 0
       ? options.maxRuns
@@ -173,6 +193,81 @@ export class TriggerService {
     }
     const start = limit === undefined ? 0 : Math.max(0, this.#runs.length - limit)
     return this.#runs.slice(start).reverse()
+  }
+
+  /**
+   * Start a real event source and feed its events into `fire()`. The emitted
+   * payload carries its trigger event name in `type`. Throws `E_UNAVAILABLE`
+   * when the profile lacks the host service the source needs.
+   * @param {'agent'|'fs'|'webhook'} type - source kind.
+   * @param {object} [opts] - source options; `id` overrides the generated id.
+   * @returns {Promise<object>} the JSON-safe source summary.
+   */
+  async startSource(type, opts = {}) {
+    const create = own(SOURCE_FACTORIES, type) ? SOURCE_FACTORIES[type] : undefined
+    if (create === undefined) throw fail('invalid_source', `unknown source type: ${String(type)}`)
+    if (!plain(opts)) throw fail('invalid_source', 'source options must be an object')
+    if (this.#ctx === null) throw fail('E_UNAVAILABLE', 'source adapters need the plugin context')
+    const id = typeof opts.id === 'string' && opts.id !== '' ? opts.id : `src_${randomUUID()}`
+    if (this.#sources.has(id)) throw fail('source_exists', `source "${id}" is already running`)
+    const record = {
+      id, type, startedAt: this.#now(), lastEventAt: null, events: 0, dropped: 0, adapter: null, info: null,
+    }
+    // Register before start(): a source may emit while connecting (fs catch-up).
+    this.#sources.set(id, record)
+    try {
+      record.adapter = create(this.#ctx, opts, payload => this.#receive(id, payload))
+      await record.adapter.start()
+      record.info = record.adapter.describe()
+      return summarizeSource(record)
+    } catch (error) {
+      this.#sources.delete(id)
+      try {
+        await record.adapter?.stop()
+      } catch {
+        // The adapter never finished starting.
+      }
+      throw error
+    }
+  }
+
+  /** Stop one source by id; returns false when no such source is running. */
+  async stopSource(id) {
+    if (typeof id !== 'string' || id === '') throw fail('invalid_source', 'source id must be a non-empty string')
+    const record = this.#sources.get(id)
+    if (record === undefined) return false
+    this.#sources.delete(id)
+    try {
+      await record.adapter?.stop()
+    } catch {
+      // Releasing an already-broken watcher or route is not a caller error.
+    }
+    return true
+  }
+
+  /** Every running source, in start order. */
+  sources() {
+    return [...this.#sources.values()].map(summarizeSource)
+  }
+
+  /** Stop every source (plugin unload). */
+  async dispose() {
+    await Promise.all([...this.#sources.keys()].map(id => this.stopSource(id)))
+  }
+
+  /** Fire one source event without letting a failure escape into the host. */
+  #receive(id, payload) {
+    const record = this.#sources.get(id)
+    if (record === undefined) return
+    if (!plain(payload) || typeof payload.type !== 'string' || payload.type === '') {
+      record.dropped += 1
+      return
+    }
+    record.events += 1
+    record.lastEventAt = this.#now()
+    this.fire(payload.type, payload).catch(() => {
+      record.dropped += 1
+    })
   }
 
   /**
@@ -330,17 +425,19 @@ export function makeTools(service) {
       },
       args => ({ runs: service.runs(args.limit) }),
     ),
+    ...makeSourceTools(service),
   ]
 }
 
 /**
- * Mount dsh-trigger: provide `ctx.triggers` and register the four tools.
+ * Mount dsh-trigger: provide `ctx.triggers` and register the seven tools.
  * @param {object} ctx - Cordis context.
  * @param {object} [config] - `{ now?, maxRuns? }`, mainly for tests.
  */
 export function apply(ctx, config = {}) {
-  const service = new TriggerService(config)
+  const service = new TriggerService({ ...config, ctx })
   ctx.provide('triggers', service)
   if (ctx.tools?.register) for (const definition of makeTools(service)) ctx.tools.register(definition)
+  ctx.effect?.(() => () => service.dispose())
   return service
 }

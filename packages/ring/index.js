@@ -1,12 +1,15 @@
 /**
  * dsh-ring — approval SLA and escalation receipts for DeepSeek Harness.
  *
- * 0.1.0 MVP: `ctx.ring` is an in-memory approval-case ledger with a deterministic
- * SLA state machine advanced by `tick(now)`. Nothing is delivered: every step
- * writes a local receipt, so the ledger is auditable without channel credentials.
- * Plain ESM, no runtime dependencies. @module dsh-ring
+ * 0.2.0: `ctx.ring` is an in-memory approval-case ledger with a deterministic
+ * SLA state machine advanced by `tick(now)`. No channel is enabled by default:
+ * every step writes a local receipt, and only an explicit `configureChannels()`
+ * lets a tick deliver through webhook, ntfy or console. Delivery is bounded,
+ * best-effort and never approves anything. Plain ESM, no runtime dependencies.
+ * @module dsh-ring
  */
 import { randomUUID } from 'node:crypto'
+import { buildChannels, buildMessage, providerForLabel } from './lib/channels/index.js'
 
 export const name = 'dsh-ring'
 export const inject = ['tools']
@@ -91,12 +94,28 @@ function normalizeChain(input) {
 export class RingService {
   #cases = new Map()
   #receipts = []
+  #channels = new Map()
 
   constructor(ctx, config = {}) {
     this.ctx = ctx
     if (!isObject(config)) fail('E_INPUT', 'config must be an object')
     this.clock = typeof config.now === 'function' ? config.now : () => Date.now()
     readTimestamp(this.clock(), 'config.now()')
+    if (config.channels !== undefined) this.configureChannels(config.channels)
+  }
+
+  /**
+   * Replace the notification channels. Omitted entries are disabled; pass `{}`
+   * to clear every channel. Configuring performs no network I/O by itself.
+   */
+  configureChannels(input = {}) {
+    this.#channels = buildChannels(input)
+    return { channels: this.channels() }
+  }
+
+  /** Configured provider names, in registry order. */
+  channels() {
+    return [...this.#channels.keys()]
   }
 
   /** Create a pending case. t0 is delivered by the next `tick` at/after createdAt. */
@@ -227,10 +246,45 @@ export class RingService {
     return this.#receipts.filter(receipt => receipt.caseId === kase.id).map(clone)
   }
 
-  /** Advance open cases to `now`: expire, deliver t0, then at most one escalation. */
-  tick(now = this.clock()) {
+  /**
+   * Deliver one notification for a known case through a configured channel.
+   * Omit `channel` to use the case's current chain label (`local`, `webhook`,
+   * `voice`, or a provider name). Resolves `{ delivery }`; a missing provider
+   * or a failed request rejects with `E_UNAVAILABLE`.
+   */
+  async notify(caseOrId, options = {}) {
+    const kase = this.#mustGet(typeof caseOrId === 'string' ? caseOrId : caseOrId?.id)
+    if (!isObject(options)) fail('E_INPUT', 'notify options must be an object')
+    const label = options.channel === undefined
+      ? kase.escalationChain.find(entry => entry.level === kase.level)?.channel
+      : readText(options.channel, 'channel', 'E_INPUT', 64)
+    const provider = providerForLabel(label)
+    const channel = provider === null ? undefined : this.#channels.get(provider)
+    if (channel === undefined) {
+      fail('E_UNAVAILABLE', `channel "${label ?? `t${kase.level}`}" is not configured for delivery`)
+    }
+    const at = readTimestamp(this.clock(), 'clock')
+    try {
+      const result = await channel.send(buildMessage(kase, label, at))
+      const delivery = { caseId: kase.id, channel: provider, ok: true, error: null, at }
+      if (result?.status !== undefined) delivery.status = result.status
+      return { delivery }
+    } catch (error) {
+      const safe = error?.code === 'E_UNAVAILABLE' && typeof error?.message === 'string' && !error.message.includes('://')
+      fail('E_UNAVAILABLE', safe ? error.message : `${provider} delivery failed`)
+    }
+  }
+
+  /**
+   * Advance open cases to `now`: expire, deliver t0, then at most one
+   * escalation. Configured channels are called best-effort; failures are
+   * returned in `deliveries` and never roll back the state machine.
+   */
+  async tick(now = this.clock()) {
     const at = readTimestamp(now, 'now')
+    const start = this.#receipts.length
     const receipts = []
+    const deliveries = []
     const changed = new Set()
     for (const kase of this.#cases.values()) {
       if (kase.state === 'resolved' || kase.state === 'expired' || kase.expiredAt !== undefined) continue
@@ -250,6 +304,7 @@ export class RingService {
         kase.updatedAt = at
         receipts.push(this.#record(kase, 'delivery', at, { channel: t0.channel, to: 't0' }))
         changed.add(kase.id)
+        await this.#deliver(kase, t0.channel, at, deliveries)
       }
       if (!['notified', 'escalated'].includes(kase.state)) continue
       const due = kase.escalationChain
@@ -263,11 +318,23 @@ export class RingService {
       kase.updatedAt = at
       receipts.push(this.#record(kase, 'escalation', at, { channel: next.channel, to: `t${next.level}` }))
       changed.add(kase.id)
+      await this.#deliver(kase, next.channel, at, deliveries)
     }
     return {
       now: at,
-      receipts,
+      receipts: this.#receipts.slice(start).map(clone),
       cases: [...changed].map(id => clone(this.#cases.get(id))),
+      deliveries,
+    }
+  }
+
+  async #deliver(kase, label, at, deliveries) {
+    const provider = providerForLabel(label)
+    if (provider === null || !this.#channels.has(provider)) return
+    try {
+      deliveries.push((await this.notify(kase, { channel: label })).delivery)
+    } catch {
+      deliveries.push({ caseId: kase.id, channel: provider, ok: false, error: 'E_UNAVAILABLE', at })
     }
   }
 
@@ -306,7 +373,7 @@ const tool = (name, description, parameters, execute) => ({ name, description, p
 /** Plain ToolDefinition objects; no dependency on `@deepseek-ai/dsh-tools`. */
 export function createTools(service) {
   return [
-    tool('ring_raise', 'Raise a pending approval case with an SLA escalation chain (local receipts only; nothing is sent).',
+    tool('ring_raise', 'Raise a pending approval case with an SLA escalation chain. Delivery only happens when a channel is explicitly configured.',
       argsSchema({
         source: { type: 'string', description: 'Origin, e.g. approval, hook, act or manual.' },
         risk: { type: 'string', enum: RISKS, description: 'Defaults to write.' },
@@ -334,10 +401,19 @@ export function createTools(service) {
     tool('ring_receipts', 'List the audit receipts for one case (delivery, escalation, ack, decision or expiry).',
       argsSchema({ id: { type: 'string' } }, ['id']),
       async args => ({ receipts: service.receipts(args?.id) })),
+    tool('ring_channels', 'List configured notification channels. No network is used unless a channel is explicitly configured.',
+      argsSchema({}),
+      async () => ({ channels: service.channels() })),
+    tool('ring_notify', 'Send one notification for a case through a configured channel; omit channel to use the current chain label.',
+      argsSchema({
+        id: { type: 'string' },
+        channel: { type: 'string', description: 'webhook, ntfy, console, local or voice.' },
+      }, ['id']),
+      async args => service.notify(args?.id, args?.channel === undefined ? {} : { channel: args.channel })),
   ]
 }
 
-/** Mount the plugin at `ctx.ring` and register the five agent tools. */
+/** Mount the plugin at `ctx.ring` and register the seven agent tools. */
 export function apply(ctx, config = {}) {
   const service = new RingService(ctx, config)
   ctx.provide('ring', service)

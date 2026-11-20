@@ -164,3 +164,49 @@ test('init writes three tasks, list reads them, and bad runs exit 2', () => {
     files.cleanup()
   }
 })
+
+test('ctx.check.run injects a runner and check_run only appears when runnable', async () => {
+  const calls = []
+  const runner = {
+    async run(task, options) {
+      calls.push({ task, options })
+      return {
+        ok: true,
+        code: null,
+        taskId: task.id,
+        result: { text: 'ran' },
+        trajectory: { steps: 1, toolCalls: 0, errors: 0 },
+        cost: { tokens: 3, usd: 0 },
+        approvals: { asked: 0, rejected: 0 },
+        exitCode: 0,
+        raw: { ok: true },
+      }
+    },
+  }
+  const ctx = fakeContext()
+  const check = apply(ctx, { runner })
+  assert.equal(ctx._tools.has('check_run'), true)
+  const record = await check.run({ id: 'x', prompt: 'hi' }, { timeoutMs: 1234 })
+  assert.equal(record.result.text, 'ran')
+  assert.equal(calls[0].task.id, 'x')
+  assert.equal(calls[0].options.timeoutMs, 1234)
+  assert.equal((await ctx._tools.get('check_run').execute({ prompt: 'hi', id: 'tool' })).taskId, 'tool')
+  await assert.rejects(ctx._tools.get('check_run').execute({ prompt: '' }), /non-empty prompt/)
+  const perCall = await check.run({ id: 'z', prompt: 'hi' }, {
+    runner: { run: async () => ({ ok: true, code: null, taskId: 'z' }) },
+  })
+  assert.equal(perCall.ok, true)
+  const configured = fakeContext()
+  apply(configured, { dshBin: '/opt/dsh.js' })
+  assert.equal(configured._tools.has('check_run'), true)
+
+  const previous = process.env.DSH_BIN
+  delete process.env.DSH_BIN
+  try {
+    const plain = apply(fakeContext())
+    assert.equal((await plain.run({ id: 'y', prompt: 'hi' })).code, 'no_runner')
+  } finally {
+    if (previous === undefined) delete process.env.DSH_BIN
+    else process.env.DSH_BIN = previous
+  }
+})

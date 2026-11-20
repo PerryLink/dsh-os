@@ -1,13 +1,14 @@
 /**
  * dsh-stage — display, window and space topology protocol for DeepSeek Harness.
  *
- * 0.1.0 is the topology protocol MVP: the `ctx.stage` service, named layouts
- * made of display-relative 0..1 zones, applied-intent assignments, bounded
- * history and undo. It never calls a native window API; macOS AX and Windows
- * Win32 adapters are scoped for 0.2.0.
+ * 0.2.0 keeps the topology protocol, named layouts, applied-intent history and
+ * undo, and adds opt-in native adapters for macOS (JXA/AX) and Windows
+ * (PowerShell/Win32). `stage_topology` serves the stored snapshot; the
+ * `stage_live_*` tools read and write through an explicitly armed adapter.
  * @module dsh-stage
  */
 import { createHash } from 'node:crypto'
+import { createAdapter, listAdapters } from './lib/adapters/index.js'
 
 /** Cordis plugin name. */
 export const name = 'dsh-stage'
@@ -120,12 +121,17 @@ const placeZone = (zone, area) => ({
 
 /** Host seam exposed as `ctx.stage`. */
 export class StageService {
-  constructor() {
+  constructor(options = {}) {
     this._topology = null
     this._layouts = new Map()
     this._history = []
     this._undone = new Map()
     this._sequence = 0
+    this._options = options
+    this._adapter = createAdapter('mock', options)
+    this._adapterName = 'mock'
+    this._liveArmed = false
+    if (options.adapter !== undefined) this.useAdapter(options.adapter)
   }
 
   _record(entry) {
@@ -184,6 +190,56 @@ export class StageService {
     return this._topology === null
       ? { schema: SCHEMAS.topology, displays: [], windows: [], spaces: [], topologyHash: null, observedAt: null }
       : clone(this._topology)
+  }
+
+  /** Available adapters, their capabilities and which one is selected. */
+  adapters() {
+    return listAdapters(this._options).map(item => ({ ...item, active: item.name === this._adapterName }))
+  }
+  /** Select and arm a live adapter. Native adapters must be available here. */
+  useAdapter(name) {
+    const adapter = createAdapter(text(name, 'E_UNAVAILABLE', 'adapter name'), this._options)
+    if (!adapter.available()) throw fail('E_UNAVAILABLE', `adapter "${adapter.name}" is not available on this platform`)
+    this._adapter = adapter
+    this._adapterName = adapter.name
+    this._liveArmed = true
+    return { name: adapter.name, platform: adapter.platform, capabilities: adapter.capabilities() }
+  }
+  _live() {
+    if (!this._liveArmed) throw fail('E_UNAVAILABLE', 'no live adapter selected; call useAdapter() or set the "adapter" config')
+    return this._adapter
+  }
+
+  /** Observe displays and windows through the selected adapter. */
+  async topologyLive() {
+    const adapter = this._live()
+    const displays = await adapter.displays()
+    return this.setTopology({ displays, windows: await adapter.windows({ displays }), spaces: [] })
+  }
+  /** Move one explicit window id through the selected adapter. */
+  async moveLive(id, rectValue) {
+    const adapter = this._live()
+    const target = text(id, 'E_DENIED', 'window id')
+    const bounds = rectOf(rectValue, 'rect')
+    try {
+      return await adapter.move(target, bounds)
+    } catch (error) {
+      return { ok: false, id, code: error.code === 'E_DENIED' ? 'E_DENIED' : 'E_UNAVAILABLE', reason: error.reason ?? 'adapter_error' }
+    }
+  }
+
+  /** Resize one explicit window id through the selected adapter. */
+  async resizeLive(id, size) {
+    const adapter = this._live()
+    const target = text(id, 'E_DENIED', 'window id')
+    if (!isObject(size) || !Number.isFinite(size.w) || !Number.isFinite(size.h) || size.w <= 0 || size.h <= 0) {
+      throw fail('invalid_bounds', 'size.w and size.h must be positive finite numbers')
+    }
+    try {
+      return await adapter.resize(target, { w: size.w, h: size.h })
+    } catch (error) {
+      return { ok: false, id, code: error.code === 'E_DENIED' ? 'E_DENIED' : 'E_UNAVAILABLE', reason: error.reason ?? 'adapter_error' }
+    }
   }
 
   /** Create or replace a named layout definition. Does not touch topology. */
@@ -294,6 +350,11 @@ const ZONE_SCHEMA = {
   required: RECT_KEYS,
 }
 
+const ABS_RECT_SCHEMA = {
+  type: 'object', additionalProperties: false, required: RECT_KEYS,
+  properties: Object.fromEntries(RECT_KEYS.map(key => [key, { type: 'number' }])),
+}
+
 const tool = (name, description, parameters, execute) => ({
   name, description, parameters, output: TOOL_OUTPUT,
   async execute(args) {
@@ -306,8 +367,8 @@ export function createTools(service) {
   return [
     tool(
       'stage_topology',
-      'Read the current display/window/space topology snapshot. Topology is supplied '
-        + 'by a platform adapter; 0.1.0 ships no native adapter.',
+      'Read the stored display/window/space topology snapshot. Use stage_live_topology '
+        + 'to observe through an armed adapter.',
       objectSchema({}),
       () => service.topology(),
     ),
@@ -354,12 +415,33 @@ export function createTools(service) {
       objectSchema({}),
       () => service.undo(),
     ),
+    tool(
+      'stage_live_topology',
+      'Read displays and windows through the selected live adapter and store the snapshot. '
+        + 'Requires useAdapter() or config.adapter; the default mock is not armed.',
+      objectSchema({}),
+      () => service.topologyLive(),
+    ),
+    tool(
+      'stage_live_move',
+      'Move one explicit window id to a rect through the selected adapter. Only ids '
+        + 'returned by stage_live_topology are valid; wildcard and "all" targets are denied.',
+      objectSchema({ id: { type: 'string', description: 'Explicit window id from stage_live_topology.' }, rect: ABS_RECT_SCHEMA }, ['id', 'rect']),
+      args => service.moveLive(args?.id, args?.rect),
+    ),
+    tool(
+      'stage_live_resize',
+      'Resize one explicit window id through the selected adapter. Only ids returned '
+        + 'by stage_live_topology are valid.',
+      objectSchema({ id: { type: 'string', description: 'Explicit window id from stage_live_topology.' }, w: { type: 'number', minimum: 0 }, h: { type: 'number', minimum: 0 } }, ['id', 'w', 'h']),
+      args => service.resizeLive(args?.id, { w: args?.w, h: args?.h }),
+    ),
   ]
 }
 
-/** Mount dsh-stage: provide `ctx.stage` and the five `stage_*` tools. */
-export function apply(ctx, _config = {}) {
-  const stage = new StageService()
+/** Mount dsh-stage: provide `ctx.stage` and the eight `stage_*` tools. */
+export function apply(ctx, config = {}) {
+  const stage = new StageService(config)
   ctx.provide('stage', stage)
   if (ctx.tools && typeof ctx.tools.register === 'function') {
     for (const item of createTools(stage)) ctx.tools.register(item)

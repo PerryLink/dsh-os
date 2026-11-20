@@ -1,7 +1,7 @@
 {
   "name": "dsh-seek",
-  "version": "0.1.1",
-  "description": "Cross-source evidence search for DeepSeek Harness with verifiable refs and freshness.",
+  "version": "0.2.0",
+  "description": "Cross-source evidence search for DeepSeek Harness with verifiable refs, freshness and real locator/memento providers.",
   "type": "module",
   "main": "index.js",
   "exports": {
@@ -10,6 +10,7 @@
   },
   "files": [
     "index.js",
+    "lib",
     "cordis.patch.yml",
     "README.md",
     "CHANGELOG.md"
@@ -49,7 +50,8 @@
       "capabilities": [],
       "tools": [
         "seek_search",
-        "seek_providers"
+        "seek_providers",
+        "seek_register_defaults"
       ],
       "ui": null,
       "stability": "experimental",

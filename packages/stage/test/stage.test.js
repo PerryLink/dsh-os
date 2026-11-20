@@ -322,7 +322,7 @@ test('history is newest-first, bounded and validates its limit', () => {
   assert.equal(capped[199].name, 'l5')
 })
 
-test('apply provides ctx.stage and registers five plain-object tools', async () => {
+test('apply provides ctx.stage and registers eight plain-object tools', async () => {
   const ctx = fakeContext()
   const service = apply(ctx)
   assert.equal(ctx.get('stage'), service)
@@ -330,6 +330,9 @@ test('apply provides ctx.stage and registers five plain-object tools', async () 
     'stage_layout_apply',
     'stage_layout_list',
     'stage_layout_set',
+    'stage_live_move',
+    'stage_live_resize',
+    'stage_live_topology',
     'stage_topology',
     'stage_undo',
   ])
@@ -372,7 +375,7 @@ test('apply provides ctx.stage and registers five plain-object tools', async () 
   assert.equal((await ctx._tools.get('stage_topology').execute({})).windows.length, 3)
   assert.deepEqual(inject, ['tools'])
   assert.equal(name, 'dsh-stage')
-  assert.equal(createTools(service).length, 5)
+  assert.equal(createTools(service).length, 8)
 })
 
 test('the service mounts without a tools registry', () => {

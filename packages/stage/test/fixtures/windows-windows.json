@@ -1,0 +1,39 @@
+{
+  "ok": true,
+  "dpiAware": true,
+  "windows": [
+    {
+      "hwnd": "65552",
+      "pid": 100,
+      "app": "Editor",
+      "bounds": { "x": 100, "y": 100, "w": 800, "h": 600 },
+      "frame": { "x": 89, "y": 89, "w": 822, "h": 622 },
+      "inset": { "l": 11, "t": 11, "r": 11, "b": 11 },
+      "dpi": 144,
+      "focused": true,
+      "minimized": false
+    },
+    {
+      "hwnd": "131104",
+      "pid": 101,
+      "app": "Browser",
+      "bounds": { "x": -1800, "y": 0, "w": 1000, "h": 800 },
+      "frame": { "x": -1811, "y": -11, "w": 1022, "h": 822 },
+      "inset": { "l": 11, "t": 11, "r": 11, "b": 11 },
+      "dpi": 96,
+      "focused": false,
+      "minimized": false
+    },
+    {
+      "hwnd": "196656",
+      "pid": 102,
+      "app": "ApplicationFrameHost",
+      "bounds": { "x": 0, "y": 0, "w": 100, "h": 100 },
+      "frame": { "x": -11, "y": -11, "w": 122, "h": 122 },
+      "inset": { "l": 11, "t": 11, "r": 11, "b": 11 },
+      "dpi": 96,
+      "focused": false,
+      "minimized": true
+    }
+  ]
+}

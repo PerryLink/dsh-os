@@ -1,7 +1,7 @@
 {
   "name": "dsh-snip",
-  "version": "0.1.1",
-  "description": "Local-first, searchable clipboard ledger for DeepSeek Harness with secret exclusion and clipboard:// agent handles.",
+  "version": "0.2.0",
+  "description": "Local-first, searchable clipboard ledger for DeepSeek Harness with explicit OS clipboard capture, secret exclusion and clipboard:// agent handles.",
   "type": "module",
   "main": "index.js",
   "exports": {
@@ -10,6 +10,7 @@
   },
   "files": [
     "index.js",
+    "lib",
     "cordis.patch.yml",
     "README.md",
     "CHANGELOG.md"
@@ -53,10 +54,14 @@
       ],
       "capabilities": [
         "clipboard",
-        "secret"
+        "secret",
+        "spawn"
       ],
       "tools": [
         "snip_add",
+        "snip_capture",
+        "snip_watch_start",
+        "snip_watch_stop",
         "snip_search",
         "snip_get",
         "snip_list",

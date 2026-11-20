@@ -43,11 +43,15 @@ function provider(name, hits, calls = []) {
   }
 }
 
-test('apply provides ctx.evidence and registers both tools', () => {
+test('apply provides ctx.evidence and registers all three tools', () => {
   const { ctx, service } = setup()
   assert.ok(service instanceof SeekService)
   assert.equal(ctx.get('evidence'), service)
-  assert.deepEqual([...ctx._tools.keys()], ['seek_search', 'seek_providers'])
+  assert.deepEqual([...ctx._tools.keys()], ['seek_search', 'seek_providers', 'seek_register_defaults'])
+  assert.deepEqual(service.sources(), [
+    { name: 'locator', status: 'unavailable', reason: 'locator_find is not registered (install/enable dsh-locator)' },
+    { name: 'memento', status: 'unavailable', reason: 'memory service is not available (install/enable dsh-memento)' },
+  ])
 })
 
 test('search fans out in parallel, dedupes by ref and sorts by score then source', async () => {
@@ -364,7 +368,13 @@ test('agent tools call the service', async () => {
   assert.equal(result.query, 'x')
   assert.deepEqual(result.hits.map(item => item.ref), ['dsh://alpha/a'])
 
-  assert.deepEqual(await ctx._tools.get('seek_providers').execute(), { providers: ['alpha'] })
+  const providers = await ctx._tools.get('seek_providers').execute()
+  assert.deepEqual(providers.providers, ['alpha'])
+  assert.deepEqual(providers.sources.map(source => [source.name, source.status]), [
+    ['alpha', 'ready'],
+    ['locator', 'unavailable'],
+    ['memento', 'unavailable'],
+  ])
   await assert.rejects(
     ctx._tools.get('seek_search').execute({}),
     error => error.code === 'invalid_query',

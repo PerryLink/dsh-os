@@ -1,6 +1,6 @@
 {
   "name": "@perrylink/dsh-check",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Paired-environment regression canary for DeepSeek Harness upgrades, model changes and plugin updates.",
   "type": "module",
   "main": "index.js",
@@ -9,10 +9,12 @@
   },
   "exports": {
     ".": "./index.js",
+    "./runner": "./lib/runner.js",
     "./package.json": "./package.json"
   },
   "files": [
     "index.js",
+    "lib",
     "bin",
     "cordis.patch.yml",
     "README.md",
@@ -41,7 +43,7 @@
   },
   "engines": {
     "node": "^22.19.0 || >=24.9.0",
-    "dsh": ">=0.2.1-rc.2 <0.3.0-0"
+    "dsh": ">=0.2.2-alpha.2 <0.3.0-0"
   },
   "dsh": {
     "manifestVersion": 1,
@@ -53,9 +55,12 @@
       "provides": [
         "check"
       ],
-      "capabilities": [],
+      "capabilities": [
+        "spawn"
+      ],
       "tools": [
-        "check_compare"
+        "check_compare",
+        "check_run"
       ],
       "ui": null,
       "stability": "experimental",
