@@ -1,6 +1,6 @@
 {
   "name": "dsh-nest",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Versioned workspace profiles for DeepSeek Harness: context, permissions, environment and defaults.",
   "type": "module",
   "main": "index.js",
@@ -19,7 +19,8 @@
     "dsh-plugin",
     "deepseek-harness",
     "agent-os",
-    "nest"
+    "nest",
+    "workspace-profile"
   ],
   "license": "MIT",
   "author": "PerryLink contributors",
@@ -44,5 +45,8 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "scripts": {
+    "test": "node --test"
   }
 }

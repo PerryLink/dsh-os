@@ -2,6 +2,8 @@
 
 > 2026-11-20 · 对象 PerryLink（个人开发者，非官方，not affiliated with DeepSeek）· 基线 DSH 0.2.2-rc.4（`ca33fd6`）· 定位：DSH 升级 / 换模型 / 升插件前后的**配对回归门禁**，不是通用 benchmark · 证据：源码/Registry 实测 [A]，公开页面 [B]，设计判断 [D]。
 
+> **npm package:** `@perrylink/dsh-check` — the unscoped `dsh-check` is blocked by npm name-similarity rules; the product name remains **Check**.
+
 ## 0. 结论
 
 - **名字**：Check；npm `dsh-check`；CLI `dsh check`；Host seam `ctx.canary`；机制名 canary（金丝雀）。

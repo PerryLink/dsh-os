@@ -3,6 +3,8 @@
 > 判断：DSH 的「环境」现在是一组互不相识的存储面（launch 快照 / 两层 `.env` / credentials / profile patch / 实时 `process.env`），不是一个对象。Root 把它变成**命名、分作用域、带信任级与 provenance 的环境档案**：启动时可 materialize，运行时可解释、可快照、可 diff、可共享；`ctx.env` 是 Host seam。
 > 2026-11-20 · DSH checkout `0.2.2-rc.4`（`ca33fd6`）· 对象 PerryLink（个人开发者，非官方，not affiliated with DeepSeek）· 交付契约：Host seam `ctx.env` + Client UI + Agent tools + CLI。
 
+> **npm package:** `@perrylink/dsh-root` — the unscoped `dsh-root` is blocked by npm name-similarity rules; the product name remains **Root**.
+
 ## 0. 口径与证据边界
 - 内核结论读自本机 checkout `ca33fd6`（`package.json` = `0.2.2-rc.4`）；npm/GitHub 采样 2026-11-20，周下载是**采用代理**不是安装量；本文无自测性能/转化数字，未实测标「待验」，行号升级需重核。
 - 一条决定性边界：**launch 快照在 `apps/cli/src/bin.ts:36` 创建、插件 mount 之前就冻结**（`launch-environment/src/index.ts:106-115`），所以插件**无法**回头改 `launchEnvironmentOf()` / credentials / launcher 代理看到的环境。这决定了本文的**两层应用模型**。
