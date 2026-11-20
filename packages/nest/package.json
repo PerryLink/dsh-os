@@ -41,6 +41,25 @@
     "manifestVersion": 1,
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "os": {
+      "service": "nest",
+      "provides": [
+        "nest"
+      ],
+      "capabilities": [
+        "fs.read"
+      ],
+      "tools": [
+        "nest_set",
+        "nest_get",
+        "nest_list",
+        "nest_diff",
+        "nest_remove"
+      ],
+      "ui": null,
+      "stability": "experimental",
+      "since": "0.1.0"
     }
   },
   "publishConfig": {

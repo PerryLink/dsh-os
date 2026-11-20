@@ -40,6 +40,22 @@
     "manifestVersion": 1,
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "os": {
+      "service": "triggers",
+      "provides": [
+        "triggers"
+      ],
+      "capabilities": [],
+      "tools": [
+        "trigger_register",
+        "trigger_list",
+        "trigger_fire",
+        "trigger_runs"
+      ],
+      "ui": null,
+      "stability": "experimental",
+      "since": "0.1.0"
     }
   },
   "publishConfig": {

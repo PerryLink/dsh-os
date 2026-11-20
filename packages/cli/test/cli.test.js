@@ -138,12 +138,12 @@ test('list --all adds optional modules and text output stays tabular', t => {
   })
   assert.equal(json.status, 0, json.stderr)
   const modules = JSON.parse(json.stdout)
-  assert.equal(modules.length, 7)
+  assert.equal(modules.length, 9)
   const optional = modules.filter(module => module.optional)
-  assert.equal(optional.length, 5)
+  assert.equal(optional.length, 7)
   assert.deepEqual(
     optional.map(module => module.name),
-    ['dsh-help', 'dsh-context', 'dsh-cost', 'dsh-backup', 'dsh-notify'],
+    ['dsh-help', '@perrylink/dsh-context', '@perrylink/dsh-cost', '@perrylink/dsh-backup', '@perrylink/dsh-notify', '@perrylink/dsh-os-shell', 'dsh-os-kit'],
   )
 
   const text = runCli(['list'], { cwd: root, env: envWithPath(emptyBin) })
@@ -280,7 +280,7 @@ test('doctor exits 1 for an unsupported Node range and an unbounded engines.dsh'
 
 test('catalog.json describes 11 modules plus 5 optional modules', () => {
   const catalog = JSON.parse(readFileSync(CATALOG_PATH, 'utf8'))
-  assert.equal(catalog.length, 16)
+  assert.equal(catalog.length, 18)
   assert.deepEqual(
     catalog.filter(entry => !entry.optional).map(entry => entry.name),
     [
@@ -297,7 +297,7 @@ test('catalog.json describes 11 modules plus 5 optional modules', () => {
       '@perrylink/dsh-root',
     ],
   )
-  assert.equal(catalog.filter(entry => entry.optional).length, 5)
+  assert.equal(catalog.filter(entry => entry.optional).length, 7)
   for (const entry of catalog) {
     for (const field of [
       'name',
@@ -308,7 +308,11 @@ test('catalog.json describes 11 modules plus 5 optional modules', () => {
       'description',
       'install',
     ]) {
-      assert.equal(typeof entry[field], 'string', `${entry.name} ${field}`)
+      if (field === 'service') {
+        assert.ok(entry[field] === null || typeof entry[field] === 'string', `${entry.name} ${field}`)
+      } else {
+        assert.equal(typeof entry[field], 'string', `${entry.name} ${field}`)
+      }
     }
     assert.match(entry.version, /^\d+\.\d+\.\d+/)
     assert.equal(entry.install, `dsh plugin --profile web add ${entry.name}`)

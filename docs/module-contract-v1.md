@@ -69,6 +69,11 @@ removable.
 | Stage | `ctx.stage` | `stage_` |
 | Ring | `ctx.ring` | `ring_` |
 | Root | `ctx.env` | `root_` |
+| Help (optional) | `ctx.help` | `help_` |
+| Context (optional) | `ctx.context` | `context_` |
+| Cost (optional) | `ctx.cost` | `cost_` |
+| Backup (optional) | `ctx.backup` | `backup_` |
+| Notify (optional) | `ctx.notify` | `notify_` |
 
 The service name is part of the public contract; renaming requires a major
 version and a conformance update.

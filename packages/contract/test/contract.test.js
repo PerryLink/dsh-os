@@ -67,6 +67,11 @@ test('SERVICES is the canonical product to Host seam table', () => {
     stage: 'stage',
     ring: 'ring',
     root: 'env',
+    help: 'help',
+    context: 'context',
+    cost: 'cost',
+    backup: 'backup',
+    notify: 'notify',
   })
   assert.ok(Object.isFrozen(SERVICES))
 })

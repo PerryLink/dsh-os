@@ -1,0 +1,72 @@
+{
+  "name": "@perrylink/dsh-notify",
+  "version": "0.1.0",
+  "description": "Channel registry, routing and delivery ledger for DeepSeek Harness notifications.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "agent-os",
+    "notify",
+    "notification",
+    "channel",
+    "ledger"
+  ],
+  "license": "MIT",
+  "author": "PerryLink contributors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PerryLink/dsh-os.git",
+    "directory": "packages/notify"
+  },
+  "homepage": "https://github.com/PerryLink/dsh-os/tree/main/packages/notify#readme",
+  "bugs": {
+    "url": "https://github.com/PerryLink/dsh-os/issues"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.9.0",
+    "dsh": ">=0.2.1-rc.2 <0.3.0-0"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "os": {
+      "service": "notify",
+      "provides": [
+        "notify"
+      ],
+      "capabilities": [
+        "notify"
+      ],
+      "tools": [
+        "notify_send",
+        "notify_channels",
+        "notify_history"
+      ],
+      "ui": null,
+      "stability": "experimental",
+      "since": "0.1.0"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

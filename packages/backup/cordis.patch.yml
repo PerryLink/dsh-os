@@ -1,0 +1,4 @@
+# @perrylink/dsh-backup bundle patch: mount the plugin.
+- insert:
+    - id: '@perrylink/dsh-backup'
+      name: '@perrylink/dsh-backup'

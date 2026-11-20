@@ -40,6 +40,25 @@
     "manifestVersion": 1,
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "os": {
+      "service": "stage",
+      "provides": [
+        "stage"
+      ],
+      "capabilities": [
+        "ui"
+      ],
+      "tools": [
+        "stage_topology",
+        "stage_layout_set",
+        "stage_layout_apply",
+        "stage_layout_list",
+        "stage_undo"
+      ],
+      "ui": null,
+      "stability": "experimental",
+      "since": "0.1.0"
     }
   },
   "scripts": {

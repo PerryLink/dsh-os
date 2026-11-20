@@ -1,0 +1,69 @@
+{
+  "name": "dsh-help",
+  "version": "0.1.0",
+  "description": "Read-only install doctor and first-run wizard for the dsh-os module family.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "agent-os",
+    "help",
+    "doctor",
+    "quickstart"
+  ],
+  "license": "MIT",
+  "author": "PerryLink contributors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PerryLink/dsh-os.git",
+    "directory": "packages/help"
+  },
+  "homepage": "https://github.com/PerryLink/dsh-os/tree/main/packages/help#readme",
+  "bugs": {
+    "url": "https://github.com/PerryLink/dsh-os/issues"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.9.0",
+    "dsh": ">=0.2.1-rc.2 <0.3.0-0"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "os": {
+      "service": "help",
+      "provides": [
+        "help"
+      ],
+      "capabilities": [],
+      "tools": [
+        "help_doctor",
+        "help_first_run",
+        "help_install_plan"
+      ],
+      "ui": null,
+      "stability": "experimental",
+      "since": "0.1.0"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

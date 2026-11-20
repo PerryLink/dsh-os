@@ -28,42 +28,18 @@ const MODULES = [
 ]
 
 const OPTIONAL_MODULES = [
-  {
-    name: 'dsh-help',
-    product: 'Help',
-    service: 'help',
-    description: 'Optional install doctor and first-run wizard for DeepSeek Harness.',
-  },
-  {
-    name: 'dsh-context',
-    product: 'Context',
-    service: 'context',
-    description:
-      'Optional active app, window and selection context provider for DeepSeek Harness.',
-  },
-  {
-    name: 'dsh-cost',
-    product: 'Cost',
-    service: 'cost',
-    description: 'Optional cost adapter for dsh-cost-meter; it ships no new meter.',
-  },
-  {
-    name: 'dsh-backup',
-    product: 'Backup',
-    service: 'backup',
-    description: 'Optional workspace snapshot and restore for DeepSeek Harness.',
-  },
-  {
-    name: 'dsh-notify',
-    product: 'Notify',
-    service: 'notify',
-    description: 'Optional attention router and notification inbox for DeepSeek Harness.',
-  },
+  { dir: 'help', product: 'Help', service: 'help' },
+  { dir: 'context', product: 'Context', service: 'context' },
+  { dir: 'cost', product: 'Cost', service: 'cost' },
+  { dir: 'backup', product: 'Backup', service: 'backup' },
+  { dir: 'notify', product: 'Notify', service: 'notify' },
+  { dir: 'shell', product: 'Shell', service: null },
+  { dir: 'kit', product: 'Kit', service: null },
 ]
 
 const install = name => `dsh plugin --profile web add ${name}`
 
-const modules = MODULES.map(({ dir, product, service }) => {
+function entry({ dir, product, service }, optional = false) {
   const manifestPath = join(REPO_ROOT, 'packages', dir, 'package.json')
   const pkg = JSON.parse(readFileSync(manifestPath, 'utf8'))
   return {
@@ -74,20 +50,12 @@ const modules = MODULES.map(({ dir, product, service }) => {
     stability: pkg.dsh?.os?.stability || 'experimental',
     description: pkg.description,
     install: install(pkg.name),
+    ...(optional ? { optional: true } : {}),
   }
-})
+}
 
-const optional = OPTIONAL_MODULES.map(({ name, product, service, description }) => ({
-  name,
-  product,
-  service,
-  version: '0.0.0',
-  stability: 'experimental',
-  description,
-  install: install(name),
-  optional: true,
-}))
-
+const modules = MODULES.map(module => entry(module))
+const optional = OPTIONAL_MODULES.map(module => entry(module, true))
 const catalog = [...modules, ...optional]
 writeFileSync(CATALOG_PATH, `${JSON.stringify(catalog, null, 2)}\n`)
 console.log(

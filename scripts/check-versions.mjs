@@ -103,7 +103,7 @@ for (const dir of directories) {
     issues.push(`publishConfig.registry is not ${NPM_REGISTRY}/ ("${registry}")`)
   }
 
-  if (!dependencies.ok) {
+  if (manifest.dsh?.kit !== true && !dependencies.ok) {
     issues.push(`dependencies must be empty (found ${dependencies.count})`)
   }
 

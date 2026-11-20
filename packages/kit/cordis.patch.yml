@@ -1,0 +1,15 @@
+# dsh-os-kit bundle patch: mount the four core modules in one insert.
+# The kit ships no config; each module stays independently configurable and
+# replaceable through its own bundle layer.
+- insert:
+    - id: dsh-act
+      name: dsh-act
+
+    - id: dsh-allow
+      name: dsh-allow
+
+    - id: dsh-snip
+      name: dsh-snip
+
+    - id: '@perrylink/dsh-check'
+      name: '@perrylink/dsh-check'

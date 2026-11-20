@@ -1,0 +1,160 @@
+name: Bug report
+description: Report a reproducible problem in a dsh-os package.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug.
+
+        **This is an independent community project, not affiliated with DeepSeek.**
+        Do not paste tokens, API keys, cookies, private paths or session contents.
+        Redact logs before attaching them.
+
+        A good report has: the package and version, the exact install command,
+        the DSH and Node versions, the smallest reproduction, and the relevant
+        log lines. "It does not work" cannot be acted on.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight
+      description: Please confirm these before filing.
+      options:
+        - label: I searched existing issues and did not find the same problem.
+          required: true
+        - label: I removed tokens, keys, cookies, usernames and private paths from everything below.
+          required: true
+        - label: I understand this is an independent community project and is not affiliated with DeepSeek.
+          required: true
+
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      description: Which package is affected? Pick the closest one.
+      multiple: false
+      options:
+        - dsh-act
+        - dsh-allow
+        - dsh-snip
+        - dsh-nest
+        - dsh-trigger
+        - dsh-seek
+        - dsh-stage
+        - dsh-ring
+        - "@perrylink/dsh-check"
+        - "@perrylink/dsh-root"
+        - "@perrylink/dsh-trace"
+        - "@perrylink/dsh-os-cli"
+        - "@perrylink/dsh-os-shell"
+        - "@perrylink/dsh-os-contract"
+        - I am not sure
+        - Other / cross-package
+    validations:
+      required: true
+
+  - type: input
+    id: package-version
+    attributes:
+      label: Package version
+      description: The version you actually installed, not the one in the README.
+      placeholder: "0.1.2"
+    validations:
+      required: true
+
+  - type: input
+    id: dsh-version
+    attributes:
+      label: DSH version
+      description: Output of `dsh --version`, or the version shown in Settings / About.
+      placeholder: "0.2.2-rc.4"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: Install method
+      description: How the package was installed.
+      multiple: false
+      options:
+        - dsh plugin --profile web add <package>
+        - dsh plugin add github:<owner>/<repo>
+        - Install from a release tarball (.tgz)
+        - Local checkout / link / workspace
+        - Installed by another bundle or market
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      multiple: false
+      options:
+        - Windows 11
+        - Windows 10
+        - Windows + WSL2
+        - macOS
+        - Linux
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js version
+      description: Output of `node --version`. Packages require 22.19+ or 24.9+.
+      placeholder: "v24.22.1"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The smallest sequence that still fails. Include the exact commands.
+      placeholder: |
+        1. dsh plugin --profile web add dsh-allow
+        2. ...
+        3. ...
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happened instead? Include the exact error text if there is one.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste the smallest relevant excerpt, with secrets and private paths removed.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else
+      description: Config snippets, whether it worked on an older version, related issues, screenshots.
+    validations:
+      required: false

@@ -40,6 +40,25 @@
     "manifestVersion": 1,
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "os": {
+      "service": "env",
+      "provides": [
+        "env"
+      ],
+      "capabilities": [
+        "secret"
+      ],
+      "tools": [
+        "root_set",
+        "root_get",
+        "root_list",
+        "root_resolve",
+        "root_explain"
+      ],
+      "ui": null,
+      "stability": "experimental",
+      "since": "0.1.0"
     }
   },
   "publishConfig": {

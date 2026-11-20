@@ -10,14 +10,14 @@
 export const SERVICES = Object.freeze({
   act: 'act', allow: 'allow', snip: 'snip', check: 'check', nest: 'nest',
   trigger: 'triggers', seek: 'evidence', trace: 'trace', stage: 'stage',
-  ring: 'ring', root: 'env',
+  ring: 'ring', root: 'env', help: 'help', context: 'context', cost: 'cost', backup: 'backup', notify: 'notify',
 })
 
 /** Agent tool prefix per canonical service. */
 const TOOL_PREFIX = Object.freeze({
   act: 'act_', allow: 'allow_', snip: 'snip_', check: 'check_', nest: 'nest_',
   triggers: 'trigger_', evidence: 'seek_', trace: 'trace_', stage: 'stage_',
-  ring: 'ring_', env: 'root_',
+  ring: 'ring_', env: 'root_', help: 'help_', context: 'context_', cost: 'cost_', backup: 'backup_', notify: 'notify_',
 })
 
 /** Capabilities a module may declare in `dsh.os.capabilities`. @type {ReadonlyArray<string>} */

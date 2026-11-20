@@ -45,6 +45,27 @@
     "manifestVersion": 1,
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "os": {
+      "service": "snip",
+      "provides": [
+        "snip"
+      ],
+      "capabilities": [
+        "clipboard",
+        "secret"
+      ],
+      "tools": [
+        "snip_add",
+        "snip_search",
+        "snip_get",
+        "snip_list",
+        "snip_forget",
+        "snip_clear"
+      ],
+      "ui": null,
+      "stability": "experimental",
+      "since": "0.1.0"
     }
   },
   "publishConfig": {

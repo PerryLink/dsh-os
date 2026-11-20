@@ -9,6 +9,17 @@ search, memory governance, window topology and approval escalation.
 > trademarks of their respective owners. These are independent community
 > packages, published under MIT.
 
+[![Terminal card: dsh-check prints "Check REGRESSION" and exits 1](docs/assets/check-demo.svg)](examples/os-kit/README.md)
+
+**Runnable in 10 minutes:** [`examples/os-kit`](examples/os-kit/README.md) has
+two dependency-free demos — Allow + Act + Snip (deny → 30-minute Grant → allow
+→ revoke → deny) and the Check regression gate. `node examples/os-kit/demo.mjs`
+needs only Node 22+; nothing is installed or published.
+
+**Docs:** [Quickstart](docs/quickstart.md) ·
+[Recipes](docs/recipes/) (CI gate, agent writes, clipboard) ·
+[Troubleshooting](docs/troubleshooting.md).
+
 ## Packages
 
 | Product | Package | Status | Design |
@@ -53,6 +64,7 @@ dsh plugin --profile web add @perrylink/dsh-trace
 
 ```
 packages/    one npm package per primitive
+examples/    dependency-free runnable demos
 docs/        design notes and the implementation contract
 scripts/     scaffold, test and publish helpers
 ```
@@ -104,6 +116,23 @@ needs the `NPM_TOKEN` repository secret (a granular npm token allowed to
 publish `dsh-*` and `@perrylink/*`), an approval-protected environment, and an
 explicit `npm publish` of the reviewed tarballs. The workflow never runs
 `npm publish`.
+
+## Community, RFCs and feedback
+
+- **Launch and support notes:** [docs/community/launch.md](docs/community/launch.md)
+  — what works today, what is still 0.2.0, and the official post / directory
+  submission drafts.
+- **Upstream RFCs (suggestions, not requirements):**
+  [`ctx.actions`](docs/rfcs/ctx-actions.md),
+  [`ctx.grant`](docs/rfcs/ctx-grant.md),
+  [`ctx.triggers`](docs/rfcs/ctx-triggers.md).
+- **Telemetry:** [docs/telemetry.md](docs/telemetry.md) — off by default; no
+  telemetry or network code ships in 0.1.x.
+- **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md),
+  [issue templates](.github/ISSUE_TEMPLATE/) and the
+  [pull request template](.github/PULL_REQUEST_TEMPLATE.md).
+- **Not affiliated with DeepSeek.** DeepSeek and DeepSeek Harness are
+  trademarks of their respective owners.
 
 ## License
 

@@ -47,6 +47,19 @@
     "manifestVersion": 1,
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "os": {
+      "service": "check",
+      "provides": [
+        "check"
+      ],
+      "capabilities": [],
+      "tools": [
+        "check_compare"
+      ],
+      "ui": null,
+      "stability": "experimental",
+      "since": "0.1.0"
     }
   },
   "scripts": {

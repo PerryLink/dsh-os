@@ -49,6 +49,11 @@ export const SERVICE_PREFIX = Object.freeze({
   stage: 'stage_',
   ring: 'ring_',
   env: 'root_',
+  help: 'help_',
+  context: 'context_',
+  cost: 'cost_',
+  backup: 'backup_',
+  notify: 'notify_',
 })
 
 export const CAPABILITIES = Object.freeze([
@@ -444,7 +449,9 @@ export function checkPackage(pkgDir, { root, strict = false, legacyWarnings = LE
   }
 
   // Zero runtime dependencies: applies to plugins and libraries alike.
-  if (pkg.dependencies !== undefined) {
+  // The meta kit is the only documented exception (it installs other modules).
+  const isKit = pkg.dsh && pkg.dsh.kit === true
+  if (!isKit && pkg.dependencies !== undefined) {
     if (typeof pkg.dependencies !== 'object' || pkg.dependencies === null || Array.isArray(pkg.dependencies)) {
       add('dependencies', 'dependencies must be an object')
     } else {

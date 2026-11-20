@@ -1,0 +1,68 @@
+{
+  "name": "@perrylink/dsh-context",
+  "version": "0.1.0",
+  "description": "Read-only context provider protocol for DeepSeek Harness: app, window, selection, clipboard metadata and files, with isolated provider snapshots.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "agent-os",
+    "context",
+    "provider",
+    "snapshot"
+  ],
+  "license": "MIT",
+  "author": "PerryLink contributors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PerryLink/dsh-os.git",
+    "directory": "packages/context"
+  },
+  "homepage": "https://github.com/PerryLink/dsh-os/tree/main/packages/context#readme",
+  "bugs": {
+    "url": "https://github.com/PerryLink/dsh-os/issues"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.9.0",
+    "dsh": ">=0.2.1-rc.2 <0.3.0-0"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "os": {
+      "service": "context",
+      "provides": [
+        "context"
+      ],
+      "capabilities": [],
+      "tools": [
+        "context_snapshot",
+        "context_providers",
+        "context_register_demo"
+      ],
+      "stability": "experimental",
+      "since": "0.1.0"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="344" viewBox="0 0 1000 344" role="img" aria-labelledby="card-title card-desc">
+  <title id="card-title">dsh-check reports REGRESSION and exits 1</title>
+  <desc id="card-desc">Terminal card of the dsh-os Check demo: the same task produced a different result under a new environment, so dsh-check printed “Check REGRESSION” and exited with code 1.</desc>
+
+  <rect x="0.5" y="0.5" width="999" height="343" rx="12" fill="#0d1117" stroke="#30363d"/>
+
+  <!-- window chrome -->
+  <path d="M0.5 12.5A12 12 0 0 1 12.5 0.5h975A12 12 0 0 1 999.5 12.5V44H0.5Z" fill="#161b22"/>
+  <line x1="0.5" y1="44" x2="999.5" y2="44" stroke="#30363d"/>
+  <circle cx="26" cy="22" r="6" fill="#ff5f56"/>
+  <circle cx="46" cy="22" r="6" fill="#ffbd2e"/>
+  <circle cx="66" cy="22" r="6" fill="#27c93f"/>
+  <text x="90" y="27" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="12.5" fill="#8b949e">examples/os-kit/check-demo — dsh-check diff</text>
+  <rect x="866" y="11" width="108" height="22" rx="11" fill="#3d1418" stroke="#f85149" stroke-opacity="0.45"/>
+  <text x="920" y="26" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="11.5" font-weight="700" fill="#f85149">REGRESSION</text>
+
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="13.5">
+    <text x="32" y="82"><tspan fill="#3fb950" font-weight="700">$&#160;</tspan><tspan fill="#e6edf3">bash examples/os-kit/check-demo/run-check-demo.sh</tspan></text>
+    <text x="32" y="112"><tspan fill="#8b949e">old:&#160;</tspan><tspan fill="#58a6ff">check-demo/old.json</tspan><tspan fill="#8b949e">&#160;— baseline run&#160;&#160;(dsh 0.2.1-rc.2 / deepseek-chat)</tspan></text>
+    <text x="32" y="142"><tspan fill="#8b949e">new:&#160;</tspan><tspan fill="#58a6ff">check-demo/new.json</tspan><tspan fill="#8b949e">&#160;— candidate run (dsh 0.2.2-rc.4 / deepseek-chat)</tspan></text>
+    <text x="32" y="172"><tspan fill="#8b949e">[1/2]&#160;</tspan><tspan fill="#c9d1d9">node ../../packages/check/bin/dsh-check.js diff --old check-demo/old.json --new check-demo/new.json</tspan></text>
+    <text x="32" y="202"><tspan fill="#c9d1d9">Check&#160;</tspan><tspan fill="#f85149" font-weight="700">REGRESSION</tspan><tspan fill="#c9d1d9">:&#160;1 task(s), 1 regression(s), 0 warning(s), 0 ignored</tspan></text>
+    <text x="48" y="232"><tspan fill="#f85149" font-weight="700">REGRESSION</tspan><tspan fill="#c9d1d9">&#160;session-token-summary&#160;</tspan><tspan fill="#d29922">[result/regression]</tspan><tspan fill="#c9d1d9">&#160;result changed</tspan></text>
+    <text x="32" y="262"><tspan fill="#8b949e">[2/2]&#160;</tspan><tspan fill="#c9d1d9">dsh-check exit code:&#160;</tspan><tspan fill="#f85149" font-weight="700">1</tspan><tspan fill="#8b949e">&#160;(expected 1: the regression gate fired)</tspan></text>
+    <text x="32" y="292"><tspan fill="#3fb950" font-weight="700">PASS</tspan><tspan fill="#c9d1d9">:&#160;Check caught the result regression and rejected the candidate run.</tspan></text>
+  </g>
+</svg>

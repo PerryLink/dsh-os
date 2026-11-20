@@ -1,0 +1,68 @@
+{
+  "name": "dsh-os-kit",
+  "version": "0.1.0",
+  "description": "Thin meta bundle that installs and mounts the four core dsh-os modules: Act, Allow, Snip and Check.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "agent-os",
+    "meta-bundle",
+    "kit"
+  ],
+  "license": "MIT",
+  "author": "PerryLink contributors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PerryLink/dsh-os.git",
+    "directory": "packages/kit"
+  },
+  "homepage": "https://github.com/PerryLink/dsh-os/tree/main/packages/kit#readme",
+  "bugs": {
+    "url": "https://github.com/PerryLink/dsh-os/issues"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.9.0",
+    "dsh": ">=0.2.1-rc.2 <0.3.0-0"
+  },
+  "dependencies": {
+    "dsh-act": "^0.1.0",
+    "dsh-allow": "^0.1.0",
+    "dsh-snip": "^0.1.0",
+    "@perrylink/dsh-check": "^0.1.0"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "os": {
+      "service": null,
+      "provides": [],
+      "capabilities": [],
+      "tools": [],
+      "stability": "experimental",
+      "since": "0.1.0"
+    },
+    "kit": true
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

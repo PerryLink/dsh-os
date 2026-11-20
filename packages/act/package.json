@@ -40,6 +40,20 @@
     "manifestVersion": 1,
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "os": {
+      "service": "act",
+      "provides": [
+        "act"
+      ],
+      "capabilities": [],
+      "tools": [
+        "act_list",
+        "act_invoke"
+      ],
+      "ui": null,
+      "stability": "experimental",
+      "since": "0.1.0"
     }
   },
   "publishConfig": {

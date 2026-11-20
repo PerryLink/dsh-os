@@ -1,0 +1,4 @@
+# @perrylink/dsh-context bundle patch: mount the plugin.
+- insert:
+    - id: '@perrylink/dsh-context'
+      name: '@perrylink/dsh-context'

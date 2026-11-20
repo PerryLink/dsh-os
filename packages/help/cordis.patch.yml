@@ -1,0 +1,4 @@
+# dsh-help bundle patch: mount the plugin.
+- insert:
+    - id: dsh-help
+      name: dsh-help

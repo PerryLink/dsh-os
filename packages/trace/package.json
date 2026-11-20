@@ -44,6 +44,24 @@
     "manifestVersion": 1,
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "os": {
+      "service": "trace",
+      "provides": [
+        "trace"
+      ],
+      "capabilities": [
+        "secret"
+      ],
+      "tools": [
+        "trace_remember",
+        "trace_search",
+        "trace_forget",
+        "trace_list"
+      ],
+      "ui": null,
+      "stability": "experimental",
+      "since": "0.1.0"
     }
   },
   "publishConfig": {

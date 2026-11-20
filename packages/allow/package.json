@@ -40,6 +40,19 @@
     "manifestVersion": 1,
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "os": {
+      "service": "allow",
+      "provides": [
+        "allow"
+      ],
+      "capabilities": [],
+      "tools": [
+        "allow_check"
+      ],
+      "ui": null,
+      "stability": "experimental",
+      "since": "0.1.0"
     }
   },
   "publishConfig": {

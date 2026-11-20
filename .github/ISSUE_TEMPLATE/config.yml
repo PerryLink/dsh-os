@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Usage questions / 使用问题
+    url: https://github.com/deepseek-ai/deepseek-harness/discussions
+    about: For questions about DSH itself, ask in the official DeepSeek Harness Discussions. This repository is an independent community project and is not affiliated with DeepSeek.
+  - name: Security report / 安全报告
+    url: https://github.com/PerryLink/dsh-os/security
+    about: Please do not open a public issue for a vulnerability. Use a private security advisory, and never paste tokens, keys or private data in a public report.
+  - name: Read the launch and support notes / 先读发布与支持说明
+    url: https://github.com/PerryLink/dsh-os/blob/main/docs/community/launch.md
+    about: Install methods, the demo, the 0.1.x limitations and the not-affiliated disclosure are documented here before you file.

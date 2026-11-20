@@ -1,0 +1,29 @@
+{
+  "schema": "dsh.check.run/v1",
+  "environment": {
+    "label": "dsh 0.2.2-rc.4 / deepseek-chat",
+    "dsh": "0.2.2-rc.4",
+    "model": "deepseek-chat"
+  },
+  "tasks": [
+    {
+      "id": "session-token-summary",
+      "result": {
+        "text": "usage unavailable"
+      },
+      "trajectory": {
+        "steps": 6,
+        "toolCalls": 4,
+        "errors": 0
+      },
+      "cost": {
+        "usd": 0.12,
+        "tokens": 18300
+      },
+      "approvals": {
+        "asked": 0,
+        "rejected": 0
+      }
+    }
+  ]
+}

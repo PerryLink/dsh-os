@@ -40,6 +40,20 @@
     "manifestVersion": 1,
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "os": {
+      "service": "evidence",
+      "provides": [
+        "evidence"
+      ],
+      "capabilities": [],
+      "tools": [
+        "seek_search",
+        "seek_providers"
+      ],
+      "ui": null,
+      "stability": "experimental",
+      "since": "0.1.0"
     }
   },
   "publishConfig": {
