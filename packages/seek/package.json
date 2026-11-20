@@ -1,6 +1,6 @@
 {
   "name": "dsh-seek",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Cross-source evidence search for DeepSeek Harness with verifiable refs and freshness.",
   "type": "module",
   "main": "index.js",
@@ -44,5 +44,8 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "scripts": {
+    "test": "node --test"
   }
 }

@@ -1,7 +1,7 @@
 {
   "name": "dsh-stage",
-  "version": "0.0.1",
-  "description": "Display, window and space topology for DeepSeek Harness agents, with reversible layouts.",
+  "version": "0.1.0",
+  "description": "Display, window and space topology protocol for DeepSeek Harness agents, with normalized, reversible layouts.",
   "type": "module",
   "main": "index.js",
   "exports": {
@@ -41,6 +41,9 @@
     "bundle": {
       "patch": "./cordis.patch.yml"
     }
+  },
+  "scripts": {
+    "test": "node --test"
   },
   "publishConfig": {
     "access": "public"

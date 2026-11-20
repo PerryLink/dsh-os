@@ -1,7 +1,7 @@
 {
   "name": "dsh-trigger",
-  "version": "0.0.1",
-  "description": "Event-to-agent trigger fabric for DeepSeek Harness with retries, dedupe and dead letters.",
+  "version": "0.1.0",
+  "description": "In-memory event-to-action trigger fabric for DeepSeek Harness: condition DSL, cooldown and a run ledger.",
   "type": "module",
   "main": "index.js",
   "exports": {
@@ -44,5 +44,8 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "scripts": {
+    "test": "node --test"
   }
 }

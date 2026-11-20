@@ -1,8 +1,7 @@
 # dsh-os
 
-A family of **OS-level primitives for DeepSeek Harness**. Six functional MVPs
-(Act, Allow, Snip, Check, Nest, Root) and five name-reserved packages
-(Trigger, Seek, Trace, Stage, Ring): actions, grants, clipboard, workspace
+A family of **OS-level primitives for DeepSeek Harness**. Eleven 0.1.0 MVPs
+(protocol/service implementations; native adapters land in 0.2.0): actions, grants, clipboard, workspace
 profiles, environment profiles, regression canaries, triggers, evidence
 search, memory governance, window topology and approval escalation.
 
@@ -19,11 +18,11 @@ search, memory governance, window topology and approval escalation.
 | **Snip** | `dsh-snip` | 0.1.0 MVP | [design](docs/design/03-snip.md) |
 | **Check** | `@perrylink/dsh-check` | 0.1.0 MVP (diff engine; runner in 0.2.0) | [design](docs/design/04-check.md) |
 | **Nest** | `dsh-nest` | 0.1.0 MVP | [design](docs/design/05-nest.md) |
-| **Trigger** | `dsh-trigger` | 0.0.1 placeholder | [design](docs/design/06-trigger.md) |
-| **Seek** | `dsh-seek` | 0.0.1 placeholder | [design](docs/design/07-seek.md) |
-| **Trace** | `@perrylink/dsh-trace` | 0.0.1 placeholder | [design](docs/design/08-trace.md) |
-| **Stage** | `dsh-stage` | 0.0.1 placeholder | [design](docs/design/09-stage.md) |
-| **Ring** | `dsh-ring` | 0.0.1 placeholder | [design](docs/design/10-ring.md) |
+| **Trigger** | `dsh-trigger` | 0.1.0 protocol MVP | [design](docs/design/06-trigger.md) |
+| **Seek** | `dsh-seek` | 0.1.0 protocol MVP | [design](docs/design/07-seek.md) |
+| **Trace** | `@perrylink/dsh-trace` | 0.1.0 protocol MVP | [design](docs/design/08-trace.md) |
+| **Stage** | `dsh-stage` | 0.1.0 protocol MVP | [design](docs/design/09-stage.md) |
+| **Ring** | `dsh-ring` | 0.1.0 protocol MVP | [design](docs/design/10-ring.md) |
 | **Root** | `@perrylink/dsh-root` | 0.1.0 MVP | [design](docs/design/11-root.md) |
 
 `Check`, `Trace` and `Root` use the `@perrylink/` scope because npm's
