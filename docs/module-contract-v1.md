@@ -8,7 +8,7 @@ removable.
 ## 1. Module rules
 
 1. ≤ 450 lines of runtime code, zero runtime dependencies (split before 1.0).
-2. One Host service + ≤ 6 agent tools; UI is optional.
+2. One Host service + ≤ 8 agent tools; UI is optional.
 3. Own storage; no global singleton.
 4. Depend on seams (`ctx.*`), never import another module's package.
 5. Declare capabilities in `dsh.os.capabilities`.
