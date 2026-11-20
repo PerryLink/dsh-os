@@ -33,7 +33,21 @@ name-similarity protection rejects the unscoped names.
 ```sh
 dsh plugin --profile web add dsh-act
 dsh plugin --profile web add dsh-allow
+dsh plugin --profile web add dsh-snip
+dsh plugin --profile web add dsh-nest
+dsh plugin --profile web add dsh-trigger
+dsh plugin --profile web add dsh-seek
+dsh plugin --profile web add dsh-stage
+dsh plugin --profile web add dsh-ring
+dsh plugin --profile web add @perrylink/dsh-check
+dsh plugin --profile web add @perrylink/dsh-root
+dsh plugin --profile web add 'https://registry.npmjs.org/@perrylink%2Fdsh-trace/-/dsh-trace-0.1.0.tgz'
 ```
+
+> `@perrylink/dsh-trace` is scoped because npm rejects the unscoped `dsh-trace`
+> as too similar to `dd-trace`. If pnpm cannot resolve its tarball from your
+> configured mirror, use the encoded tarball URL above.
+
 
 ## Repository layout
 
@@ -42,6 +56,14 @@ packages/    one npm package per primitive
 docs/        design notes and the implementation contract
 scripts/     scaffold, test and publish helpers
 ```
+
+## Status
+
+All eleven packages ship a 0.1.0 MVP: services, agent tools, tests and a
+bundle manifest. Native/OS adapters (AX/Win32, real clipboard capture, DSH
+headless runner, fs/webhook/agent trigger sources, locator/library/memento
+providers) are scheduled for 0.2.0. `node scripts/test-all.mjs` runs 102 tests
+across 12 suites.
 
 ## Development
 

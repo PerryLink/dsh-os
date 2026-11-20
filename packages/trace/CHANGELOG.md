@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1
+
+- Republish after npm failed to serve the 0.1.0 tarball (metadata existed, tarball 404). No code change.
+
 ## 0.1.0
 
 - Add `TraceService` exposed as the Host service `ctx.trace` with
