@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.4.0 — 2026-11-21
+
+### Added
+
+- **Content-hash taint gate.** The gateway keeps an in-process
+  `TaintRegistry` of `sha256(text)` for every `text`/`content` field returned
+  by `snip_get`, `seek_resolve` and `trigger_runs`, and for any result that
+  carries a `taintToken`. Only digests, source ids, tokens and timestamps are
+  stored; the original text is never kept or logged.
+- `os_do` on `act.fs.write` (or `legacy.act_invoke` with `args.id ===
+  "fs.write"`) hashes `args.text`/`args.content`. A registered digest requires
+  the base Grant **and** `cap:act.fs.write:tainted` through `ctx.allow.check`,
+  or a fresh `taintToken` bound to that digest. A miss returns `E_DENIED`,
+  `subcode: "grant_required"`, `details.permission:
+  "cap:act.fs.write:tainted"` and `nextTools: [os_request]`.
+- Tokens are single-use, hash-bound and expire after five minutes
+  (`TAINT_TTL_MS`). A used or expired token cannot authorize another write,
+  but the digest stays registered (bounded to 256 entries) so the tainted
+  Grant is still required. Taint evidence is stripped before the handler runs.
+- `os_request({ ..., tainted: true })` requests the mapped `:tainted`
+  capability, closing the two-approval loop through `os_observe`/`os_do`:
+  `legacy.act_invoke` maps to `cap:act.fs.write:tainted`.
+- `config.taint` (`{ ttlMs, max, now }`) for hosts/tests; exports
+  `TaintRegistry`, `TAINT_TTL_MS`, `MAX_TAINT_RECORDS` and the taint helpers.
+- Tests: blocked verbatim reuse, base+tainted Grants, one-shot and stripped
+  tokens, forged/expired tokens, ordinary content, `seek_resolve` and legacy
+  `snip_get` sources, and the real `dsh-allow` recovery loop.
+
+### Changed
+
+- `VERSION` and the package version are `0.4.0`. `os_do`/`os_request` schemas
+  document the taint behaviour; `os_request` gains the optional `tainted`
+  field.
+
+### Limit
+
+- The digest gate prevents verbatim reuse only. Rewritten content, substrings
+  or a different fetch path produce a different digest and pass. Full
+  provenance still requires host metadata; this is not taint tracking.
+
 ## 0.3.0 — 2026-11-21
 
 ### Added

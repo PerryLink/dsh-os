@@ -17,6 +17,7 @@ export {
   createGateway, createTools, gatewayTools, VERSION, TOOL_NAMES, CAPABILITY_PREFIX, capabilityName,
 } from './lib/gateway.js'
 export { createStateStore, STATE_VERSION, MAX_ENTRIES } from './lib/state.js'
+export { TaintRegistry, TAINT_TTL_MS, MAX_TAINT_RECORDS, TOKEN_PATTERN, TAINT_SOURCES, isTaintSource, sha256 } from './lib/taint.js'
 export { ok, err, legacyOutcome, resolveCode, ERROR_CLASSES, RESULT_SCHEMA } from './lib/envelope.js'
 
 /** Cordis plugin name. */
@@ -61,7 +62,7 @@ function restrictToGateway(ctx) {
  * `ctx.tools.schemas/get` exist, the first `os_find`/`os_status` lazily adapts
  * every visible non-`os_*` tool as `legacy.<tool name>`.
  * @param {any} ctx
- * @param {{authorize?: Function, strict?: boolean, legacyTools?: any[], legacyOptions?: any, capabilities?: any[], stateFile?: string, gatewayOnly?: boolean}} [config]
+ * @param {{authorize?: Function, strict?: boolean, legacyTools?: any[], legacyOptions?: any, capabilities?: any[], stateFile?: string, gatewayOnly?: boolean, taint?: {ttlMs?: number, max?: number, now?: Function}}} [config]
  * @returns {KernelService}
  */
 export function apply(ctx, config = {}) {
@@ -78,6 +79,7 @@ export function apply(ctx, config = {}) {
     ctx,
     stateFile: config.stateFile,
     gatewayOnly: config.gatewayOnly === true,
+    taint: config.taint,
   })
   if (ctx.tools && typeof ctx.tools.register === 'function') for (const tool of tools) ctx.tools.register(tool)
   if (config.gatewayOnly === true) {

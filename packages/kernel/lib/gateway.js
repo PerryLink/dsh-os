@@ -6,6 +6,7 @@ import { RISKS } from './descriptor.js'
 import { fingerprint } from './registry.js'
 import { VERSION, RESULT_SCHEMA, ok as makeResult, err as failure, legacyOutcome } from './envelope.js'
 import { createStateStore } from './state.js'
+import { TaintRegistry, sha256 } from './taint.js'
 
 export { VERSION, RESULT_SCHEMA }
 export const TOOL_NAMES = Object.freeze(['os_find', 'os_do', 'os_request', 'os_observe', 'os_help', 'os_status'])
@@ -25,9 +26,52 @@ const OUTPUT = {
 }
 const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value)
 const textOf = value => typeof value === 'string' && value.trim() ? value.trim() : null
+const subjectOf = exec => textOf(exec?.subject)
+  ?? textOf(exec?.agent?.session?.id)
+  ?? textOf(exec?.agent?.id)
 const maxRisk = risk => Math.max(...risk.map(item => RISK_RANK[item] ?? 0))
 const isRisky = descriptor =>
   descriptor.risk.some(risk => risk === 'write' || risk === 'execute') || descriptor.idempotency === 'destructive'
+
+/** Capability ids whose tainted-write gate is enforced by the kernel. */
+const TAINT_WRITE_IDS = new Set(['act.fs.write'])
+const taintTarget = (id, args) => {
+  if (TAINT_WRITE_IDS.has(id)) return id
+  if (id === 'legacy.act_invoke' && isObject(args) && args.id === 'fs.write') return 'act.fs.write'
+  return null
+}
+const taintedCapability = (id, args) => {
+  const target = taintTarget(id, args)
+  return `${capabilityName(target ?? id)}:tainted`
+}
+
+/** Exact write text plus the optional token carried in args or nested act args. */
+function taintProbe(id, args) {
+  const target = taintTarget(id, args)
+  if (target === null || !isObject(args)) return null
+  const nested = id === 'legacy.act_invoke' && isObject(args.args) ? args.args : args
+  const pick = value => typeof value?.text === 'string' && value.text !== '' ? value.text
+    : typeof value?.content === 'string' && value.content !== '' ? value.content : null
+  const text = pick(nested) ?? (nested === args ? null : pick(args))
+  if (text === null) return null
+  const token = typeof args.taintToken === 'string' && args.taintToken !== '' ? args.taintToken
+    : typeof nested.taintToken === 'string' && nested.taintToken !== '' ? nested.taintToken : null
+  return { target, hash: sha256(text), token }
+}
+
+/** Drop taint evidence before invoking; the kernel has already evaluated it. */
+function withoutTaint(id, args) {
+  const copy = { ...args }
+  delete copy.tainted
+  delete copy.taintToken
+  if (id === 'legacy.act_invoke' && isObject(copy.args)) {
+    const nested = { ...copy.args }
+    delete nested.tainted
+    delete nested.taintToken
+    copy.args = nested
+  }
+  return copy
+}
 
 const notFound = (id, requestId) => failure('E_NOT_FOUND', `No capability named "${id}".`, {
   subcode: 'unknown_capability',
@@ -63,7 +107,7 @@ function card(descriptor) {
 /**
  * Build a gateway over one registry.
  * @param {any} registry
- * @param {{ctx?: any, stateFile?: string, gatewayOnly?: boolean}} [options]
+ * @param {{ctx?: any, stateFile?: string, gatewayOnly?: boolean, taint?: any}} [options]
  */
 export function createGateway(registry, options = {}) {
   if (!registry || typeof registry.resolve !== 'function') throw new TypeError('createGateway needs a registry')
@@ -74,6 +118,7 @@ export function createGateway(registry, options = {}) {
   const handles = new Map()
   const idempotency = new Map()
   const autoGrants = new Map()
+  const taint = options.taint instanceof TaintRegistry ? options.taint : new TaintRegistry(options.taint)
   let idempotencyStore = null
   try {
     idempotencyStore = createStateStore(stateFile)
@@ -83,7 +128,9 @@ export function createGateway(registry, options = {}) {
 
   /** Resolve the Allow service once per call; a throwing getter fails closed. */
   function allowService() {
-    if (ctx?.allow) return ctx.allow
+    // Prefer the injected getter; the direct property is a test/host fallback.
+    // Cordis throws on an uninjected read, so it stays inside try/catch.
+    try { if (ctx?.allow) return ctx.allow } catch { /* not injected */ }
     if (typeof ctx?.get !== 'function') return null
     try { return ctx.get('allow') ?? null } catch { return null }
   }
@@ -136,11 +183,12 @@ export function createGateway(registry, options = {}) {
     }
   }
 
-  /** Peek at a cached approval bound to this subject/id/args without consuming it. */
-  function findAutoGrant(subject, id, argsHash) {
+  /** Peek at a cached approval bound to this subject/id/args/capability. */
+  function findAutoGrant(subject, id, argsHash, capability) {
     if (!subject || !argsHash) return null
     for (const item of autoGrants.values()) {
-      if (item.id === id && item.subject === subject && item.argsHash === argsHash) return item
+      if (item.id === id && item.subject === subject && item.argsHash === argsHash
+        && (capability === undefined || item.capability === capability)) return item
     }
     return null
   }
@@ -192,7 +240,7 @@ export function createGateway(registry, options = {}) {
   }
 
   async function allowedByHost(exec, descriptor) {
-    const subject = textOf(exec?.subject)
+    const subject = subjectOf(exec)
     const allow = allowService()
     if (!subject || !allow || typeof allow.check !== 'function') return false
     try {
@@ -213,6 +261,36 @@ export function createGateway(registry, options = {}) {
       ],
       requestId: exec?.requestId,
       details: { capability: descriptor.id, permission: capabilityName(descriptor.id), risk: descriptor.risk, permissions: descriptor.permissions },
+    })
+
+  /** Ask Allow for a tainted-write capability without consuming a cached grant. */
+  async function taintedAllowed(exec, capability) {
+    const subject = subjectOf(exec)
+    const allow = allowService()
+    if (!subject || !allow || typeof allow.check !== 'function') return false
+    try {
+      return (await allow.check({ subject, capability }))?.allowed === true
+    } catch {
+      return false
+    }
+  }
+
+  const taintDenied = (descriptor, args, probe, record, exec) => failure('E_DENIED',
+    `Writing content from a tainted source to "${probe.target}" needs a separate tainted Grant.`, {
+      subcode: 'grant_required',
+      remediation: 'Call os_request with tainted:true and the same id and args, then os_observe; or pass a fresh taintToken from the read.',
+      nextTools: [
+        { tool: 'os_request', args: { id: descriptor.id, args, reason: `Grant tainted-write access to ${probe.target}.`, tainted: true }, why: 'create the pending tainted-write approval' },
+        { tool: 'os_find', args: { intent: probe.target }, why: 'read the capability card and its tainted permission' },
+      ],
+      requestId: exec?.requestId,
+      details: {
+        capability: descriptor.id,
+        permission: `${capabilityName(probe.target)}:tainted`,
+        tainted: true,
+        taintSource: record?.source ?? null,
+        reason: probe.token ? 'invalid_taint_token' : 'taint_required',
+      },
     })
 
   async function execute(input = {}, exec = {}) {
@@ -237,9 +315,10 @@ export function createGateway(registry, options = {}) {
     if (!descriptor) return notFound(id, exec?.requestId)
     const gated = isRisky(descriptor)
     const argsHash = fingerprint(args)
-    const subject = textOf(exec?.subject)
+    const subject = subjectOf(exec)
     // A grant cached by os_observe is bound to the exact subject/id/args triple.
-    const auto = gated && !isGrant(providedGrant) ? findAutoGrant(subject, descriptor.id, argsHash) : null
+    const auto = gated && !isGrant(providedGrant)
+      ? findAutoGrant(subject, descriptor.id, argsHash, capabilityName(descriptor.id)) : null
     const grant = providedGrant ?? auto?.grant ?? undefined
     const authorized = !gated || Boolean(auto) || isGrant(grant)
     if (input.preview === true) {
@@ -267,15 +346,41 @@ export function createGateway(registry, options = {}) {
       }
     }
     if (!authorized && !(await allowedByHost(exec, descriptor))) return denied(descriptor, args, exec)
+    // Content-hash taint gate: the model no longer decides by writing
+    // `tainted:true`; a digest registered from snip_get/seek_resolve/
+    // trigger_runs (or any result carrying a taintToken) forces the extra
+    // :tainted Grant. A fresh, hash-bound token is the one-time alternative.
+    let callArgs = args
+    let taintAuto = null
+    const probe = taintProbe(descriptor.id, args)
+    if (probe) {
+      const record = taint.lookup(probe.hash)
+      if (record !== undefined || probe.token !== null) {
+        let cleared = record !== undefined && probe.token !== null && taint.consume(probe.hash, probe.token)
+        if (!cleared) {
+          const capability = taintedCapability(descriptor.id, args)
+          const cached = findAutoGrant(subject, descriptor.id, argsHash, capability)
+          if (cached) {
+            taintAuto = cached
+            cleared = true
+          } else {
+            cleared = await taintedAllowed(exec, capability)
+          }
+        }
+        if (!cleared) return taintDenied(descriptor, args, probe, record, exec)
+        callArgs = withoutTaint(descriptor.id, args)
+      }
+    }
     // Consume only after every check and after the idempotency replay path, so
     // a replayed call never burns a fresh approval and an approval is used once.
     if (auto) takeAutoGrant(auto)
-    const callRequestId = auto?.requestId ?? exec?.requestId
+    if (taintAuto) takeAutoGrant(taintAuto)
+    const callRequestId = auto?.requestId ?? taintAuto?.requestId ?? exec?.requestId
     const started = Date.now()
     let outcome
     try {
-      outcome = await registry.invoke(descriptor.id, args, {
-        ctx, subject: exec?.subject, agent: exec?.agent, signal: exec?.signal, grant, requestId: callRequestId,
+      outcome = await registry.invoke(descriptor.id, callArgs, {
+        ctx, subject: subjectOf(exec), agent: exec?.agent, signal: exec?.signal, grant, requestId: callRequestId,
       })
     } catch (error) {
       return failure('E_INTERNAL', error?.message ?? String(error), {
@@ -321,6 +426,7 @@ export function createGateway(registry, options = {}) {
     const value = normalized?.ok === true ? normalized.value : outcome.value
     const result = makeResult(descriptor.id, value, { requestId: callRequestId, latencyMs: Date.now() - started })
     remember(value)
+    taint.observe(descriptor.id, value)
     if (slot) {
       const entry = { argsHash, result }
       idempotency.set(slot, entry)
@@ -361,15 +467,19 @@ export function createGateway(registry, options = {}) {
         details: { service: 'allow.request' },
       })
     }
-    const capability = capabilityName(descriptor.id)
     // os_do treats an `args.grant` shortcut as a grant, not capability input,
     // so the approval fingerprint must use the same normalized args.
     const requestArgs = isObject(args) && Object.prototype.hasOwnProperty.call(args, 'grant')
       ? Object.fromEntries(Object.entries(args).filter(([key]) => key !== 'grant')) : args
-    const subject = textOf(exec?.subject)
+    // `tainted:true` asks for `<target>:tainted` instead of the base capability;
+    // legacy.act_invoke maps to act.fs.write so both verbs share one approval.
+    const capability = input.tainted === true
+      ? taintedCapability(descriptor.id, requestArgs)
+      : capabilityName(descriptor.id)
+    const subject = subjectOf(exec)
     if (!subject) {
       return failure('E_INVALID_ARGUMENT', 'os_request needs an executing subject.', {
-        remediation: 'Call os_request from an agent turn; the host supplies exec.subject.',
+        remediation: 'Call os_request from an agent turn; the host supplies exec.subject or exec.agent.session.id.',
         requestId: exec?.requestId,
       })
     }
@@ -413,12 +523,12 @@ export function createGateway(registry, options = {}) {
     }
     if (requestId) {
       const local = requests.get(requestId)
-      if (local && textOf(exec?.subject) && local.subject !== textOf(exec?.subject)) {
+      if (local && subjectOf(exec) && local.subject !== subjectOf(exec)) {
         return failure('E_NOT_FOUND', `No request named "${requestId}".`, {
           subcode: 'request_not_found', requestId: exec?.requestId,
         })
       }
-      const remote = await latestRequest(requestId, local?.subject ?? textOf(exec?.subject))
+      const remote = await latestRequest(requestId, local?.subject ?? subjectOf(exec))
       if (!local && !remote) return failure('E_NOT_FOUND', `No request named "${requestId}".`, {
         subcode: 'request_not_found',
         remediation: 'Call os_request to create a pending request, then observe its requestId.',
@@ -527,17 +637,18 @@ export function createGateway(registry, options = {}) {
       riskMax: { type: 'string', enum: [...RISKS], description: 'Only return capabilities at or below this risk.' },
       limit: { type: 'integer', minimum: 1, maximum: 10, description: 'Maximum cards (default 5).' },
     }, ['intent'], find),
-    defineTool('os_do', 'Execute a resolved capability. Returns an OsResult; write/execute capabilities need a grant. After os_observe reports the request approved, retry with the same id and args and the cached grant is consumed automatically.', {
+    defineTool('os_do', 'Execute a resolved capability. Returns an OsResult; write/execute capabilities need a grant. After os_observe reports the request approved, retry with the same id and args and the cached grant is consumed automatically. Writing text previously returned by snip_get/seek_resolve/trigger_runs also needs the `<id>:tainted` Grant, or a fresh taintToken bound to that text.', {
       id: { type: 'string', description: 'Capability id from os_find, for example "snip.search".' },
-      args: { type: 'object', additionalProperties: true, description: 'Capability input matching its inputSchema.' },
+      args: { type: 'object', additionalProperties: true, description: 'Capability input matching its inputSchema. For act.fs.write/legacy.act_invoke, text/content is hashed against the taint registry.' },
       preview: { type: 'boolean', description: 'Validate and preview without running the handler.' },
       idempotencyKey: { type: 'string', description: 'Reuse on retries so a write happens at most once; with config.stateFile it survives a restart.' },
       grant: { description: 'Optional grant object or id; normally omitted because os_observe caches the approved one.' },
     }, ['id'], execute),
-    defineTool('os_request', 'Create a pending approval request for capability "cap:<id>"; never approves it. Needs ctx.allow.request.', {
+    defineTool('os_request', 'Create a pending approval request for capability "cap:<id>"; never approves it. Needs ctx.allow.request. Pass tainted:true to request the extra tainted-write Grant.', {
       id: { type: 'string', description: 'Capability id that needs approval.' },
       args: { type: 'object', additionalProperties: true, description: 'Exact args that will be executed later.' },
       reason: { type: 'string', description: 'One-sentence reason shown to the human approver.' },
+      tainted: { type: 'boolean', description: 'Request "cap:<id>:tainted" for content from a taint source.' },
     }, ['id', 'args', 'reason'], request),
     defineTool('os_observe', 'Observe a request, job or dsh:// handle. For a request it refreshes state from Allow, consumes grantAvailable and lets the next matching os_do run.', {
       requestId: { type: 'string', description: 'requestId returned by os_request.' },
@@ -550,7 +661,7 @@ export function createGateway(registry, options = {}) {
     defineTool('os_status', 'Report installed kernel modules, capability count, gateway version and health. Read-only.', {}, [], status),
   ]
 
-  return { tools, find, do: execute, request, observe, help, status, state: { requests, jobs, handles, idempotency, autoGrants } }
+  return { tools, find, do: execute, request, observe, help, status, state: { requests, jobs, handles, idempotency, autoGrants, taint } }
 }
 
 /** Six plain ToolDefinitions bound to `registry`. */

@@ -152,7 +152,7 @@ test('os_status lazily refreshes and reports legacy and capability counts', asyn
   })
   const status = await agentTool('os_status').execute({})
   assert.equal(status.ok, true)
-  assert.equal(status.version, '0.3.0')
+  assert.equal(status.version, '0.4.0')
   assert.equal(status.legacy, 3)
   assert.equal(status.capabilities, 1)
   assert.equal(status.total, 4)

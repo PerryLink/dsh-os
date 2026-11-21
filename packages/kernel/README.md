@@ -31,9 +31,11 @@ or fromTool       |          os_observe / os_help / os_status
    - `os_find({intent, riskMax?, limit?})` → compact capability cards;
    - `os_do({id, args, preview?, idempotencyKey?, grant?})` → `os.result/v1`;
      `write`/`execute`/`destructive` capabilities without a grant return
-     `E_DENIED` with `remediation` and `nextTools: [os_request]`;
-   - `os_request({id, args, reason})` → `ctx.allow.request` for capability
-     `cap:<descriptor.id>` (or `E_UNAVAILABLE` when Allow is absent);
+     `E_DENIED` with `remediation` and `nextTools: [os_request]`; writes of
+     previously-seen taint-source text also need the `:tainted` Grant (below);
+   - `os_request({id, args, reason, tainted?})` → `ctx.allow.request` for
+     capability `cap:<descriptor.id>` (or `cap:<id>:tainted` when
+     `tainted:true`; `E_UNAVAILABLE` when Allow is absent);
    - `os_observe({requestId?, jobId?, handle?})` → refreshes a request from
      Allow, and when approved consumes the Grant once and caches it;
    - `os_help({task})` → 4 steps + candidate capabilities + risks;
@@ -59,6 +61,40 @@ The recovery loop is closed inside the kernel:
    host injection. The approval is gone, so a replay or exhausted Grant stays
    `E_DENIED`. The cache is bound to `subject + id + args fingerprint`, and
    the Allow check omits `scope` so a narrowed approval still works.
+
+## Content-hash taint gate (0.4.0)
+
+`tainted: true` is a claim, not evidence. The gateway instead records the
+SHA-256 of every `text`/`content` field returned by a taint source —
+`snip_get`, `seek_resolve`, `trigger_runs` — and of text in any result that
+carries a `taintToken`. Only the digest, source id, token and timestamps are
+kept; the text is hashed and discarded, and no plaintext is logged.
+
+For `act.fs.write` (or `legacy.act_invoke` with `args.id === "fs.write"`), the
+gateway hashes `args.text` / `args.content` (nested under `args.args` for
+`act_invoke`). If the digest is registered, the write needs **the base Grant
+plus one of**:
+
+- `ctx.allow.check({ subject, capability: "cap:act.fs.write:tainted" })`,
+  normally through `os_request({ id, args, reason, tainted: true })` →
+  `os_observe` → `os_do`; or
+- a fresh `taintToken` returned with that exact text — single use, bound to
+  the digest, valid for five minutes.
+
+Otherwise `os_do` returns `E_DENIED` with `subcode: "grant_required"`,
+`details.permission: "cap:act.fs.write:tainted"` and `nextTools:
+[os_request]`. Taint evidence is stripped before the handler runs. The digest
+stays registered after its token is used or expires, so later writes still
+need the tainted Grant. The registry is in-process and bounded to 256
+digests.
+
+**Limit: exact-text reuse only.** Rewriting the content, copying a substring,
+or re-fetching it through another path yields a different digest and passes
+this gate. Full provenance needs host-supplied source metadata carried with
+the content; the kernel does not inspect model reasoning, and a module remains
+callable outside the gateway. The gate raises the cost of replaying a
+prompt-injected snippet; it is not a sandbox. Ordinary reads such as
+`act.fs.read` do not seed the registry.
 
 ## Idempotency journal
 
@@ -161,4 +197,6 @@ node --test
 Covers descriptors, registry CRUD/conflict/search/lazy invoke, `fromTool`,
 the six verbs, legacy bridge and envelopes, the permission bridge against the
 real `dsh-allow` service (`cap:<id>`, observe refresh, one-shot grant, args
-binding), idempotency across a restart, `gatewayOnly` and the shipped preset.
+binding), the content-hash taint gate (blocked/dual-grant/token/forged/expired/
+ordinary/recovery loop), idempotency across a restart, `gatewayOnly` and the
+shipped preset.

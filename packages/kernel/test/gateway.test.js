@@ -159,7 +159,7 @@ test('os_help returns a 4-step plan with capabilities and risks; os_status repor
 
   const status = await tool('os_status').execute({})
   assert.equal(status.ok, true)
-  assert.equal(status.version, '0.3.0')
+  assert.equal(status.version, '0.4.0')
   assert.deepEqual(status.modules, ['demo'])
   assert.equal(status.health.status, 'ok')
   assert.equal(status.tools.length, 6)

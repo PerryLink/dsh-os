@@ -357,8 +357,13 @@ export function apply(ctx, config = {}) {
   if (ctx.tools && typeof ctx.tools.register === 'function') {
     for (const tool of createTools(service)) ctx.tools.register(tool)
   }
-  if (ctx.webServer) {
-    const register = () => registerBridge(ctx.webServer, service)
+  // Do not read `ctx.webServer` directly: it is not in `inject` (the shell is
+  // optional), and Cordis throws on an uninjected read. Resolve it via get().
+  let webServer
+  try { webServer = ctx.webServer } catch { /* not injected */ }
+  if (!webServer) webServer = getService('webServer')
+  if (webServer) {
+    const register = () => registerBridge(webServer, service)
     if (typeof ctx.effect === 'function') ctx.effect(register, 'dsh-os-shell: routes')
     else register()
   } else if (typeof ctx.inject === 'function') {

@@ -52,11 +52,11 @@ needs only Node 22+; nothing is installed or published.
 | **Cost** | `@perrylink/dsh-cost` | 0.1.0 optional | adapter for `dsh-cost-meter` |
 | **Backup** | `@perrylink/dsh-backup` | 0.2.0 optional | allowlisted snapshot / restore plan |
 | **Notify** | `@perrylink/dsh-notify` | 0.1.0 optional | channel registry / attention router |
-| **Shell** | `@perrylink/dsh-os-shell` | 0.3.0 optional | approvals + activity tabs |
+| **Shell** | `@perrylink/dsh-os-shell` | 0.4.0 optional | injection-safe approvals/activity |
 | **CLI** | `@perrylink/dsh-os-cli` | 0.2.0 tool | `dsh-os list/doctor/install/approvals` |
 | **Contract** | `@perrylink/dsh-os-contract` | 0.2.0 library | result/error/handle protocols |
-| **Kit** | `dsh-os-kit` | 0.6.0 meta bundle | installs 6 latest modules |
-| **Kernel** | `@perrylink/dsh-os-kernel` | 0.3.0 core | 76 legacy tools + approval bridge |
+| **Kit** | `dsh-os-kit` | 0.7.0 meta bundle | installs 6 latest modules |
+| **Kernel** | `@perrylink/dsh-os-kernel` | 0.4.0 core | taint gate + approval bridge |
 | **MCP** | `@perrylink/dsh-os-mcp` | 0.2.0 tool | read-only default + write approval path |
 | **A2A** | `@perrylink/dsh-os-a2a` | 0.1.0 tool | agent card + task protocol prototype |
 

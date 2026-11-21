@@ -98,7 +98,7 @@
   - 参数：`id`*、`args`、`preview`、`idempotencyKey`、`grant`；返回：OsResult {schema,ok,tool,summary,items,page,handles,next,cost,provenance} 或 {ok:false,error:{code,...}}
 - **os_request** · `W·A` · since 0.3 — 为需要审批的 capability 创建 pending 申请，绝不自行批准。
   - 用：os_do 返回 E_DENIED 后，用同一 id/args 申请。 不用：需要 ctx.allow.request；没有 Allow 服务时返回 E_UNAVAILABLE。0.2 替代：allow_request + 人类 allow.approve。
-  - 参数：`id`*、`args`*、`reason`*；返回：{ok,requestId,status,hint,capability}
+  - 参数：`id`*、`args`*、`reason`*、`tainted`；返回：{ok,requestId,status,hint,capability}
 - **os_observe** · `R` · since 0.3 — 观察 requestId、jobId 或 dsh:// handle 的状态与结果。
   - 用：os_request 后轮询审批，或读取 os_do 返回的 job/handle。 不用：一次只传一个 id；handle 会过期，不存在时 E_NOT_FOUND。0.2 替代：allow_wait / 具体 get 工具。
   - 参数：`requestId`、`jobId`、`handle`；返回：{ok,kind,state,request|job|result,...}
