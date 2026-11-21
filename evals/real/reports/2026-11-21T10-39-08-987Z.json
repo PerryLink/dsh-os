@@ -1,0 +1,602 @@
+{
+  "schema": "dsh-os.eval-real/v1",
+  "layer": "A-real (DSH headless; real model calls; external-state grading)",
+  "generatedAt": "2026-11-21T10:39:08.987Z",
+  "env": {
+    "node": "v24.22.1",
+    "platform": "linux",
+    "dshBin": "/home/yy/deepseek-harness/apps/cli/lib/bin.js",
+    "profile": "eval",
+    "keyVar": "DEEPSEEK_API_KEY",
+    "commit": "53e994f",
+    "dirty": true
+  },
+  "scenarios": [
+    {
+      "id": "seek-evidence",
+      "title": "seek 证据",
+      "goal": "用 seek 搜索并 resolve 证据，写出至少两条可解析 ref 的结论；不引用不存在的文档。",
+      "initial": [
+        "临时工作区：docs/user-trust.md 与 docs/env.md 是真实文档",
+        "notes.md 提到 docs/deprecated-trust.md，但该文件不存在",
+        "profile 需要挂载 dsh-seek + dsh-locator；否则 seek_* 不可用"
+      ],
+      "prompt": "先调用 seek_providers 查看可用来源，再用 seek_search 搜索 \"user-trust\" 的证据。基于 docs/user-trust.md 和 docs/env.md 各写一条结论到 evidence.json：{\"claims\":[{\"text\":\"...\",\"ref\":\"dsh://locator/...\"}]}。每条 ref 必须先经 seek_resolve 验证可解析，并且只能引用实际存在的 docs 文件。notes.md 提到的 docs/deprecated-trust.md 不存在，禁止引用它，也不要编造 ref。",
+      "success": false,
+      "strictSuccess": false,
+      "deferredChecks": 0,
+      "toolCalls": 52,
+      "invalidCalls": 0,
+      "tokensEstimate": 769472,
+      "interventions": [
+        {
+          "kind": "approval.asked",
+          "outcome": "unavailable"
+        }
+      ],
+      "firstTool": "seek_providers",
+      "expectedFirstTool": [
+        "seek_providers",
+        "seek_search",
+        "read"
+      ],
+      "firstStepCorrect": true,
+      "steps": [
+        {
+          "n": 1,
+          "tool": "seek_providers",
+          "args": "{}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_zkunxOakX2Uxm4ExYAy90461"
+        },
+        {
+          "n": 2,
+          "tool": "bash",
+          "args": "{\"command\":\"ls -la; echo \\\"---\\\"; ls -la docs 2>/dev/null\",\"description\":\"List workspace and docs contents\"}",
+          "ok": false,
+          "code": "SANDBOX_UNAVAILABLE",
+          "invalid": null,
+          "callId": "call_01_iT8TdEmAEw5Az75XocIb4015"
+        },
+        {
+          "n": 3,
+          "tool": "seek_register_defaults",
+          "args": "{}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_HnQPB4ivrBOwKzQ022kH7987"
+        },
+        {
+          "n": 4,
+          "tool": "locator_status",
+          "args": "{}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_2d5Jq7FVzDFoP9p0i95v3938"
+        },
+        {
+          "n": 5,
+          "tool": "seek_search",
+          "args": "{\"query\":\"user-trust\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_Zd7pSw3ji9PPiwM7Ko5K2573"
+        },
+        {
+          "n": 6,
+          "tool": "glob",
+          "args": "{\"pattern\":\"docs/*\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_mO44Rbv1CDwA0DBeX3JK3290"
+        },
+        {
+          "n": 7,
+          "tool": "read",
+          "args": "{\"file_path\":\"/tmp/dsh-real-seek-evidence-4P2FhX/docs/user-trust.md\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_rf8wPpViQE603KuI7JwU5533"
+        },
+        {
+          "n": 8,
+          "tool": "read",
+          "args": "{\"file_path\":\"/tmp/dsh-real-seek-evidence-4P2FhX/docs/env.md\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_V1Y8DpUpiTe9kSFIiapM9256"
+        },
+        {
+          "n": 9,
+          "tool": "locator_find",
+          "args": "{\"query\":\"user-trust\",\"pathPrefix\":\"/tmp/dsh-real-seek-evidence-4P2FhX\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_02_mBkfaNTqTp9k6r1igGN32085"
+        },
+        {
+          "n": 10,
+          "tool": "locator_search",
+          "args": "{\"query\":\"user-trust\",\"scope\":\"all\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_oSHk4FMRXeH1WeGdCru77803"
+        },
+        {
+          "n": 11,
+          "tool": "locator_find",
+          "args": "{\"query\":\"user-trust\",\"scope\":\"all\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_Kvj9NVF8Qy0W58qmMo3K3837"
+        },
+        {
+          "n": 12,
+          "tool": "glob",
+          "args": "{\"pattern\":\"*\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_02_482BiAVeCeKJzWxvYixF6947"
+        },
+        {
+          "n": 13,
+          "tool": "read",
+          "args": "{\"file_path\":\"/tmp/dsh-real-seek-evidence-4P2FhX/notes.md\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_UpbLflJmQRxgao0dN2301064"
+        },
+        {
+          "n": 14,
+          "tool": "bash",
+          "args": "{\"command\":\"pwd; realpath .; ls -la /home/yy | head -30; echo ---; ls -la /home/yy/docs 2>/dev/null\",\"description\":\"Inspect real paths and home docs\",\"sandbox_permissions\":\"danger-full-access\",\"justification\":\"The configured workspace-write sandbox backend is unusable on this host, so I need danger-full-access to inspect the filesystem and verify how the locator roots relate to the session workspace.\"}",
+          "ok": false,
+          "code": "SANDBOX_ESCALATION_UNAVAILABLE",
+          "invalid": null,
+          "callId": "call_01_ScUlQBAKJmm4mwGQToyn4707"
+        },
+        {
+          "n": 15,
+          "tool": "locator_find",
+          "args": "{\"query\":\"user-trust\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_NKAY0useJ3NNjyl5Q7cu3194"
+        },
+        {
+          "n": 16,
+          "tool": "locator_search",
+          "args": "{\"query\":\"README.md\",\"limit\":5}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_5Tdoww5E0V4etYojCpKo7703"
+        },
+        {
+          "n": 17,
+          "tool": "locator_status",
+          "args": "{}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_02_byHM0pcYUVyDo8XFzR6W4615"
+        },
+        {
+          "n": 18,
+          "tool": "seek_search",
+          "args": "{\"query\":\"README\",\"limit\":5}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_F6TQBG4NxPWkSejoRBcG8697"
+        },
+        {
+          "n": 19,
+          "tool": "locator_search",
+          "args": "{\"query\":\"docs user-trust.md env.md\",\"mode\":\"names\",\"limit\":10}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_MUT23EEqCdZMJipBEqm26635"
+        },
+        {
+          "n": 20,
+          "tool": "locator_rebuild",
+          "args": "{\"roots\":[\"/tmp/dsh-real-seek-evidence-4P2FhX\"]}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_0mK0aRjwTnTH8ttqu7N43028"
+        },
+        {
+          "n": 21,
+          "tool": "locator_search",
+          "args": "{\"query\":\"deprecated-trust\",\"mode\":\"names\",\"scope\":\"all\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_4ni8MuPmouDWHdtYVUSR5608"
+        },
+        {
+          "n": 22,
+          "tool": "locator_search",
+          "args": "{\"query\":\"env.md\",\"mode\":\"names\",\"scope\":\"all\",\"limit\":10}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_02_0nOaFG8sETBL1fjryU4q0760"
+        },
+        {
+          "n": 23,
+          "tool": "act_list",
+          "args": "{\"query\":\"locator\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_bY2gd1rKZrYGfgv3Dpgp4706"
+        },
+        {
+          "n": 24,
+          "tool": "capability_search",
+          "args": "{\"intent\":\"search local file content evidence and resolve evidence refs\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_TrNx300tR6QSE1k4qTcz5274"
+        },
+        {
+          "n": 25,
+          "tool": "seek_search",
+          "args": "{\"query\":\"deepseek\",\"limit\":3}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_sSrK3aPPZ9ckUtTXFPrd0223"
+        },
+        {
+          "n": 26,
+          "tool": "locator_explore",
+          "args": "{\"question\":\"user-trust profiles\",\"thoroughness\":\"quick\",\"scope\":\"all\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_iyQgqdkLSdy5JW8plrzC1794"
+        },
+        {
+          "n": 27,
+          "tool": "locator_search",
+          "args": "{\"query\":\"path:node_modules dsh-seek\",\"limit\":10,\"scope\":\"all\",\"dirsOnly\":true}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_BNeLq0UzX82kYkK2ExbI6204"
+        },
+        {
+          "n": 28,
+          "tool": "locator_search",
+          "args": "{\"query\":\"path:node_modules dsh-locator\",\"limit\":10,\"scope\":\"all\",\"dirsOnly\":true}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_Wyd3I2b3MciueCg1pS4U3594"
+        },
+        {
+          "n": 29,
+          "tool": "locator_search",
+          "args": "{\"query\":\"seek\",\"limit\":20,\"scope\":\"all\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_2VnRa3d08BnOlgQvY5fi5979"
+        },
+        {
+          "n": 30,
+          "tool": "grep",
+          "args": "{\"pattern\":\"content-path-denied\",\"path\":\"/home/yy/deepseek-harness\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_KBsfDL36pq2XB4rcqoLz3283"
+        },
+        {
+          "n": 31,
+          "tool": "glob",
+          "args": "{\"pattern\":\"/tmp/dsh-real-home/profiles/eval/node_modules/dsh-seek/**/*.js\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_mp4wKi7owJTuCuO7uTx68252"
+        },
+        {
+          "n": 32,
+          "tool": "glob",
+          "args": "{\"pattern\":\"/tmp/dsh-real-home/profiles/eval/node_modules/dsh-locator/**/*.js\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_R5aWcEOktADvL1sqHaj89857"
+        },
+        {
+          "n": 33,
+          "tool": "read",
+          "args": "{\"file_path\":\"/tmp/dsh-real-home/profiles/eval/node_modules/dsh-locator/package.json\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_3i8CRKtFO9mgtNZbkMGL2915"
+        },
+        {
+          "n": 34,
+          "tool": "grep",
+          "args": "{\"path\":\"/tmp/dsh-real-home/profiles/eval/node_modules\",\"pattern\":\"content-path-denied\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_u67uom9MMIf492ubn0IM6776"
+        },
+        {
+          "n": 35,
+          "tool": "grep",
+          "args": "{\"path\":\"/tmp/dsh-real-home/profiles/eval/node_modules\",\"pattern\":\"dsh://locator\",\"include\":\"*.js\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_QsvDwMvZRloqQl901H0b1663"
+        },
+        {
+          "n": 36,
+          "tool": "grep",
+          "args": "{\"path\":\"/tmp/dsh-real-home/profiles/eval/node_modules\",\"pattern\":\"seek: locator\",\"include\":\"*.js\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_BS7RPPq2T1yDVWAq123S0502"
+        },
+        {
+          "n": 37,
+          "tool": "grep",
+          "args": "{\"path\":\"/tmp/dsh-real-home/profiles/eval/node_modules\",\"pattern\":\"seek_search\",\"include\":\"*.js\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_TUvGUCmQIewzqe7kmBa92041"
+        },
+        {
+          "n": 38,
+          "tool": "grep",
+          "args": "{\"path\":\"/home/yy/deepseek-harness\",\"pattern\":\"seek_search\",\"include\":\"*.ts\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_kBil0KYCVekSN3QLFDTV0995"
+        },
+        {
+          "n": 39,
+          "tool": "locator_search",
+          "args": "{\"query\":\"path:dsh-real-home seek\",\"limit\":20,\"scope\":\"all\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_1N8wpQloaBhg8o9YiIiG2485"
+        },
+        {
+          "n": 40,
+          "tool": "locator_search",
+          "args": "{\"query\":\"cordis.yml\",\"limit\":20,\"scope\":\"all\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_GgQHOZ1NsCiJKYzNeB2z1473"
+        },
+        {
+          "n": 41,
+          "tool": "read",
+          "args": "{\"file_path\":\"/tmp/dsh-real-home/profiles/eval/cordis.yml\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_bMMOc2xtmBQXCudfG1yd7176"
+        },
+        {
+          "n": 42,
+          "tool": "read",
+          "args": "{\"file_path\":\"/tmp/dsh-real-home/profiles/eval/package.json\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_bTJMgHArWKEbMxnEa7SX3066"
+        },
+        {
+          "n": 43,
+          "tool": "grep",
+          "args": "{\"path\":\"/mnt/d/Projects/dsh/dsh-os/packages/seek\",\"pattern\":\"content-path-denied|locator\",\"include\":\"*.ts\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_pAndsLb3bjou0ld9zNbf9725"
+        },
+        {
+          "n": 44,
+          "tool": "glob",
+          "args": "{\"pattern\":\"/mnt/d/Projects/dsh/dsh-os/packages/seek/src/*.ts\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_WwaFYnmvPDJ2carUtSa76543"
+        },
+        {
+          "n": 45,
+          "tool": "read",
+          "args": "{\"file_path\":\"/mnt/d/Projects/dsh/dsh-os/packages/seek/package.json\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_KyPQAyU9ifAK6LcMnpde6378"
+        },
+        {
+          "n": 46,
+          "tool": "read",
+          "args": "{\"file_path\":\"/tmp/dsh-real-home/profiles/eval/node_modules/dsh-seek/package.json\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_J0R0XXtvAkaUtmNaLdiX8724"
+        },
+        {
+          "n": 47,
+          "tool": "grep",
+          "args": "{\"path\":\"/mnt/d/Projects/dsh/dsh-os/packages/seek\",\"pattern\":\"locator\",\"include\":\"*.js\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_jbUo8ZiFdBJvNAmKNHWR0704"
+        },
+        {
+          "n": 48,
+          "tool": "seek_resolve",
+          "args": "{\"ref\":\"dsh://locator/docs/user-trust.md\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_uA2MC7eQSRjCC2tjLBUL8066"
+        },
+        {
+          "n": 49,
+          "tool": "seek_resolve",
+          "args": "{\"ref\":\"dsh://locator/docs/env.md\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_S7gNpbnsBQ7xfMo1wd7o7573"
+        },
+        {
+          "n": 50,
+          "tool": "read",
+          "args": "{\"file_path\":\"/tmp/dsh-real-home/profiles/eval/cordis.patch.yml\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_CBsdq6Zya7nanjcStkGw4321"
+        },
+        {
+          "n": 51,
+          "tool": "locator_find",
+          "args": "{\"query\":\"hidden from agent-layer resolution\",\"scope\":\"all\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_jMxgwSWW2dYckOUeyt403775"
+        },
+        {
+          "n": 52,
+          "tool": "locator_resolve",
+          "args": "{\"ref\":\"ref://file?path=%2Ftmp%2Fdsh-real-seek-evidence-4P2FhX%2Fdocs%2Fuser-trust.md\",\"mode\":\"meta\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_8sJ0Cq2Hc5pnlWfaXz8z3879"
+        }
+      ],
+      "checks": [
+        {
+          "id": "seek-search-used",
+          "ok": true,
+          "detail": "seek_search 调用 3 次（至少 1）"
+        },
+        {
+          "id": "seek-resolve-used",
+          "ok": true,
+          "detail": "seek_resolve 调用 2 次（至少 2）"
+        },
+        {
+          "id": "evidence-chain",
+          "ok": false,
+          "detail": "evidence.json 不存在"
+        }
+      ],
+      "failures": [
+        {
+          "n": 2,
+          "tool": "bash",
+          "code": "SANDBOX_UNAVAILABLE",
+          "invalid": null
+        },
+        {
+          "n": 14,
+          "tool": "bash",
+          "code": "SANDBOX_ESCALATION_UNAVAILABLE",
+          "invalid": null
+        }
+      ],
+      "approvals": {
+        "asked": 1,
+        "decided": 1,
+        "rejected": 1,
+        "outcomes": {
+          "unavailable": 1
+        },
+        "parsed": 230,
+        "files": 4,
+        "source": "log"
+      },
+      "finalReason": {
+        "kind": "completed"
+      },
+      "finalText": "## 结论：无法生成合规的 evidence.json，因此没有伪造证据\n\n按你指定的顺序执行后，链路在 **seek 的 locator 来源**这一层被环境拦截，无法产出任何可被 `seek_resolve` 验证的 `dsh://locator/...` ref。\n\n### 实际执行记录\n\n1. **`seek_providers`**：初始两个来源都不可用\n   - `locator`: `locator_find is not registered (install/enable dsh-locator)`\n   - `memento`: `cannot get property \"memory\" without inject`\n\n2. **`seek_register_defaults`**：locator 已注册成功（`status: ready`）。\n\n3. **`seek_search \"user-trust\"`**：0 命中，且来源报错\n   - `{\"source\":\"locator\",\"code\":\"E_UNAUTHORIZED\",\"message\":\"seek: locator: content-path-denied\"}`\n\n4. **`locator_find \"user-trust\"`**（限定到本工作区）直接失败：\n   - `content-path-denied (path-outside-roots)`\n   - `locator_status` 显示 locator 根目录只有 `/home/yy`，而本会话 cwd `/tmp/dsh-real-seek-evidence-4P2FhX` 不在其中（`cwd-not-indexed`）。\n\n5. **尝试把工作区纳入索引**：`locator_rebuild(roots=[\"/tmp/dsh-real-seek-evidence-4P2FhX\"])`\n   - `locator_rebuild failed: root is outside the configured roots: /tmp/dsh-real-seek-evidence-4P2FhX`\n\n6. **验证候选 ref（按 seek 规范就是工作区相对路径）**：\n   - `seek_resolve(\"dsh://locator/docs/user-trust.md\")` → `found:false`, `E_UNAUTHORIZED`, `content-path-denied`\n   - `seek_resolve(\"dsh://locator/docs/env.md\")` → 同样失败\n   - 底层 `locator_resolve` 对该工作区文件也是 `path-outside-roots`\n\n7. **文件事实核对**：\n   - `docs/` 下实际只有 `docs/env.md`、`docs/user-trust.md`\n   - `notes.md` 提到的 `docs/deprecated-trust.md` 确认不存在（未引用、也未杜撰）\n   - `docs/user-trust.md` 内容：*User-trust profiles are hidden from agent-layer resolution.*\n   - `docs/env.md` 内容：*Root never materializes process.env.*\n\n### 为什么不写 evidence.json\n\n两条结论本身可以从文档读出，但你的硬性要求是「每条 ref 必须先经 `seek_resolve` 验证可解析」。目前两个 ref 的 `seek_resolve` 都返回 `found:false`。若仍把 `dsh://locator/docs/...` 写进 `evidence.json`，就是**未经解析验证的 ref**，等同于编造可解析性，违反你的约束，所以我选择不落盘。\n\n### 解除阻塞即可完成\n\n以下任一条件满足后我可立即产出并逐条验证：\n- 把 `/tmp/dsh-real-seek-evidence-4P2FhX` 加入 dsh-locator 的索引根目录（或把会话 cwd 放到 `/home/yy` 下某目录），然后重建索引；\n- 或由环境提供可用的审批通道，允许调整 locator 配置/以 `danger-full-access` 运行（当前 `workspace-write` 沙箱后端在本机不可用，且无审批通道）。\n\n若你接受降级产物，我也可以写一个 `{\"claims\":[]}`（或带 `blocked` 说明字段）的 `…",
+      "sessionId": "session-1b9cbb37-b54c-4d15-9957-06ab76f8ac78",
+      "exitCode": 0,
+      "timedOut": false,
+      "stepLimitHit": false,
+      "tokenLimitHit": false,
+      "tokensUsed": 44860,
+      "outputLimitHit": false,
+      "protocolOk": true,
+      "parseErrors": 0,
+      "badLines": [],
+      "usageComplete": true,
+      "tokensSource": "usage",
+      "durationMs": 105119,
+      "stdoutBytes": 108729,
+      "stderr": "[dsh-locator] locator: replayed 57534 journal entries (7391785 bytes) from /home/yy/.cache/dsh-locator\n[dsh-locator] locator: loaded 232548 entries from /home/yy/.cache/dsh-locator\n[llm-deepseek-api-key] model listing from https://api.deepseek.com/models loaded 2 model(s), skipped 0 row(s)\n[dsh-locator] locator: watching 1 root(s)\n",
+      "profile": "eval",
+      "dshBin": "/home/yy/deepseek-harness/apps/cli/lib/bin.js",
+      "error": null
+    }
+  ],
+  "metrics": {
+    "scenarios": 1,
+    "successes": 0,
+    "successRate": 0,
+    "strictSuccesses": 0,
+    "strictSuccessRate": 0,
+    "deferredChecks": 0,
+    "deferredScenarios": 0,
+    "firstStepAccuracy": 1,
+    "recoveryRate": 0,
+    "recoveredScenarios": 0,
+    "scenariosWithFailures": 1,
+    "toolCalls": 52,
+    "invalidCalls": 0,
+    "invalidCallRate": 0,
+    "avgSteps": 52,
+    "tokensEstimate": 769472,
+    "avgTokens": 769472,
+    "interventions": 1,
+    "assistedSuccesses": 0,
+    "autonomousSuccesses": 0
+  }
+}
