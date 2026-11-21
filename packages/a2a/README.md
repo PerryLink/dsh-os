@@ -1,4 +1,4 @@
-# @perrylink/dsh-os-a2a
+# dsh-os-a2a
 
 An **A2A prototype** for [dsh-os](../../README.md): one Agent Card, 12 skills,
 in-memory tasks and a local approval loop. It is a protocol sketch, not a
@@ -81,7 +81,7 @@ The default executor returns
 real backend later:
 
 ```js
-import { createServer } from '@perrylink/dsh-os-a2a'
+import { createServer } from 'dsh-os-a2a'
 
 const server = createServer({
   executor: async ({ skill, text }) => {

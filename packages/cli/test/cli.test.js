@@ -143,14 +143,14 @@ test('list --all adds optional modules and text output stays tabular', t => {
   assert.equal(optional.length, 7)
   assert.deepEqual(
     optional.map(module => module.name),
-    ['dsh-help', '@perrylink/dsh-context', '@perrylink/dsh-cost', '@perrylink/dsh-backup', '@perrylink/dsh-notify', '@perrylink/dsh-os-shell', 'dsh-os-kit'],
+    ['dsh-help', 'dsh-scene', 'dsh-price', 'dsh-timecapsule', 'dsh-buzz', 'dsh-os-shell', 'dsh-os-kit'],
   )
 
   const text = runCli(['list'], { cwd: root, env: envWithPath(emptyBin) })
   assert.equal(text.status, 0)
   assert.match(text.stdout, /^NAME\s+PRODUCT\s+SERVICE\s+VERSION\s+STABILITY\s+DESCRIPTION/m)
   assert.match(text.stdout, /dsh-act\s+Act\s+ctx\.act\s+0\.2\.0\s+stable/)
-  assert.doesNotMatch(text.stdout, /@perrylink\/dsh-root/)
+  assert.doesNotMatch(text.stdout, /dsh-runtime-env/)
 
   const all = runCli(['list', '--all'], { cwd: root, env: envWithPath(emptyBin) })
   assert.match(all.stdout, /not published yet/)
@@ -168,14 +168,14 @@ test('info resolves aliases and prints install and update commands', t => {
 
   const byService = runCli(['info', 'ctx.env'], { cwd: root })
   assert.equal(byService.status, 0, byService.stderr)
-  assert.match(byService.stdout, /package:\s+@perrylink\/dsh-root/)
+  assert.match(byService.stdout, /package:\s+dsh-runtime-env/)
 
-  const byPackage = runCli(['info', '@perrylink/dsh-check', '--json'], { cwd: root })
+  const byPackage = runCli(['info', 'dsh-canary', '--json'], { cwd: root })
   assert.equal(byPackage.status, 0, byPackage.stderr)
   const detail = JSON.parse(byPackage.stdout)
-  assert.equal(detail.name, '@perrylink/dsh-check')
-  assert.equal(detail.install, 'dsh plugin --profile web add @perrylink/dsh-check')
-  assert.equal(detail.update, 'dsh plugin --profile web add @perrylink/dsh-check@latest')
+  assert.equal(detail.name, 'dsh-canary')
+  assert.equal(detail.install, 'dsh plugin --profile web add dsh-canary')
+  assert.equal(detail.update, 'dsh plugin --profile web add dsh-canary@latest')
 
   const optional = runCli(['info', 'help'], { cwd: root })
   assert.equal(optional.status, 0, optional.stderr)
@@ -249,7 +249,7 @@ test('update prints @latest commands for every product module', t => {
   assert.equal(lines.length, 12)
   assert.ok(lines.every(line => line.startsWith('dsh plugin --profile web add ')))
   assert.ok(lines.every(line => line.endsWith('@latest')))
-  assert.ok(lines.includes('dsh plugin --profile web add @perrylink/dsh-root@latest'))
+  assert.ok(lines.includes('dsh plugin --profile web add dsh-runtime-env@latest'))
 
   const dev = runCli(['update', '--profile', 'dev'], { cwd: root, env: envWithPath(emptyBin) })
   assert.match(dev.stdout, /^dsh plugin --profile dev add dsh-act@latest$/m)
@@ -287,15 +287,15 @@ test('catalog.json describes 12 modules plus 7 optional modules', () => {
       'dsh-act',
       'dsh-allow',
       'dsh-snip',
-      '@perrylink/dsh-check',
+      'dsh-canary',
       'dsh-nest',
       'dsh-trigger',
       'dsh-seek',
-      '@perrylink/dsh-trace',
+      'dsh-record',
       'dsh-stage',
       'dsh-ring',
-      '@perrylink/dsh-root',
-      '@perrylink/dsh-os-kernel',
+      'dsh-runtime-env',
+      'dsh-os-kernel',
     ],
   )
   assert.equal(catalog.filter(entry => entry.optional).length, 7)

@@ -9,9 +9,9 @@ const EXPECTED = [
   { id: 'dsh-act', name: 'dsh-act' },
   { id: 'dsh-allow', name: 'dsh-allow' },
   { id: 'dsh-snip', name: 'dsh-snip' },
-  { id: '@perrylink/dsh-check', name: '@perrylink/dsh-check' },
-  { id: 'dsh-os-kernel', name: '@perrylink/dsh-os-kernel' },
-  { id: '@perrylink/dsh-os-shell', name: '@perrylink/dsh-os-shell' },
+  { id: 'dsh-canary', name: 'dsh-canary' },
+  { id: 'dsh-os-kernel', name: 'dsh-os-kernel' },
+  { id: 'dsh-os-shell', name: 'dsh-os-shell' },
 ]
 
 function unquote(value) {
@@ -62,9 +62,9 @@ test('manifest stays dependency-only and points at the patch', () => {
     'dsh-act': '^0.5.0',
     'dsh-allow': '^0.4.0',
     'dsh-snip': '^0.4.0',
-    '@perrylink/dsh-check': '^0.4.0',
-    '@perrylink/dsh-os-kernel': '^0.4.0',
-    '@perrylink/dsh-os-shell': '^0.4.0',
+    'dsh-canary': '^0.4.0',
+    'dsh-os-kernel': '^0.4.0',
+    'dsh-os-shell': '^0.4.0',
   }
   for (const [name, range] of Object.entries(manifest.dependencies)) assert.equal(range, ranges[name])
 

@@ -52,7 +52,7 @@ dsh plugin --profile web add dsh-os-kit@0.4.0
 
 # 或只装需要的
 dsh plugin --profile web add dsh-allow@0.4.0
-dsh plugin --profile web add @perrylink/dsh-check@0.3.0
+dsh plugin --profile web add dsh-canary@0.3.0
 ```
 
 - `--profile web` 只是示例；换成你的实际 profile。
@@ -140,7 +140,7 @@ dsh plugin --profile web add dsh-os-kit@0.4.0
 
 # Or install only what you need
 dsh plugin --profile web add dsh-allow@0.4.0
-dsh plugin --profile web add @perrylink/dsh-check@0.3.0
+dsh plugin --profile web add dsh-canary@0.3.0
 ```
 
 - `--profile web` is an example; use your actual profile.

@@ -2,7 +2,7 @@
 
 > 2026-11-20 · DSH `0.2.2-rc.4`（checkout `ca33fd6843`）· 对象：PerryLink（个人开发者，非官方）。 **结论先行**：Trace 是 `dsh-memory-protocol/v1` 之上的**治理与溯源层**，不是第 322 个记忆仓库。一句话：**让 Agent 跨会话记住决策与偏好，并让每条记忆都能回答“从哪来、凭什么信、谁批准、何时过期、为什么被召回、忘了没有”。** MVP **7 周**。
 
-> **npm package:** `@perrylink/dsh-trace` — the unscoped `dsh-trace` is blocked by npm name-similarity rules; the product name remains **Trace**.
+> **npm package:** `dsh-record` — the unscoped `dsh-trace` is blocked by npm name-similarity rules; the product name remains **Trace**.
 
 ## 0. 结论
 - **名字**：`Trace` / npm **`dsh-trace`**（2026-11-20 实测 404，可用）；备选 `Past` / `dsh-past`（404）。`Recall`、`Memo` 均已被正面竞品占用（见 §1）。

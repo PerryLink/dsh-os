@@ -7,10 +7,10 @@
 
 | # | Workstream | Owner (wave) | Scope | Status |
 |---|---|---|---|---|
-| 1 | **Contract package** | `ws-contract` (1) | `packages/contract`, `@perrylink/dsh-os-contract`; types/schemas/errors/refs/audit; <100 lines runtime | done |
+| 1 | **Contract package** | `ws-contract` (1) | `packages/contract`, `dsh-os-contract`; types/schemas/errors/refs/audit; <100 lines runtime | done |
 | 2 | **Manifests** | `ws-manifests` (2) | add `dsh.os` to all 11 packages + validator; no code changes | done |
 | 3 | **Conformance** | `ws-conformance` (1) | `scripts/conformance.mjs` + `test/conformance.test.js`; 10 checks | done |
-| 4 | **Catalog + CLI** | `ws-catalog` (1) | `packages/cli`, `@perrylink/dsh-os-cli`, bin `dsh-os`: list/doctor/install | done |
+| 4 | **Catalog + CLI** | `ws-catalog` (1) | `packages/cli`, `dsh-os-cli`, bin `dsh-os`: list/doctor/install | done |
 | 5a | **Security: Allow** | `ws-sec-allow` (1) | audit persistence, admin tool isolation, load validation, tests | done |
 | 5b | **Security: Snip + Root** | `ws-sec-snip-root` (1) | sourceApp secret scan, vars secret detection, proxy userinfo, path newline | done |
 | 5c | **Security: Stage + Ring + Seek** | `ws-sec-srr` (1) | undo hash, expired escalation, provider timeout/signal | done |

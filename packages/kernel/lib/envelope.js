@@ -1,7 +1,7 @@
 /**
  * Local `ok()` / `err()` envelopes for the OsResult and OsError protocols.
  *
- * Mirrors @perrylink/dsh-os-contract's result/error helpers on purpose: the
+ * Mirrors dsh-os-contract's result/error helpers on purpose: the
  * kernel stays zero-dependency and keeps its published `os.result/v1` schema.
  * Unknown or legacy error codes are aliased to the nine classes, with the
  * original kept in `details.legacyCode`.

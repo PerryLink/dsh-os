@@ -3,7 +3,7 @@
 > 判断：DSH 的「环境」现在是一组互不相识的存储面（launch 快照 / 两层 `.env` / credentials / profile patch / 实时 `process.env`），不是一个对象。Root 把它变成**命名、分作用域、带信任级与 provenance 的环境档案**：启动时可 materialize，运行时可解释、可快照、可 diff、可共享；`ctx.env` 是 Host seam。
 > 2026-11-20 · DSH checkout `0.2.2-rc.4`（`ca33fd6`）· 对象 PerryLink（个人开发者，非官方，not affiliated with DeepSeek）· 交付契约：Host seam `ctx.env` + Client UI + Agent tools + CLI。
 
-> **npm package:** `@perrylink/dsh-root` — the unscoped `dsh-root` is blocked by npm name-similarity rules; the product name remains **Root**.
+> **npm package:** `dsh-runtime-env` — the unscoped `dsh-root` is blocked by npm name-similarity rules; the product name remains **Root**.
 
 ## 0. 口径与证据边界
 - 内核结论读自本机 checkout `ca33fd6`（`package.json` = `0.2.2-rc.4`）；npm/GitHub 采样 2026-11-20，周下载是**采用代理**不是安装量；本文无自测性能/转化数字，未实测标「待验」，行号升级需重核。
@@ -14,9 +14,9 @@
 |---|---|---|
 | **dsh-root** | **404 未发布** | ✅ 主名，立刻占位 |
 | dsh-ground / dsh-field | 404 / 404 | 备选；Ground 可作发布失败时的 fallback（语义：ground truth / 地基） |
-| dsh-env | 404 | ❌ 搜索被 708 次/周的 `@hyzyn/dsh-env` 占死，语义太泛 |
-| dsh-env-profile / dsh-profiles | **200**（`0.1.4`，206 次/周）/**200**（`0.0.1` 占位） | ❌ 已存在 / 已占 |
-| @perrylink/dsh-root | 404 | 备用，不作主名（发现性差） |
+| dsh-runtime-env | 404 | ❌ 搜索被 708 次/周的 `@hyzyn/dsh-runtime-env` 占死，语义太泛 |
+| dsh-runtime-env-profile / dsh-profiles | **200**（`0.1.4`，206 次/周）/**200**（`0.0.1` 占位） | ❌ 已存在 / 已占 |
+| dsh-runtime-env | 404 | 备用，不作主名（发现性差） |
 
 - **最终名**：Root｜npm `dsh-root`｜bin `dsh-root`｜seam `ctx.env`｜对象 `EnvProfile`｜CLI `dsh-root …` + 会话内 `/env`。**`dsh root` 不可用**：launcher 把第一个非 flag token 当 profile 名（`apps/cli/src/args.ts:206`），`dsh root` = 启动名为 root 的 profile，CLI 必须是独立 bin。
 - 残留风险：官方 monorepo 根包内部名就是 `@deepseek-ai/dsh-root`（private，npm 404），源码搜索会撞；README 首行 + `bin` banner + `repository` 三处声明非官方，绝不发 `@deepseek-ai/*` scope。404 ≠ 永久可注册，落地第一步 `npm view dsh-root` 复核并占位。
@@ -26,7 +26,7 @@
 
 1. **没有环境对象**：`ctx.settings` 只把插件 Config 的 **Volatile** 字段投影成表单，写入也只作用于 volatile path（`settings/src/index.ts:308,386`）；普通变量、跨插件偏好、用户级环境都不在词汇表。settings 的 provenance 只有 `value/base/user` + revision（`settings/src/types.ts:29-43`），回答不了「谁加的 PATH」。
 2. **项目 `.env` 被设计成不能设 PATH/代理/endpoint**：`BOOTSTRAP_NAMES` 显式含 `PATH`、`HTTP(S)_PROXY`、`DEEPSEEK_BASE_URL` 等（`app-boot/src/index.ts:137-157`），项目层一律拒绝（`:189-196`），只有 home `.env` 放行代理与两个 endpoint（`:173-185`）。而真实 workspace 恰恰需要这几项。
-3. **生态是碎片不是层**：`@hyzyn/dsh-env` 708 次/周，用单文件 `~/.dsh/env.yml` + 直接写 `process.env`（README 原文）；代理插件 743/478 次/周各改一格。`@hyzyn` 自己的 README 承认宿主优先级在 `0.2.1-alpha.3` 翻转过、`process.env` 与 `credentials.resolve()` 可能不同答（「卡片说已配置、MCP 却 401」）。没人做「值从哪来」。
+3. **生态是碎片不是层**：`@hyzyn/dsh-runtime-env` 708 次/周，用单文件 `~/.dsh/env.yml` + 直接写 `process.env`（README 原文）；代理插件 743/478 次/周各改一格。`@hyzyn` 自己的 README 承认宿主优先级在 `0.2.1-alpha.3` 翻转过、`process.env` 与 `credentials.resolve()` 可能不同答（「卡片说已配置、MCP 却 401」）。没人做「值从哪来」。
 
 | 人群 | 场景 | 付费点 |
 |---|---|---|
@@ -147,7 +147,7 @@ class EnvService extends Service {                 // super(ctx, 'env')
 ```
 
 - Client：`settings.section` 注册 Environment 页（`ui-settings-account/src/client/index.ts:327` 同款），会话面板用 `conversation.session.panel.section`（`ui-jobs/src/client/index.ts:39`）显示 `env: acme @r3 · 2 drift`。
-- 只依赖公共 seam：`launchEnvironment`（读）、`credentials`（resolve/describe）、`storage.domain`、`profileContext`、`shell`/`subprocess`（写侧适配器）；缺 `credentials` → secretRef 标 `unresolved`，其余照常。两个 bundle entry：`root-boot`（零注入、同步 materialize 非密 vars，供 `!!js`）与 `root`（完整服务，带注入）。**mount 顺序是产品的一部分**：必须排在聚合层第一位（与 `@hyzyn/dsh-env` 同一手法）。
+- 只依赖公共 seam：`launchEnvironment`（读）、`credentials`（resolve/describe）、`storage.domain`、`profileContext`、`shell`/`subprocess`（写侧适配器）；缺 `credentials` → secretRef 标 `unresolved`，其余照常。两个 bundle entry：`root-boot`（零注入、同步 materialize 非密 vars，供 `!!js`）与 `root`（完整服务，带注入）。**mount 顺序是产品的一部分**：必须排在聚合层第一位（与 `@hyzyn/dsh-runtime-env` 同一手法）。
 
 ## 5. 与 Nest / Allow / Check 的组合
 | 组合 | 契约 | 失败即关 |
@@ -219,4 +219,4 @@ class EnvService extends Service {                 // super(ctx, 'env')
 
 ## 12. 证据
 - 源码（checkout `ca33fd6`，0.2.2-rc.4）：`packages/boot/app-boot/src/index.ts:137,173,189,209`；`packages/util/launch-environment/src/index.ts:1-10,106-115`；`apps/cli/src/bin.ts:36`；`apps/cli/src/profile-boot.ts:286`；`apps/cli/src/args.ts:153,206`；`packages/settings/settings/src/index.ts:308,386`；`packages/settings/settings/src/types.ts:29-43`；`packages/util/http-proxy/src/install.ts:190,199,314,322`；`packages/util/http-proxy/src/policy.ts:33,57`；`packages/shell/shell/src/types.ts:85-99`；`packages/shell/shell-env/src/index.ts:122,133,164`；`packages/shell/tool-bash/src/index.ts:535-540`；`packages/shell/tool-pwsh/src/index.ts:558-562`；`packages/shell/bash-local/src/index.ts:163-172`；`packages/subprocess/subprocess/src/index.ts:54,73-87`；`packages/subprocess/subprocess-local/src/spawn.ts:41-47`；`packages/credentials/credentials-local/src/index.ts:1-10,571-584`；`packages/credentials/credentials/src/types.ts:14`；`packages/core/agent/src/runtime-types.ts:32-41`；`packages/core/tools/src/index.ts:128`；`packages/boot/app-boot/src/profile-context.ts:15-27`；`docs/cordis-primer.md:39`。
-- 生态（npm/GitHub，2026-11-20）：[@hyzyn/dsh-env](https://www.npmjs.com/package/@hyzyn/dsh-env) `0.3.19` / 708 次/周 / 69★（仓库 `hyzyn/dsh-plugin-kit`）/ pushed 2026-11-19，单文件 `~/.dsh/env.yml`、写 `process.env`、README 自述首挂与 `0.2.1-alpha.3` 优先级翻转；[dsh-env-profile](https://www.npmjs.com/package/dsh-env-profile) `0.1.4` / 206 次/周；[@copylee/dsh-proxy](https://www.npmjs.com/package/@copylee/dsh-proxy) `0.4.6` / 743 次/周；[@tr1v3r/dsh-proxy](https://www.npmjs.com/package/@tr1v3r/dsh-proxy) `0.2.6` / 478 次/周；[dsh-network-settings](https://www.npmjs.com/package/dsh-network-settings) `0.3.3` / 436 次/周；DSH 主仓 284,543★（pushed 2026-11-18）。npm 可用性（curl registry 直查）：`dsh-root`/`dsh-ground`/`dsh-field`/`@perrylink/dsh-root` = 404；`dsh-env-profile` = 200（`0.1.4`）、`dsh-profiles` = 200（`0.0.1` 占位）；`@deepseek-ai/dsh-root` = 404（官方 monorepo 根包为 private）。
+- 生态（npm/GitHub，2026-11-20）：[@hyzyn/dsh-runtime-env](https://www.npmjs.com/package/@hyzyn/dsh-runtime-env) `0.3.19` / 708 次/周 / 69★（仓库 `hyzyn/dsh-plugin-kit`）/ pushed 2026-11-19，单文件 `~/.dsh/env.yml`、写 `process.env`、README 自述首挂与 `0.2.1-alpha.3` 优先级翻转；[dsh-runtime-env-profile](https://www.npmjs.com/package/dsh-runtime-env-profile) `0.1.4` / 206 次/周；[@copylee/dsh-proxy](https://www.npmjs.com/package/@copylee/dsh-proxy) `0.4.6` / 743 次/周；[@tr1v3r/dsh-proxy](https://www.npmjs.com/package/@tr1v3r/dsh-proxy) `0.2.6` / 478 次/周；[dsh-network-settings](https://www.npmjs.com/package/dsh-network-settings) `0.3.3` / 436 次/周；DSH 主仓 284,543★（pushed 2026-11-18）。npm 可用性（curl registry 直查）：`dsh-root`/`dsh-ground`/`dsh-field`/`dsh-runtime-env` = 404；`dsh-runtime-env-profile` = 200（`0.1.4`）、`dsh-profiles` = 200（`0.0.1` 占位）；`@deepseek-ai/dsh-root` = 404（官方 monorepo 根包为 private）。

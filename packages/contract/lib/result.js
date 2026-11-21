@@ -1,6 +1,6 @@
 /**
  * OsResult v1 helpers: bounded envelopes, signed cursors and `dsh://` handles.
- * @module @perrylink/dsh-os-contract/lib/result
+ * @module dsh-os-contract/lib/result
  */
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { newId } from './ids.js'

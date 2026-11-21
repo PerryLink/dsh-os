@@ -46,8 +46,8 @@ Check 有两个入口：
 
 | 入口 | 用途 | 安装方式 |
 |---|---|---|
-| `dsh-check` CLI | 本地/CI 里 diff 两份 run | `npm install --save-dev @perrylink/dsh-check` |
-| DSH bundle | 提供 `ctx.check` 和 `check_compare` | `dsh plugin ... add @perrylink/dsh-check` |
+| `dsh-check` CLI | 本地/CI 里 diff 两份 run | `npm install --save-dev dsh-canary` |
+| DSH bundle | 提供 `ctx.check` 和 `check_compare` | `dsh plugin ... add dsh-canary` |
 
 先装 CLI，因为下一步马上要用：
 
@@ -55,7 +55,7 @@ Check 有两个入口：
 mkdir dsh-os-quickstart
 cd dsh-os-quickstart
 npm init -y
-npm install --save-dev @perrylink/dsh-check
+npm install --save-dev dsh-canary
 npx dsh-check --help
 ```
 
@@ -70,7 +70,7 @@ Usage:
 Exit codes: 0 pass/warnings, 1 regression, 2 usage or input error.
 ```
 
-包名是 **scoped** 的 `@perrylink/dsh-check`。裸 `dsh-check` 在 npm 上不存在：
+包名是 **scoped** 的 `dsh-canary`。裸 `dsh-check` 在 npm 上不存在：
 在没装本地依赖的目录里跑 `npx dsh-check` 会得到 404，见文末
 [常见错误](#常见错误)。
 
@@ -199,8 +199,8 @@ echo "exit=$?"
 用一个只给本 quickstart 用的 profile，避免动你现有的 `web`：
 
 ```sh
-dsh plugin --profile quickstart add @perrylink/dsh-check
-dsh plugin --profile quickstart add dsh-act dsh-allow dsh-snip dsh-nest @perrylink/dsh-root
+dsh plugin --profile quickstart add dsh-canary
+dsh plugin --profile quickstart add dsh-act dsh-allow dsh-snip dsh-nest dsh-runtime-env
 ```
 
 > 这个 profile 只用于“看层”。要在 Web/真实会话里使用，把 `quickstart` 换成
@@ -212,34 +212,34 @@ dsh plugin --profile quickstart add dsh-act dsh-allow dsh-snip dsh-nest @perryli
 dsh: initialized profile quickstart at <DSH_HOME>/profiles/quickstart
 ...
 dependencies:
-+ @perrylink/dsh-check <version>
++ dsh-canary <version>
 ...
 dependencies:
-+ @perrylink/dsh-root <version>
++ dsh-runtime-env <version>
 + dsh-act <version>
 + dsh-allow <version>
 + dsh-nest <version>
 + dsh-snip <version>
 ```
 
-> `dsh plugin` 把参数转发给 pnpm。`@perrylink/dsh-check` 在这里装的是
+> `dsh plugin` 把参数转发给 pnpm。`dsh-canary` 在这里装的是
 > **bundle**；第 1 步项目里的那份是 **CLI**。同名同包，但两个入口各管一边。
 >
 > 如果你刚发布了一个 patch，pnpm 的 `minimumReleaseAge` 可能先解析到旧
-> patch。固定版本即可：`... add @perrylink/dsh-check@0.1.1`。详见
+> patch。固定版本即可：`... add dsh-canary@0.1.1`。详见
 > [Troubleshooting §1.4](./troubleshooting.md#14-装到的不是最新-patchminimumreleaseage)。
 
 ## 5. 用 `--dump-config` 看到层（约 1 分钟）
 
 ```sh
-dsh --profile quickstart --dump-config | grep -E '^# == (dsh-|@perrylink/)'
+dsh --profile quickstart --dump-config | grep -E '^# == dsh-'
 ```
 
 预期（顺序可能因 pnpm 解析而不同）：
 
 ```text
-# == @perrylink/dsh-check
-# == @perrylink/dsh-root
+# == dsh-canary
+# == dsh-runtime-env
 # == dsh-act
 # == dsh-allow
 # == dsh-nest
@@ -271,9 +271,9 @@ dsh --profile quickstart --dump-config | grep '^# =='
 
 | 现象 | 原因 | 修复 |
 |---|---|---|
-| `npm error 404 ... 'dsh-check@*'` | 用了裸名，或在没装依赖的目录跑 `npx dsh-check` | 装 `@perrylink/dsh-check`，或 `npx --yes @perrylink/dsh-check@0.1.1 ...` |
+| `npm error 404 ... 'dsh-check@*'` | 用了裸名，或在没装依赖的目录跑 `npx dsh-check` | 装 `dsh-canary`，或 `npx --yes dsh-canary@0.1.1 ...` |
 | `error: required option '--profile <name>' not specified` | `dsh plugin` 少了 `--profile`，或 `--profile` 放在 `add` 后面 | 用 `dsh plugin --profile quickstart add ...`；`--profile` 必须在子命令前 |
-| `Failed to resolve the latest version of dsh-trace ... 404` | 用了未加 scope 的 `dsh-trace`，或镜像还没同步 | 用 `@perrylink/dsh-trace`；镜像问题见 [Troubleshooting §4](./troubleshooting.md#4-trace-tarball-404) |
+| `Failed to resolve the latest version of dsh-trace ... 404` | 用了未加 scope 的 `dsh-trace`，或镜像还没同步 | 用 `dsh-record`；镜像问题见 [Troubleshooting §4](./troubleshooting.md#4-trace-tarball-404) |
 | 输出 `Check PASS`，不是 `REGRESSION` | 两份 run 的 `result` 相同，或 `--old/--new` 指向了同一份/错文件 | 用 `--json` 看 `verdict`；确认 candidate 的 `result` 真的变了 |
 | `Error: dsh: profile "quickstart" does not exist` | 还没创建该 profile | 先跑第 4 步的 `dsh plugin --profile quickstart add ...` |
 | `.../check.tasks.json already exists; refusing to overwrite` | 对同一个目录重复跑 `init` | 换一个目录（`npx dsh-check init evals2`），或先确认旧文件不再需要 |

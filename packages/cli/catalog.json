@@ -27,13 +27,13 @@
     "install": "dsh plugin --profile web add dsh-snip"
   },
   {
-    "name": "@perrylink/dsh-check",
+    "name": "dsh-canary",
     "product": "Check",
     "service": "check",
     "version": "0.4.0",
     "stability": "experimental",
     "description": "Paired-environment regression canary for DeepSeek Harness upgrades, model changes and plugin updates.",
-    "install": "dsh plugin --profile web add @perrylink/dsh-check"
+    "install": "dsh plugin --profile web add dsh-canary"
   },
   {
     "name": "dsh-nest",
@@ -63,13 +63,13 @@
     "install": "dsh plugin --profile web add dsh-seek"
   },
   {
-    "name": "@perrylink/dsh-trace",
+    "name": "dsh-record",
     "product": "Trace",
     "service": "trace",
     "version": "0.3.0",
     "stability": "experimental",
     "description": "Auditable long-term memory governance for DeepSeek Harness: provenance, expiry, conflict, forget, optional dsh:// ref verification, and a read-only dsh-memento bridge.",
-    "install": "dsh plugin --profile web add @perrylink/dsh-trace"
+    "install": "dsh plugin --profile web add dsh-record"
   },
   {
     "name": "dsh-stage",
@@ -90,22 +90,22 @@
     "install": "dsh plugin --profile web add dsh-ring"
   },
   {
-    "name": "@perrylink/dsh-root",
+    "name": "dsh-runtime-env",
     "product": "Root",
     "service": "env",
     "version": "0.1.2",
     "stability": "experimental",
     "description": "Named, explainable and snapshot-able environment profiles for DeepSeek Harness.",
-    "install": "dsh plugin --profile web add @perrylink/dsh-root"
+    "install": "dsh plugin --profile web add dsh-runtime-env"
   },
   {
-    "name": "@perrylink/dsh-os-kernel",
+    "name": "dsh-os-kernel",
     "product": "Kernel",
     "service": "kernel",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "stability": "experimental",
-    "description": "Thin capability kernel for dsh-os: descriptor protocol, registry, legacy tool bridge, six os_* verbs, Allow grant bridge and optional idempotency journal.",
-    "install": "dsh plugin --profile web add @perrylink/dsh-os-kernel"
+    "description": "Thin capability kernel for dsh-os: descriptor protocol, registry, legacy tool bridge, six os_* verbs, Allow grant bridge, content-hash taint gate and optional idempotency journal.",
+    "install": "dsh plugin --profile web add dsh-os-kernel"
   },
   {
     "name": "dsh-help",
@@ -118,60 +118,60 @@
     "optional": true
   },
   {
-    "name": "@perrylink/dsh-context",
+    "name": "dsh-scene",
     "product": "Context",
     "service": "context",
     "version": "0.1.0",
     "stability": "experimental",
     "description": "Read-only context provider protocol for DeepSeek Harness: app, window, selection, clipboard metadata and files, with isolated provider snapshots.",
-    "install": "dsh plugin --profile web add @perrylink/dsh-context",
+    "install": "dsh plugin --profile web add dsh-scene",
     "optional": true
   },
   {
-    "name": "@perrylink/dsh-cost",
+    "name": "dsh-price",
     "product": "Cost",
     "service": "cost",
     "version": "0.1.0",
     "stability": "experimental",
     "description": "Optional cost adapter for dsh-cost-meter: meter passthrough plus a local USD budget ledger and pre-flight gate for DeepSeek Harness.",
-    "install": "dsh plugin --profile web add @perrylink/dsh-cost",
+    "install": "dsh plugin --profile web add dsh-price",
     "optional": true
   },
   {
-    "name": "@perrylink/dsh-backup",
+    "name": "dsh-timecapsule",
     "product": "Backup",
     "service": "backup",
     "version": "0.2.0",
     "stability": "experimental",
     "description": "Read-only, allowlisted filesystem snapshot manifests and restore plans for DeepSeek Harness: metadata inventory with sensitive-path exclusions and hard caps, no copying and no deleting.",
-    "install": "dsh plugin --profile web add @perrylink/dsh-backup",
+    "install": "dsh plugin --profile web add dsh-timecapsule",
     "optional": true
   },
   {
-    "name": "@perrylink/dsh-notify",
+    "name": "dsh-buzz",
     "product": "Notify",
     "service": "notify",
     "version": "0.1.0",
     "stability": "experimental",
     "description": "Channel registry, routing and delivery ledger for DeepSeek Harness notifications.",
-    "install": "dsh plugin --profile web add @perrylink/dsh-notify",
+    "install": "dsh plugin --profile web add dsh-buzz",
     "optional": true
   },
   {
-    "name": "@perrylink/dsh-os-shell",
+    "name": "dsh-os-shell",
     "product": "Shell",
     "service": null,
-    "version": "0.3.0",
+    "version": "0.4.0",
     "stability": "experimental",
     "description": "Optional UI shell for dsh-os: a view contribution registry, an owner-only JSON bridge and a minimal React client for approvals, activity, Act, Snip and Check.",
-    "install": "dsh plugin --profile web add @perrylink/dsh-os-shell",
+    "install": "dsh plugin --profile web add dsh-os-shell",
     "optional": true
   },
   {
     "name": "dsh-os-kit",
     "product": "Kit",
     "service": null,
-    "version": "0.6.0",
+    "version": "0.7.0",
     "stability": "experimental",
     "description": "Thin meta bundle that installs and mounts the six core dsh-os modules: Act, Allow, Snip, Check, Kernel and Shell.",
     "install": "dsh plugin --profile web add dsh-os-kit",

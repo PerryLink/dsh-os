@@ -93,7 +93,7 @@ The report contains:
 
 Five steps, one command each:
 
-1. Install Check: `dsh plugin --profile web add @perrylink/dsh-check`
+1. Install Check: `dsh plugin --profile web add dsh-canary`
 2. Generate a run: `dsh --profile headless --json "<task>" > run-baseline.ndjson`
 3. Diff two runs: `dsh-check diff --old run-baseline.json --new run-candidate.json`
 4. Install Act and Allow: `dsh plugin --profile web add dsh-allow && dsh plugin --profile web add dsh-act`

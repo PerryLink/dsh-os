@@ -1,4 +1,4 @@
-# Context · `@perrylink/dsh-context`
+# Context · `dsh-scene`
 
 > A read-only context provider protocol for DeepSeek Harness: each provider
 > supplies any subset of `app`, `window`, `selection`, `clipboard` and `files`,
@@ -18,7 +18,7 @@ metadata-only adapter; the demo provider does not supply it.
 
 The unscoped `dsh-context` npm name is already used by a different DeepSeek
 Harness plugin (a context dashboard by another author), so this module is
-published as `@perrylink/dsh-context`.
+published as `dsh-scene`.
 
 **Not affiliated with DeepSeek.** DeepSeek and DeepSeek Harness are trademarks
 of their respective owners.
@@ -26,7 +26,7 @@ of their respective owners.
 ## Install
 
 ```sh
-dsh plugin --profile web add @perrylink/dsh-context
+dsh plugin --profile web add dsh-scene
 ```
 
 The bundle patch mounts the plugin and provides `ctx.context`. Requires Node

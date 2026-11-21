@@ -2,7 +2,7 @@
  * dsh-os-shell Host JSON bridge: owner-only routes for the client. Approvals
  * and activity are read/decide endpoints; decisions require a human `by`.
  * `registerBridge` is a no-op without `ctx.webServer`; handlers answer JSON.
- * @module @perrylink/dsh-os-shell/bridge
+ * @module dsh-os-shell/bridge
  */
 const SNAPSHOT_LIMIT = 50
 const MAX_BODY = 64 * 1024

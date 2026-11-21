@@ -1,4 +1,4 @@
-# @perrylink/dsh-os-cli
+# dsh-os-cli
 
 `dsh-os` is a **zero-dependency** CLI for the [dsh-os](../../README.md) module
 family. It is a local catalog, a read-only health check, and a safe command
@@ -18,7 +18,7 @@ Node.js `>=22.19.0`.
 ## Install
 
 ```sh
-npm install -g @perrylink/dsh-os-cli
+npm install -g dsh-os-cli
 dsh-os list
 ```
 
@@ -47,7 +47,7 @@ node packages/cli/bin/dsh-os.js list
 $ dsh-os list
 NAME                  PRODUCT  SERVICE       VERSION  STABILITY     DESCRIPTION
 dsh-act               Act      ctx.act       0.1.1    experimental  Typed action registry and ...
-@perrylink/dsh-check  Check    ctx.check     0.1.1    experimental  Paired-environment regression canary ...
+dsh-canary  Check    ctx.check     0.1.1    experimental  Paired-environment regression canary ...
 ...
 ```
 
@@ -68,7 +68,7 @@ Act
   update:      dsh plugin --profile web add dsh-act@latest
 ```
 
-Modules can be referenced by package name (`dsh-act`, `@perrylink/dsh-root`),
+Modules can be referenced by package name (`dsh-act`, `dsh-runtime-env`),
 product (`Act`, `Root`) or service (`act`, `ctx.env`).
 
 ### doctor

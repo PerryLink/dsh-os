@@ -1,4 +1,4 @@
-# Check · `@perrylink/dsh-check`
+# Check · `dsh-canary`
 
 > **Upgrade canary, not an update checker.** Compare two paired runs across
 > result, trajectory, cost and approvals, then fail CI only on a real regression.
@@ -21,14 +21,14 @@ of their respective owners.
 ## Install
 
 ```sh
-npm install --save-dev @perrylink/dsh-check
+npm install --save-dev dsh-canary
 npx dsh-check --help
 ```
 
 As a Cordis bundle:
 
 ```sh
-dsh plugin --profile web add @perrylink/dsh-check
+dsh plugin --profile web add dsh-canary
 ```
 
 Requires Node 22.19+ (or Node 24.9+). No runtime dependencies.
@@ -112,7 +112,7 @@ dropped. Explicit `env` config is trusted and merged last; `allowedDshBins` pins
 Programmatic use:
 
 ```js
-import { CheckRunner } from '@perrylink/dsh-check/runner'
+import { CheckRunner } from 'dsh-canary/runner'
 
 const runner = new CheckRunner({
   dshBin: '/home/me/deepseek-harness/apps/cli/lib/bin.js', // default: DSH_BIN or node_modules/.bin/dsh

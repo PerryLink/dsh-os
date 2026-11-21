@@ -1,11 +1,11 @@
 /**
- * @perrylink/dsh-context — read-only context provider protocol for dsh-os.
+ * dsh-scene — read-only context provider protocol for dsh-os.
  *
  * 0.1.0 is the protocol and the `ctx.context` registry only. Real active
  * app/window/selection adapters land in 0.2.0. Context never reads the OS
  * clipboard: raw clipboard text belongs to Snip; the `clipboard` field is
  * reserved for a future metadata-only adapter.
- * @module @perrylink/dsh-context
+ * @module dsh-scene
  */
 
 /** Cordis plugin name. */

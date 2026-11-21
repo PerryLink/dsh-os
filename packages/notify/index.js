@@ -1,5 +1,5 @@
 /**
- * @perrylink/dsh-notify — channel registry, routing and delivery ledger for
+ * dsh-buzz — channel registry, routing and delivery ledger for
  * DeepSeek Harness.
  *
  * 0.1.0 is routing + ledger only: callers register a channel, `send()` routes
@@ -8,11 +8,11 @@
  * 0.2.0. Ring can use `send()` for escalation notifications once a channel is
  * registered.
  *
- * Plain ESM, no runtime dependencies. @module @perrylink/dsh-notify
+ * Plain ESM, no runtime dependencies. @module dsh-buzz
  */
 import { randomUUID } from 'node:crypto'
 
-export const name = '@perrylink/dsh-notify'
+export const name = 'dsh-buzz'
 export const inject = ['tools']
 
 export const PRIORITIES = Object.freeze(['low', 'normal', 'high', 'urgent'])

@@ -23,20 +23,20 @@
 | 1 | **Act** | 行动 | `dsh-act` | 404 可用 | `dsh-actions` 已被竞品占（0.5.2、343 周下载、6★）；`dsh-do`/`dsh-run` 被占 |
 | 2 | **Allow** | 允许 | `dsh-allow` | 404 可用 | `dsh-grant`/`dsh-permit` 被 `tudamu` 预留（0.0.1，概念正面冲突）→ 尽快占位 |
 | 3 | **Snip** | 剪取 | `dsh-snip` | 404 可用 | `dsh-clip`/`dsh-copy`/`dsh-paste` 被占；同名截图仓 3 个，需 README 区分 |
-| 4 | **Check** | 检查 | `@perrylink/dsh-check` | 404 可用 | `dsh-test`/`dsh-guard` 被占；`dsh-eval-harness` 已做 baseline+CI（237/月） |
+| 4 | **Check** | 检查 | `dsh-canary` | 404 可用 | `dsh-test`/`dsh-guard` 被占；`dsh-eval-harness` 已做 baseline+CI（237/月） |
 | 5 | **Nest** | 巢/工作窝 | `dsh-nest` | 404 可用 | `dsh-room`/`dsh-profile` 被占位；`dsh-workspace-combiner` 564/周是最近竞品 |
 | 6 | **Trigger** | 扳机/触发 | `dsh-trigger` | 404 可用 | 原名 Hook 弃用：`dsh-hooks` 0.14.8/1,109 周、且宿主 “hook” 已被兼容桥占用 |
 | 7 | **Seek** | 寻找 | `dsh-seek` | 404 可用 | `dsh-find`/`dsh-search` 被占；`session-query` 每月 204 万次是单库红海 |
-| 8 | **Trace** | 痕迹 | `@perrylink/dsh-trace` | 404 可用 | `dsh-recall`/`dsh-memo` 被占；memento 0.5.32 已发 memory protocol v1 → Trace 做治理层 |
+| 8 | **Trace** | 痕迹 | `dsh-record` | 404 可用 | `dsh-recall`/`dsh-memo` 被占；memento 0.5.32 已发 memory protocol v1 → Trace 做治理层 |
 | 9 | **Stage** | 舞台/台面 | `dsh-stage` | 404 可用 | `dsh-window-locator` 是单点；无强竞品 |
 | 10 | **Ring** | 铃响 | `dsh-ring` | 404 可用 | `Sanksu/dsh-ring` 是 0★ 提示音，非品类；`dsh-alert`/`dsh-call`/`dsh-nudge` 被占 |
-| 11 | **Root** | 根/基础 | `@perrylink/dsh-root` | 404 可用 | `@deepseek-ai/dsh-root` 是官方 private 内部名（npm 404），搜索会撞；`dsh-env` 被占 |
+| 11 | **Root** | 根/基础 | `dsh-runtime-env` | 404 可用 | `@deepseek-ai/dsh-root` 是官方 private 内部名（npm 404），搜索会撞；`dsh-runtime-env` 被占 |
 
-> npm 相似度规则：`dsh-check`（像 es-check/nth-check）、`dsh-trace`（像 dd-trace）、`dsh-root`（像 is-root）被拒，故这三个改用 `@perrylink/` scope；产品裸名不变。
+> **2026-11-21 更新：全部改为裸名。** `dsh-check`/`dsh-root`/`dsh-trace` 原名被相似度拒绝，改用 `dsh-canary`/`dsh-runtime-env`/`dsh-record`；Context→`dsh-scene`、Cost→`dsh-price`、Backup→`dsh-timecapsule`、Notify→`dsh-buzz`。
 
 **命名纪律**：
 - 产品名只用裸名（Act/Allow/…），包名统一 `dsh-<name>`；README 首行 `Not affiliated with DeepSeek.`
-- **立刻占位**：11 个 npm 包 + `@perrylink/*` 镜像 + GitHub 仓，发 `0.0.1` 占位；`dsh-allow` 已出现被预留的先例，晚一周可能就没了。
+- **立刻占位**：全部裸 npm 包（无 scope） + GitHub 仓，发 `0.0.1` 占位；`dsh-allow` 已出现被预留的先例，晚一周可能就没了。
 - 不使用 `@deepseek-ai/*` scope；不使用官方商标/图标。
 
 ---
@@ -66,7 +66,7 @@
 ### 3.1 一个 core 包（所有产品共用）
 
 ```
-@perrylink/dsh-os-core
+dsh-os-kernel
 ├── object      BaseObject / Owner / Scope / TTL / AuditRef
 ├── audit       append-only event log + hash chain + export
 ├── ref         dsh://<kind>/<id> 引用 + freshness + resolve
@@ -266,7 +266,7 @@ Root ──→ Nest / Allow / Check
 
 ## 9. 未来 7 天（立刻做）
 
-1. **占名**：11 个 npm 包发 `0.0.1`（README 首行 Not affiliated），建 11 个 GitHub 仓（private/public 均可），加 `@perrylink/*` 镜像。
+1. **占名**：11 个 npm 包发 `0.0.1`（README 首行 Not affiliated），建 11 个 GitHub 仓（private/public 均可），全部裸名发布，不再维护 scoped 镜像。
 2. **建 monorepo**：`dsh-os`（pnpm workspace），`packages/core` + 11 个空包 + `docs/`。
 3. **冻结基类**：`BaseObject`、`AuditEvent`、`Ref`、`ActionDescriptor`、`Grant` 五个 schema，写成一页 ADR。
 4. **搭 CI**：lint/test/build + 一个最小 `Check` 金任务（dogfood）。

@@ -1,5 +1,5 @@
 {
-  "name": "@perrylink/dsh-os-contract",
+  "name": "dsh-os-contract",
   "version": "0.2.0",
   "description": "Canonical service names, capabilities, error codes, refs, result/error/audit protocol helpers and thin validators shared by dsh-os modules.",
   "type": "module",

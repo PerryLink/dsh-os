@@ -54,7 +54,7 @@ test('the shipped preset is static-checkable and mounts no other tool plugin', (
   const preset = fileURLToPath(new URL('../../../docs/presets/os-gateway.cordis.yml', import.meta.url))
   const yaml = readFileSync(preset, 'utf8')
   assert.match(yaml, /id: os-gateway/)
-  assert.match(yaml, /name: '@perrylink\/dsh-os-kernel'/)
+  assert.match(yaml, /name: 'dsh-os-kernel'/)
   assert.match(yaml, /gatewayOnly: true/)
   assert.equal(/name: '@deepseek-ai\/dsh-tool-/.test(yaml), false, 'only the kernel may expose model-facing tools')
 

@@ -12,9 +12,9 @@ modules and mounts them through one insert patch:
 | Act | `dsh-act` | `ctx.act` |
 | Allow | `dsh-allow` | `ctx.allow` |
 | Snip | `dsh-snip` | `ctx.snip` |
-| Check | `@perrylink/dsh-check` | `ctx.check` |
-| Kernel | `@perrylink/dsh-os-kernel` | `ctx.kernel` |
-| Shell | `@perrylink/dsh-os-shell` | `ctx.osShell` |
+| Check | `dsh-canary` | `ctx.check` |
+| Kernel | `dsh-os-kernel` | `ctx.kernel` |
+| Shell | `dsh-os-shell` | `ctx.osShell` |
 
 The kit registers no service, no capability and no agent tool. Its `index.js`
 is an empty plugin entry kept so the package is a valid bundle; every behavior
@@ -43,9 +43,9 @@ need:
 dsh plugin --profile web add dsh-act
 dsh plugin --profile web add dsh-allow
 dsh plugin --profile web add dsh-snip
-dsh plugin --profile web add @perrylink/dsh-check
-dsh plugin --profile web add @perrylink/dsh-os-kernel
-dsh plugin --profile web add @perrylink/dsh-os-shell
+dsh plugin --profile web add dsh-canary
+dsh plugin --profile web add dsh-os-kernel
+dsh plugin --profile web add dsh-os-shell
 ```
 
 Use the kit for the whole set, or install only the modules you need. Modules
@@ -67,8 +67,8 @@ The dsh-os module contract forbids runtime dependencies. **The kit is the
 documented exception** (`"kit": true` in its manifest): it contains no runtime
 logic, and its six `dependencies` are exactly the modules it mounts. The ranges
 are compatible semver ranges, not pins: `dsh-act ^0.3.0`, `dsh-allow ^0.4.0`,
-`dsh-snip ^0.2.0`, `@perrylink/dsh-check ^0.3.0`,
-`@perrylink/dsh-os-kernel ^0.2.0` and `@perrylink/dsh-os-shell ^0.3.0`, so each
+`dsh-snip ^0.2.0`, `dsh-canary ^0.3.0`,
+`dsh-os-kernel ^0.2.0` and `dsh-os-shell ^0.3.0`, so each
 module keeps its own release cadence.
 
 ## Requirements

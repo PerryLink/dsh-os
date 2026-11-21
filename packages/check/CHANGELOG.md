@@ -75,5 +75,5 @@ at most 20 of each
 
 ## 0.0.1
 
-- Reserve the `@perrylink/dsh-check` package name.
+- Reserve the `dsh-canary` package name.
 - Publish the bundle manifest and an empty, side-effect-free plugin entry.

@@ -41,11 +41,11 @@ body:
         - dsh-seek
         - dsh-stage
         - dsh-ring
-        - "@perrylink/dsh-check"
-        - "@perrylink/dsh-root"
-        - "@perrylink/dsh-trace"
-        - "@perrylink/dsh-os-cli"
-        - "@perrylink/dsh-os-shell"
+        - "dsh-canary"
+        - "dsh-runtime-env"
+        - "dsh-record"
+        - "dsh-os-cli"
+        - "dsh-os-shell"
         - Contract / manifest / conformance
         - Docs / demo / examples
         - New package

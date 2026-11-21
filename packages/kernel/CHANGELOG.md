@@ -107,7 +107,7 @@
 - `os_status` now reports `{ legacy, capabilities, total }`; legacy descriptors
   are excluded from `modules`.
 - Local `ok()` / `err()` / `legacyOutcome()` envelope helpers
-  (`./envelope` export), mirroring `@perrylink/dsh-os-contract` without adding
+  (`./envelope` export), mirroring `dsh-os-contract` without adding
   a dependency.
 - `fromTool()` recognizes `execute` in names/descriptions as execute risk.
 

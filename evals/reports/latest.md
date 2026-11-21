@@ -1,8 +1,8 @@
 # dsh-os AI 可用性评测报告
 
-- 生成：2026-11-21T14:51:31.900Z
+- 生成：2026-11-21T15:16:32.348Z
 - 层：P-scripted (fixed policy; no model, no network)
-- 环境：Node v24.22.1 · commit 20a8f83（工作树有未提交改动）
+- 环境：Node v24.22.1 · commit a38e3c8（工作树有未提交改动）
 
 ## 总览
 

@@ -1,5 +1,5 @@
 {
-  "name": "@perrylink/dsh-backup",
+  "name": "dsh-timecapsule",
   "version": "0.2.0",
   "description": "Read-only, allowlisted filesystem snapshot manifests and restore plans for DeepSeek Harness: metadata inventory with sensitive-path exclusions and hard caps, no copying and no deleting.",
   "type": "module",

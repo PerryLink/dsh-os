@@ -44,12 +44,12 @@ body:
         - dsh-seek
         - dsh-stage
         - dsh-ring
-        - "@perrylink/dsh-check"
-        - "@perrylink/dsh-root"
-        - "@perrylink/dsh-trace"
-        - "@perrylink/dsh-os-cli"
-        - "@perrylink/dsh-os-shell"
-        - "@perrylink/dsh-os-contract"
+        - "dsh-canary"
+        - "dsh-runtime-env"
+        - "dsh-record"
+        - "dsh-os-cli"
+        - "dsh-os-shell"
+        - "dsh-os-contract"
         - I am not sure
         - Other / cross-package
     validations:

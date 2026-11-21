@@ -1,5 +1,5 @@
 {
-  "name": "@perrylink/dsh-os-mcp",
+  "name": "dsh-os-mcp",
   "version": "0.2.0",
   "description": "Stdio MCP server for the dsh-os capability catalog: zero dependencies, read-only by default, approval-token write path, no DSH connection.",
   "type": "module",

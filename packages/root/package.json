@@ -1,5 +1,5 @@
 {
-  "name": "@perrylink/dsh-root",
+  "name": "dsh-runtime-env",
   "version": "0.1.2",
   "description": "Named, explainable and snapshot-able environment profiles for DeepSeek Harness.",
   "type": "module",

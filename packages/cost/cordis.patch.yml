@@ -1,4 +1,4 @@
-# @perrylink/dsh-cost bundle patch: mount the plugin.
+# dsh-price bundle patch: mount the plugin.
 - insert:
-    - id: '@perrylink/dsh-cost'
-      name: '@perrylink/dsh-cost'
+    - id: 'dsh-price'
+      name: 'dsh-price'

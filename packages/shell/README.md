@@ -1,4 +1,4 @@
-# Shell · `@perrylink/dsh-os-shell`
+# Shell · `dsh-os-shell`
 
 > **The shell is optional.** It is a contribution registry, an owner-only JSON
 > bridge and a minimal client page, not a product. No module requires it;
@@ -17,7 +17,7 @@ package has no React dependency, no JSX and no build step.
 ## Install
 
 ```sh
-dsh plugin --profile web add @perrylink/dsh-os-shell
+dsh plugin --profile web add dsh-os-shell
 ```
 
 Requires Node 22.19+ (or Node 24.9+) and a DSH host in the
@@ -125,7 +125,7 @@ descriptors) is separate from `./client` and retained for 0.1 compatibility.
 ## Rendering (Host)
 
 ```js
-import { render } from '@perrylink/dsh-os-shell'
+import { render } from 'dsh-os-shell'
 
 render(ctx.osShell.listViews())
 // <ul class="dsh-os-views">…</ul>

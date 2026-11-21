@@ -1,4 +1,4 @@
-# `@perrylink/dsh-os-contract`
+# `dsh-os-contract`
 
 > Canonical service names, capabilities, error codes, refs, result/error/audit
 > protocol helpers and thin validators shared by the dsh-os module family.
@@ -31,7 +31,7 @@ container, no base class and no shared event bus here.
 ## Install
 
 ```sh
-npm install @perrylink/dsh-os-contract
+npm install dsh-os-contract
 ```
 
 ## Exports
@@ -74,7 +74,7 @@ import {
   isOsObject,
   makeRef,
   parseRef,
-} from '@perrylink/dsh-os-contract'
+} from 'dsh-os-contract'
 
 SERVICES.trigger // 'triggers' → the module provides ctx.triggers
 CAPABILITIES[0] // 'fs.read'
@@ -107,7 +107,7 @@ const tool = defineTool({
 scalar data (an array is treated as `items`):
 
 ```js
-import { makeHandle, ok, page, RESULT_SCHEMA } from '@perrylink/dsh-os-contract'
+import { makeHandle, ok, page, RESULT_SCHEMA } from 'dsh-os-contract'
 
 const first = page(entries, { limit: 20 })
 // { items, limit, returned, total, hasMore, nextCursor }
@@ -145,7 +145,7 @@ const result = ok(
 ## Error protocol (`OsError` v1)
 
 ```js
-import { err, isRetryable, toToolError } from '@perrylink/dsh-os-contract'
+import { err, isRetryable, toToolError } from 'dsh-os-contract'
 
 const error = err('E_DENIED', {
   subcode: 'grant_required',

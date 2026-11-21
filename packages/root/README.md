@@ -1,4 +1,4 @@
-# Root · `@perrylink/dsh-root`
+# Root · `dsh-runtime-env`
 
 > Named, explainable environment profiles for DeepSeek Harness.
 
@@ -25,7 +25,7 @@ of their respective owners.
 ## Install
 
 ```sh
-dsh plugin --profile web add @perrylink/dsh-root
+dsh plugin --profile web add dsh-runtime-env
 ```
 
 Plain ESM, Node.js 22+, no runtime dependencies and no build step.

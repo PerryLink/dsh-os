@@ -180,7 +180,7 @@ profile installation with a Linux runtime for boot.
 export DSH_HOME=$(mktemp -d /tmp/dsh-gw.XXXXXX)
 "${DSH[@]}" --profile eval-gw --from-default-profile web --dump-config >/dev/null
 "${DSH[@]}" plugin --profile eval-gw add \
-  @perrylink/dsh-os-kernel@0.3.0 dsh-allow@0.4.0
+  dsh-os-kernel@0.3.0 dsh-allow@0.4.0
 ```
 
 `--from-default-profile web --dump-config` initializes a profile whose bundle
@@ -234,7 +234,7 @@ cat > "$DSH_HOME/profiles/eval-gw/cordis.patch.yml" <<'YAML'
               kernel: true
             config:
               - id: os-kernel
-                name: '@perrylink/dsh-os-kernel'
+                name: 'dsh-os-kernel'
                 config:
                   gatewayOnly: true
 YAML

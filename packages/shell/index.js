@@ -1,12 +1,12 @@
 /**
- * @perrylink/dsh-os-shell — optional UI shell contribution registry for dsh-os.
+ * dsh-os-shell — optional UI shell contribution registry for dsh-os.
  *
  * This is a registry, not an application. Modules register view descriptors on
  * the Host seam `ctx.osShell`; the shell owns routing, shortcuts and theme. The
  * Host never imports module UI code: `ui/index.js` is a lazy client entry, and
  * a `mount` function is stored but never called here. No DOM, no framework, no
  * runtime dependencies.
- * @module @perrylink/dsh-os-shell
+ * @module dsh-os-shell
  */
 
 import { registerBridge } from './bridge.js'

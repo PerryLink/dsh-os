@@ -1,6 +1,6 @@
 /**
  * OsError v1: nine classes, recovery hints, cause projection and legacy aliases.
- * @module @perrylink/dsh-os-contract/lib/error
+ * @module dsh-os-contract/lib/error
  */
 import { newId } from './ids.js'
 

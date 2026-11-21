@@ -1,7 +1,7 @@
 /**
  * Process-local ULID-style ids (`req_…`, `aud_…`). Zero dependencies beyond
  * Node's crypto; no I/O and no persistence.
- * @module @perrylink/dsh-os-contract/lib/ids
+ * @module dsh-os-contract/lib/ids
  */
 import { randomBytes } from 'node:crypto'
 

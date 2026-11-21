@@ -1,6 +1,6 @@
 /**
  * dsh-check guard — Grant resolution, budget and structured refusals.
- * @module @perrylink/dsh-check/guard
+ * @module dsh-canary/guard
  */
 export const HOUR_MS = 3_600_000
 export const DEFAULT_MAX_RUNS_PER_HOUR = 10

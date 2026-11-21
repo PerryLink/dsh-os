@@ -40,7 +40,7 @@ interface CapabilityDescriptor {
 ## 2. 注册中心（≤300 行，零 import）
 
 ```js
-// @perrylink/dsh-os-contract/registry.js — 纯 ESM，无 node: 内建，浏览器/worker 可用
+// dsh-os-contract/registry.js — 纯 ESM，无 node: 内建，浏览器/worker 可用
 export function createRegistry({ authorize, strict = false } = {}) { /* Map + filter + gate */ }
 const r = createRegistry({ authorize })             // 宿主装配时创建一次
 r.register(desc | desc[] | { id, meta, load })     // 同步、幂等；返回 unregister()

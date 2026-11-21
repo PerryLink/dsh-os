@@ -1,6 +1,6 @@
 # dsh-os gateway preset: only the six os_* verbs reach the model.
 # Merge this `insert` row into $DSH_HOME/profiles/<profile>/cordis.patch.yml.
-# Install @perrylink/dsh-os-kernel; keep dsh-allow mounted in the same profile
+# Install dsh-os-kernel; keep dsh-allow mounted in the same profile
 # (outside this preset) so the kernel can resolve ctx.allow.
 - insert:
     - id: preset-os-gateway
@@ -30,7 +30,7 @@
               kernel: true
             config:
               - id: os-kernel
-                name: '@perrylink/dsh-os-kernel'
+                name: 'dsh-os-kernel'
                 config:
                   gatewayOnly: true
                   # stateFile: /home/you/.dsh/os-kernel-idempotency.json

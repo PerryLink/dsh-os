@@ -22,17 +22,17 @@ export const NODE_RANGE = '^22.19.0 || >=24.9.0'
  * Act, Check standalone, then the rest in catalog order.
  */
 export const MODULES = Object.freeze([
-  { product: 'Check', package: '@perrylink/dsh-check', service: 'check' },
+  { product: 'Check', package: 'dsh-canary', service: 'check' },
   { product: 'Allow', package: 'dsh-allow', service: 'allow' },
   { product: 'Act', package: 'dsh-act', service: 'act' },
   { product: 'Snip', package: 'dsh-snip', service: 'snip' },
   { product: 'Nest', package: 'dsh-nest', service: 'nest' },
   { product: 'Trigger', package: 'dsh-trigger', service: 'triggers' },
   { product: 'Seek', package: 'dsh-seek', service: 'evidence' },
-  { product: 'Trace', package: '@perrylink/dsh-trace', service: 'trace' },
+  { product: 'Trace', package: 'dsh-record', service: 'trace' },
   { product: 'Stage', package: 'dsh-stage', service: 'stage' },
   { product: 'Ring', package: 'dsh-ring', service: 'ring' },
-  { product: 'Root', package: '@perrylink/dsh-root', service: 'env' },
+  { product: 'Root', package: 'dsh-runtime-env', service: 'env' },
 ])
 
 /** The one command shape this module ever emits. */
@@ -139,7 +139,7 @@ export class HelpService {
         step: 1,
         id: 'install-check',
         title: 'Install Check',
-        command: addCommand('@perrylink/dsh-check'),
+        command: addCommand('dsh-canary'),
         note: 'Check is standalone. It diffs runs and has no module dependencies.',
       },
       {
@@ -211,7 +211,7 @@ export class HelpService {
       commands: steps.map(step => step.command),
       empty: steps.length === 0,
       ...(steps.length === 0
-        ? { note: `No modules requested. Start with Check: ${addCommand('@perrylink/dsh-check')}` }
+        ? { note: `No modules requested. Start with Check: ${addCommand('dsh-canary')}` }
         : {}),
       dependencies: [
         { product: 'Act', requires: ['allow'] },

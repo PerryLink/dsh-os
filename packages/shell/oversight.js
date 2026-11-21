@@ -3,7 +3,7 @@
  * activity feed. Allow owns every decision and every narrowing rule; the shell
  * only validates human input, rejects machine identities and projects service
  * data for the owner-only bridge. Zero dependencies, no DOM.
- * @module @perrylink/dsh-os-shell/oversight
+ * @module dsh-os-shell/oversight
  */
 
 const REQUEST_ID = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/

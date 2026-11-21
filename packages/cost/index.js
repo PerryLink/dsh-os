@@ -1,10 +1,10 @@
 /**
- * @perrylink/dsh-cost — a budget/admission adapter for DeepSeek Harness.
+ * dsh-price — a budget/admission adapter for DeepSeek Harness.
  * Cost is not a meter: it reads `ctx.costMeter` (dsh-cost-meter) or any
  * `ctx.cost` provider exposing summary()/status()/usage(), and keeps a local
  * budget ledger used as a pre-flight USD gate. Install `dsh-cost-meter` first;
  * without a meter summary() returns { available: false, reason }.
- * @module @perrylink/dsh-cost
+ * @module dsh-price
  */
 
 import { randomUUID } from 'node:crypto'

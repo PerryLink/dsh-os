@@ -1,5 +1,5 @@
 /**
- * @perrylink/dsh-os-kernel — the thin capability kernel for dsh-os.
+ * dsh-os-kernel — the thin capability kernel for dsh-os.
  *
  * It owns a registry, six agent verbs and the descriptor protocol. It owns no
  * business logic: every capability stays in its own module and is registered
@@ -21,7 +21,7 @@ export { TaintRegistry, TAINT_TTL_MS, MAX_TAINT_RECORDS, TOKEN_PATTERN, TAINT_SO
 export { ok, err, legacyOutcome, resolveCode, ERROR_CLASSES, RESULT_SCHEMA } from './lib/envelope.js'
 
 /** Cordis plugin name. */
-export const name = '@perrylink/dsh-os-kernel'
+export const name = 'dsh-os-kernel'
 /** The kernel registers six agent tools through the host registry. */
 export const inject = ['tools']
 

@@ -46,7 +46,7 @@ Use one of these instead:
 `$DSH_HOME/profiles/<profile>/cordis.patch.yml`:
 
 ```sh
-dsh plugin add @perrylink/dsh-os-kernel
+dsh plugin add dsh-os-kernel
 dsh plugin add dsh-allow
 # then merge docs/presets/os-gateway.cordis.yml into the profile patch
 ```

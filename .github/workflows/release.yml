@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       package:
-        description: 'Comma-separated packages: directory names (act,allow) or npm names (dsh-act,@perrylink/dsh-check)'
+        description: 'Comma-separated packages: directory names (act,allow) or npm names (dsh-act,dsh-canary)'
         required: true
         type: string
 
@@ -85,7 +85,7 @@ jobs:
       # and uploads tarballs. Releasing to npm is a separate, manual maintainer
       # action that requires:
       #   1. an `NPM_TOKEN` repository secret holding a granular npm token
-      #      allowed to publish `dsh-*` and `@perrylink/*`;
+      #      allowed to publish `dsh-*`;
       #   2. an approval-protected GitHub environment (required reviewers) on
       #      whatever job would read that token;
       #   3. a human to review the uploaded artifact and run

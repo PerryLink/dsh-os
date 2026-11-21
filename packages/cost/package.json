@@ -1,5 +1,5 @@
 {
-  "name": "@perrylink/dsh-cost",
+  "name": "dsh-price",
   "version": "0.1.0",
   "description": "Optional cost adapter for dsh-cost-meter: meter passthrough plus a local USD budget ledger and pre-flight gate for DeepSeek Harness.",
   "type": "module",

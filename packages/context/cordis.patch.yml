@@ -1,4 +1,4 @@
-# @perrylink/dsh-context bundle patch: mount the plugin.
+# dsh-scene bundle patch: mount the plugin.
 - insert:
-    - id: '@perrylink/dsh-context'
-      name: '@perrylink/dsh-context'
+    - id: 'dsh-scene'
+      name: 'dsh-scene'

@@ -36,7 +36,7 @@ L0  Host         DSH services, tools, sandbox, sessions
 
 ### L1 Kernel：薄，但唯一
 
-新包 `@perrylink/dsh-os-kernel`，职责只有五件：
+新包 `dsh-os-kernel`，职责只有五件：
 
 1. **Capability Registry**：注册/检索/解析/调用；按 risk/tag/capability 过滤。
 2. **Permission Broker**：Request → Approval → Grant → use；模型不能批准。
@@ -226,7 +226,7 @@ validate → authorize(Request/Grant) → preview(optional) → execute(sandbox/
 
 ## 10. 最小垂直切片（验证架构，不是最终产品）
 
-1. `@perrylink/dsh-os-kernel`：descriptor + registry + `os_find/os_do/os_request/os_observe/os_help/os_status`。
+1. `dsh-os-kernel`：descriptor + registry + `os_find/os_do/os_request/os_observe/os_help/os_status`。
 2. 把 **Act、Snip、Check** 三个模块改成 descriptor + handler，旧工具保留 alias。
 3. `allow_request/allow_wait` + `dsh-os approvals` + Shell pending。
 4. Act 内置 `fs.read/write/list`（Grant-gated）。

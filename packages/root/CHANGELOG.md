@@ -43,5 +43,5 @@
 
 ## 0.0.1
 
-- Reserve the `@perrylink/dsh-root` package name.
+- Reserve the `dsh-runtime-env` package name.
 - Publish the bundle manifest and an empty, side-effect-free plugin entry.

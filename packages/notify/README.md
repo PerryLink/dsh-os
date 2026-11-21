@@ -1,4 +1,4 @@
-# Notify · `@perrylink/dsh-notify`
+# Notify · `dsh-buzz`
 
 > **Route a notification, then prove what happened.** A channel registry and a
 > local delivery ledger for DeepSeek Harness — the wiring, not the channels.
@@ -11,7 +11,7 @@ notifications** — register an adapter and call `send()` from its tick/escalate
 path; until 0.2.0 that path only writes the ledger.
 
 `dsh-notify` on npm is already taken by an unrelated package, so this module
-publishes as `@perrylink/dsh-notify`. Product name: **Notify**.
+publishes as `dsh-buzz`. Product name: **Notify**.
 
 **Not affiliated with DeepSeek.** DeepSeek and DeepSeek Harness are trademarks
 of their respective owners.
@@ -19,9 +19,9 @@ of their respective owners.
 ## Install
 
 ```sh
-dsh plugin --profile web add @perrylink/dsh-notify
+dsh plugin --profile web add dsh-buzz
 # or
-npm install @perrylink/dsh-notify
+npm install dsh-buzz
 ```
 
 Requires Node 22.19+ (or Node 24.9+). No runtime dependencies.

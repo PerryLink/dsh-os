@@ -2,7 +2,7 @@
 
 > 2026-11-20 · 对象 PerryLink（个人开发者，非官方，not affiliated with DeepSeek）· 基线 DSH 0.2.2-rc.4（`ca33fd6`）· 定位：DSH 升级 / 换模型 / 升插件前后的**配对回归门禁**，不是通用 benchmark · 证据：源码/Registry 实测 [A]，公开页面 [B]，设计判断 [D]。
 
-> **npm package:** `@perrylink/dsh-check` — the unscoped `dsh-check` is blocked by npm name-similarity rules; the product name remains **Check**.
+> **npm package:** `dsh-canary` — the unscoped `dsh-check` is blocked by npm name-similarity rules; the product name remains **Check**.
 
 ## 0. 结论
 
@@ -21,7 +21,7 @@
 | Guard | `dsh-guard` | 200，1.0.0 运行期快照回退 | ❌ 语义冲突 |
 | Prove | `dsh-prove` | 404，可用 | 备选；不如 Check 直白 |
 
-`dsh-check` 的 404 是 npm 对不存在包的标准响应，不是“下载失败”。风险是 `dsh-check-update`、`dsh-check-for-updates`、`dsh-check-pack` 已存在，搜索词拥挤；用“upgrade canary, not an update checker”作首句，关键词加 canary/regression/eval/CI，立即发 0.1.0 占名；同时注册 `@perrylink/dsh-check` 兜底。产品名 Check，机制名 canary，seam 用任务要求的 `ctx.canary`。
+`dsh-check` 的 404 是 npm 对不存在包的标准响应，不是“下载失败”。风险是 `dsh-check-update`、`dsh-check-for-updates`、`dsh-check-pack` 已存在，搜索词拥挤；用“upgrade canary, not an update checker”作首句，关键词加 canary/regression/eval/CI，立即发 0.1.0 占名；同时注册 `dsh-canary` 兜底。产品名 Check，机制名 canary，seam 用任务要求的 `ctx.canary`。
 
 ## 2. 一句话 / 问题 / 用户
 
@@ -205,7 +205,7 @@ Act/Allow/Root/`ctx.canary` 在 rc.4 内核都不存在（`docs/capability-seams
 5. **误报杀死产品**：模型非确定性下，“回归”定义必须保守；2 个连续失败或确定性断言才判 REGRESSION。
 6. **隐私事故**：一次上传用户 session 就致命；默认本地、默认脱敏、默认不分享。
 7. **seam 不落地**：Act/Allow/Root 是家族提案，可能长期不在内核；CLI 必须独立可用，集成层 feature-detect。
-8. **名字拥挤**：`dsh-check-*` 已有更新检查器，安全圈 canary token 又与发布 canary 同名；先占名、首句限定“upgrade canary”、关键词区分；若被抢注退 `@perrylink/dsh-check`。
+8. **名字拥挤**：`dsh-check-*` 已有更新检查器，安全圈 canary token 又与发布 canary 同名；先占名、首句限定“upgrade canary”、关键词区分；若被抢注退 `dsh-canary`。
 9. **付费意愿**：个人作者不愿为门禁付费；企业 CI/审计才是买家，Pro 只是漏斗。
 10. **审批脚本化造成虚假安全感**：CI 里 auto-allow 会掩盖真实审批回归；报告必须标 `approvalMode`，关键套件另跑真实审批录制。
 11. **DSH 版本矩阵维护成本**：rc 周更；用定时金丝雀 + 社区 case 分摊，否则会被维护拖死；Windows/WSL/macOS 路径与进程终止差异也要进 CI 矩阵。

@@ -41,9 +41,9 @@
     "dsh-act": "^0.5.0",
     "dsh-allow": "^0.4.0",
     "dsh-snip": "^0.4.0",
-    "@perrylink/dsh-check": "^0.4.0",
-    "@perrylink/dsh-os-kernel": "^0.4.0",
-    "@perrylink/dsh-os-shell": "^0.4.0"
+    "dsh-canary": "^0.4.0",
+    "dsh-os-kernel": "^0.4.0",
+    "dsh-os-shell": "^0.4.0"
   },
   "dsh": {
     "manifestVersion": 1,

@@ -36,7 +36,7 @@ test('the bundle hands off its package id and registers main + sidebar.panellist
   }
 
   assert.ok(handoff, 'window.__ModuleLoader__.load was not called')
-  assert.equal(handoff.id, '@perrylink/dsh-os-shell')
+  assert.equal(handoff.id, 'dsh-os-shell')
   assert.equal(typeof handoff.factory, 'function')
 
   const react = {

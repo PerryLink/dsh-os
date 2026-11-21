@@ -68,13 +68,13 @@ Error: ERR_PNPM_PACKAGE_MANAGER_ADD_RESOLVE_LATEST
       client error (404 Not Found)
 ```
 
-三个包必须带 `@perrylink/`：
+所有包现在都是**裸名**；三个原名被占/被 npm 相似度拒绝的包改成了附近裸名：
 
 | 产品 | npm 包名 |
 |---|---|
-| Check | `@perrylink/dsh-check` |
-| Root | `@perrylink/dsh-root` |
-| Trace | `@perrylink/dsh-trace` |
+| Check | `dsh-canary` |
+| Root | `dsh-runtime-env` |
+| Trace | `dsh-record` |
 
 其余产品（Act、Allow、Snip、Nest、Trigger、Seek、Stage、Ring）是不带 scope
 的 `dsh-*`。完整清单见根 [`README.md`](../README.md#packages)。
@@ -83,7 +83,7 @@ CLI 同理：`npx dsh-check` 会去找 npm 上的裸包 `dsh-check` 并 404。�
 依赖时用包名：
 
 ```sh
-npx --yes @perrylink/dsh-check@0.1.1 --help
+npx --yes dsh-canary@0.1.1 --help
 ```
 
 ### 1.4 装到的不是最新 patch（`minimumReleaseAge`）
@@ -93,10 +93,10 @@ npx --yes @perrylink/dsh-check@0.1.1 --help
 
 ```text
 Added 1 entry to minimumReleaseAgeExclude in pnpm-workspace.yaml (set minimumReleaseAgeStrict to true to gate these updates with a prompt):
-  @perrylink/dsh-check@0.1.0
+  dsh-canary@0.1.0
 ...
 dependencies:
-+ @perrylink/dsh-check 0.1.0
++ dsh-canary 0.1.0
 ```
 
 而 npm 上的 latest 可能已经是 `0.1.1`。两种处理：
@@ -104,7 +104,7 @@ dependencies:
 1. **固定版本**（推荐，尤其是 CI）：
 
    ```sh
-   dsh plugin --profile web add @perrylink/dsh-check@0.1.1
+   dsh plugin --profile web add dsh-canary@0.1.1
    ```
 
    实测会写入 `minimumReleaseAgeExclude` 并装到 `0.1.1`。
@@ -115,7 +115,7 @@ dependencies:
 确认实际版本：
 
 ```sh
-npm view @perrylink/dsh-check version   # registry 上的 latest
+npm view dsh-canary version   # registry 上的 latest
 (cd "${DSH_HOME:-$HOME/.dsh}/profiles/web" && pnpm list --depth 0)
 ```
 
@@ -144,7 +144,7 @@ dsh plugin --profile web add dsh-nest --registry=https://registry.npmjs.org/
 排查某个包在 npmjs 上的真实状态：
 
 ```sh
-npm view @perrylink/dsh-check version dist.tarball --registry=https://registry.npmjs.org/
+npm view dsh-canary version dist.tarball --registry=https://registry.npmjs.org/
 ```
 
 如果这里正常、镜像不正常，就是镜像同步问题，不是包损坏。
@@ -170,7 +170,7 @@ npm view @perrylink/dsh-check version dist.tarball --registry=https://registry.n
 ```sh
 node --version
 dsh --version
-npm view @perrylink/dsh-check engines --json
+npm view dsh-canary engines --json
 ```
 
 dsh-os 包的约束（以 0.1.x 为例）：
@@ -221,7 +221,7 @@ dsh plugin --profile web version-exemptions
 
 | 现象 | 先查 | 处理 |
 |---|---|---|
-| `404 ... dsh-check@*` | 是不是漏了 `@perrylink/` | 用 `@perrylink/dsh-check` |
+| `404 ... dsh-check@*` | 没有 `dsh-check` 这个包 | 用 `dsh-canary`（Check 的包名） |
 | `ERR_PNPM_FETCH_404` / tarball 404 | `npm view <pkg> dist.tarball --registry=https://registry.npmjs.org/` | 换 registry，或按 §4 用 tarball URL |
 | 镜像有 metadata、没 tarball | 同上 | 临时 `--registry=https://registry.npmjs.org/` |
 | 401 / 403 | 是不是误把发布 token 配到了安装环境 | 安装用公共 registry，token 只用于发布 |
@@ -229,21 +229,21 @@ dsh plugin --profile web version-exemptions
 
 ## 4. Trace tarball 404
 
-`@perrylink/dsh-trace` 曾出现过“npm 上有 metadata，但 tarball 404”的情况；
-镜像同步也可能只同步到一半。症状是 `dsh plugin add @perrylink/dsh-trace`
+`dsh-record` 曾出现过“npm 上有 metadata，但 tarball 404”的情况；
+镜像同步也可能只同步到一半。症状是 `dsh plugin add dsh-record`
 报 `ERR_PNPM_FETCH_404`、`404 Not Found`，或 `Failed to resolve ... tarball`。
 
 ### 4.1 先确认官方 tarball 是否存在
 
 ```sh
-npm view @perrylink/dsh-trace version dist.tarball --registry=https://registry.npmjs.org/
+npm view dsh-record version dist.tarball --registry=https://registry.npmjs.org/
 ```
 
 实测输出：
 
 ```text
 version = '0.1.0'
-dist.tarball = 'https://registry.npmjs.org/@perrylink/dsh-trace/-/dsh-trace-0.1.0.tgz'
+dist.tarball = 'https://registry.npmjs.org/dsh-record/-/dsh-trace-0.1.0.tgz'
 ```
 
 如果这里也 404，先等/重试；不要随便换第三方镜像。
@@ -260,14 +260,14 @@ dsh plugin --profile web add 'https://registry.npmjs.org/@perrylink%2Fdsh-trace/
 
 ```text
 dependencies:
-+ @perrylink/dsh-trace 0.1.0
++ dsh-record 0.1.0
 ```
 
 然后确认层：
 
 ```sh
-dsh --profile web --dump-config | grep '^# == @perrylink/dsh-trace'
-# == @perrylink/dsh-trace
+dsh --profile web --dump-config | grep '^# == dsh-record'
+# == dsh-record
 ```
 
 ### 4.3 注意
@@ -276,8 +276,8 @@ dsh --profile web --dump-config | grep '^# == @perrylink/dsh-trace'
   `latest` 更新；镜像恢复后建议换回普通 scoped 安装：
 
   ```sh
-  dsh plugin --profile web remove @perrylink/dsh-trace
-  dsh plugin --profile web add @perrylink/dsh-trace
+  dsh plugin --profile web remove dsh-record
+  dsh plugin --profile web add dsh-record
   ```
 
 - URL 里的版本必须真实存在；先用 `npm view` 确认。
@@ -363,10 +363,10 @@ dsh --profile web --dump-config | grep '^# =='
 在当初安装它的项目里：
 
 ```sh
-npm uninstall @perrylink/dsh-check
+npm uninstall dsh-canary
 ```
 
-如果是 `npx --yes @perrylink/dsh-check@...` 临时跑的，没有项目依赖需要清；
+如果是 `npx --yes dsh-canary@...` 临时跑的，没有项目依赖需要清；
 npm 缓存可以用 `npm cache verify` 维护，但不要为了“干净”删整个缓存。
 
 ### 6.3 移除实验 profile

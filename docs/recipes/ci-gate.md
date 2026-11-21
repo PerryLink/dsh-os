@@ -57,7 +57,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          npx --yes @perrylink/dsh-check@0.1.1 \
+          npx --yes dsh-canary@0.1.1 \
             diff --old checks/baseline.json --new checks/candidate.json \
             --json > check-report.json
           status=$?
@@ -88,7 +88,7 @@ jobs:
 checkout 里。想先跑通流水线，可以先提交两份 fixture；确认能稳定变红/变绿后，
 再把 candidate 换成 artifact。
 
-### 为什么用 `npx --yes @perrylink/dsh-check@0.1.1`
+### 为什么用 `npx --yes dsh-canary@0.1.1`
 
 - 不需要 `npm install` 步骤，npx 会临时解析包并执行 `dsh-check` bin；
 - **必须写 scoped 包名**。`npx dsh-check` 会在 npm 上找裸包 `dsh-check` 并
@@ -148,7 +148,7 @@ jq -e '.verdict != "warning"' check-report.json >/dev/null \
 已知 flaky 的任务用 `--allow-flaky` 保留 diff、但从门禁里移除：
 
 ```bash
-npx --yes @perrylink/dsh-check@0.1.1 \
+npx --yes dsh-canary@0.1.1 \
   diff --old checks/baseline.json --new checks/candidate.json \
   --allow-flaky session-token-summary
 ```
@@ -176,7 +176,7 @@ Check PASS: 1 task(s), 0 regression(s), 0 warning(s), 1 ignored
 
 | 现象 | 原因 | 修复 |
 |---|---|---|
-| `npm error 404 ... 'dsh-check@*'` | 用了 `npx dsh-check` | 改成 `npx --yes @perrylink/dsh-check@0.1.1` |
+| `npm error 404 ... 'dsh-check@*'` | 用了 `npx dsh-check` | 改成 `npx --yes dsh-canary@0.1.1` |
 | `Check produced no report` | npx 下载/执行失败，或 Check 在写报告前就退出 | 看这一步的 stderr；确认 registry 可达、Node 版本正确 |
 | exit `2` | 用法或输入错误：缺 `--old/--new`、JSON 非法、task id 重复/为空 | 先用 `npx ... diff --old ... --new ...` 在本地复现 |
 | exit `1` 但看不到 diff 行 | 加了 `--json`，stdout 只有 JSON | 打开 artifact 里的 `check-report.json` |

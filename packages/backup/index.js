@@ -1,10 +1,10 @@
 /**
- * @perrylink/dsh-backup — read-only, allowlisted snapshot manifests and restore plans.
+ * dsh-timecapsule — read-only, allowlisted snapshot manifests and restore plans.
  *
  * 0.2.0 adds a root allowlist, default sensitive-path exclusions, hard limits
  * and an in-memory audit ledger. It never copies, moves, deletes or writes a
  * file, and it never touches the restore target.
- * @module @perrylink/dsh-backup
+ * @module dsh-timecapsule
  */
 import { createHash, randomUUID } from 'node:crypto'
 import {
@@ -17,7 +17,7 @@ import {
   HASH, fail, plainObject, normalize, HOME, absolute, limit, hashOption, idOf,
   isForbidden, inside, canonical, canonicalLoose, patternList, matcher, anyMatch,
 } from './lib/path.js'
-export const name = '@perrylink/dsh-backup'
+export const name = 'dsh-timecapsule'
 export const inject = ['tools']
 export const SNAPSHOT_SCHEMA = 'dsh.backup.snapshot/v1'
 export const DIFF_SCHEMA = 'dsh.backup.diff/v1'

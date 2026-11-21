@@ -1,4 +1,4 @@
-# @perrylink/dsh-os-kernel
+# dsh-os-kernel
 
 **A thin capability kernel for dsh-os.** It is a routing and protocol layer,
 not an OS implementation: it stores no clipboard, opens no window, runs no
@@ -128,7 +128,7 @@ subagent-level restriction, not a preset YAML key.
 ## Mount
 
 ```js
-import { apply } from '@perrylink/dsh-os-kernel'
+import { apply } from 'dsh-os-kernel'
 // ctx.tools must exist (inject: ['tools']); apply() provides ctx.kernel
 const kernel = apply(ctx)          // six tools registered into ctx.tools
 // Optional: apply(ctx, { gatewayOnly: true }) inside an agent preset,
@@ -183,7 +183,7 @@ classes with `details.legacyCode`.
   is absent. The kernel never imports a module.
 - **Zero runtime dependencies**, plain ESM. `lib/state.js` uses only Node
   built-ins (`node:fs`, `node:path`) and only when `config.stateFile` is set;
-  `lib/envelope.js` mirrors `@perrylink/dsh-os-contract`'s `ok()`/`err()`
+  `lib/envelope.js` mirrors `dsh-os-contract`'s `ok()`/`err()`
   helpers instead of importing them, so the package stays standalone. Its
   success schema remains the published `os.result/v1`.
 - **No publish** in this package's scripts; release is owned by the monorepo.

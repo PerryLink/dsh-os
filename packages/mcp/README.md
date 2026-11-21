@@ -1,4 +1,4 @@
-# @perrylink/dsh-os-mcp
+# dsh-os-mcp
 
 A [Model Context Protocol](https://modelcontextprotocol.io) server for the
 [dsh-os](../../README.md) capability catalog. It is **read-only by default** and
@@ -22,7 +22,7 @@ Node.js `>=22.19.0`.
 ## Install and run
 
 ```sh
-npm install -g @perrylink/dsh-os-mcp
+npm install -g dsh-os-mcp
 dsh-os-mcp --version
 ```
 

@@ -1,4 +1,4 @@
-# Cost · `@perrylink/dsh-cost`
+# Cost · `dsh-price`
 
 > An optional cost **adapter** for DeepSeek Harness: meter passthrough plus a
 > local USD budget ledger and a pre-flight gate.
@@ -15,7 +15,7 @@ provider. It reads the meter that already does that and answers three questions:
 spend go ahead*.
 
 > The name `dsh-cost` on npm belongs to another project. This module is published
-> as `@perrylink/dsh-cost`; the product name is **Cost**.
+> as `dsh-price`; the product name is **Cost**.
 
 **Not affiliated with DeepSeek.** DeepSeek and DeepSeek Harness are trademarks
 of their respective owners.
@@ -24,7 +24,7 @@ of their respective owners.
 
 ```sh
 dsh plugin --profile web add dsh-cost-meter          # the meter (optional but required for summary)
-dsh plugin --profile web add @perrylink/dsh-cost     # this adapter
+dsh plugin --profile web add dsh-price     # this adapter
 ```
 
 No runtime dependencies, no build step, Node 22.19+ (or Node 24.9+).

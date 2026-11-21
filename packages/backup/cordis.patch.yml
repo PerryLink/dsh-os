@@ -1,4 +1,4 @@
-# @perrylink/dsh-backup bundle patch: mount the plugin.
+# dsh-timecapsule bundle patch: mount the plugin.
 - insert:
-    - id: '@perrylink/dsh-backup'
-      name: '@perrylink/dsh-backup'
+    - id: 'dsh-timecapsule'
+      name: 'dsh-timecapsule'

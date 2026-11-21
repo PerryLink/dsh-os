@@ -11,11 +11,11 @@
     - id: dsh-snip
       name: dsh-snip
 
-    - id: '@perrylink/dsh-check'
-      name: '@perrylink/dsh-check'
+    - id: 'dsh-canary'
+      name: 'dsh-canary'
 
     - id: dsh-os-kernel
-      name: '@perrylink/dsh-os-kernel'
+      name: 'dsh-os-kernel'
 
-    - id: '@perrylink/dsh-os-shell'
-      name: '@perrylink/dsh-os-shell'
+    - id: 'dsh-os-shell'
+      name: 'dsh-os-shell'

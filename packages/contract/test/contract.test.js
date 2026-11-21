@@ -221,7 +221,7 @@ test('assertManifest rejects malformed manifests', () => {
 
 test('this package manifest is a non-plugin contract manifest', () => {
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
-  assert.equal(pkg.name, '@perrylink/dsh-os-contract')
+  assert.equal(pkg.name, 'dsh-os-contract')
   assert.equal(pkg.version, '0.2.0')
   assert.equal(pkg.type, 'module')
   assert.equal(pkg.dependencies, undefined)

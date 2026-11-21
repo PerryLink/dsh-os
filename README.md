@@ -7,7 +7,7 @@ an optional UI shell, a catalog CLI and a dependency-only kit.
 
 The modules stay small and independent: one Host service, ≤6 agent tools,
 zero runtime dependencies, independent semver, no cross-module imports. The
-contract (`@perrylink/dsh-os-contract`) and the optional shell are the only
+contract (`dsh-os-contract`) and the optional shell are the only
 shared layers; the kit contains no business code.
 
 > **Not affiliated with DeepSeek.** DeepSeek and DeepSeek Harness are
@@ -39,30 +39,28 @@ needs only Node 22+; nothing is installed or published.
 | **Act** | `dsh-act` | 0.5.0 (fs + taint gate) | [design](docs/design/01-act.md) |
 | **Allow** | `dsh-allow` | 0.4.0 (one-time grants) | [design](docs/design/02-allow.md) |
 | **Snip** | `dsh-snip` | 0.4.0 (capture + taint) | [design](docs/design/03-snip.md) |
-| **Check** | `@perrylink/dsh-check` | 0.4.0 (runner + envelope) | [design](docs/design/04-check.md) |
+| **Check** | `dsh-canary` | 0.4.0 (runner + envelope) | [design](docs/design/04-check.md) |
 | **Nest** | `dsh-nest` | 0.1.0 MVP | [design](docs/design/05-nest.md) |
 | **Trigger** | `dsh-trigger` | 0.4.0 (payload + taint) | [design](docs/design/06-trigger.md) |
 | **Seek** | `dsh-seek` | 0.5.0 (trace + taint) | [design](docs/design/07-seek.md) |
-| **Trace** | `@perrylink/dsh-trace` | 0.3.0 (memento + ref verify) | [design](docs/design/08-trace.md) |
+| **Trace** | `dsh-record` | 0.3.0 (memento + ref verify) | [design](docs/design/08-trace.md) |
 | **Stage** | `dsh-stage` | 0.2.0 (macOS/Windows adapters) | [design](docs/design/09-stage.md) |
 | **Ring** | `dsh-ring` | 0.4.0 (Grant-gated delivery) | [design](docs/design/10-ring.md) |
-| **Root** | `@perrylink/dsh-root` | 0.1.2 MVP | [design](docs/design/11-root.md) |
+| **Root** | `dsh-runtime-env` | 0.1.2 MVP | [design](docs/design/11-root.md) |
 | **Help** | `dsh-help` | 0.1.0 optional | install doctor / first run |
-| **Context** | `@perrylink/dsh-context` | 0.1.0 optional | context provider protocol |
-| **Cost** | `@perrylink/dsh-cost` | 0.1.0 optional | adapter for `dsh-cost-meter` |
-| **Backup** | `@perrylink/dsh-backup` | 0.2.0 optional | allowlisted snapshot / restore plan |
-| **Notify** | `@perrylink/dsh-notify` | 0.1.0 optional | channel registry / attention router |
-| **Shell** | `@perrylink/dsh-os-shell` | 0.4.0 optional | injection-safe approvals/activity |
-| **CLI** | `@perrylink/dsh-os-cli` | 0.2.0 tool | `dsh-os list/doctor/install/approvals` |
-| **Contract** | `@perrylink/dsh-os-contract` | 0.2.0 library | result/error/handle protocols |
+| **Context** | `dsh-scene` | 0.1.0 optional | context provider protocol |
+| **Cost** | `dsh-price` | 0.1.0 optional | adapter for `dsh-cost-meter` |
+| **Backup** | `dsh-timecapsule` | 0.2.0 optional | allowlisted snapshot / restore plan |
+| **Notify** | `dsh-buzz` | 0.1.0 optional | channel registry / attention router |
+| **Shell** | `dsh-os-shell` | 0.4.0 optional | injection-safe approvals/activity |
+| **CLI** | `dsh-os-cli` | 0.2.0 tool | `dsh-os list/doctor/install/approvals` |
+| **Contract** | `dsh-os-contract` | 0.2.0 library | result/error/handle protocols |
 | **Kit** | `dsh-os-kit` | 0.7.0 meta bundle | installs 6 latest modules |
-| **Kernel** | `@perrylink/dsh-os-kernel` | 0.4.0 core | taint gate + approval bridge |
-| **MCP** | `@perrylink/dsh-os-mcp` | 0.2.0 tool | read-only default + write approval path |
-| **A2A** | `@perrylink/dsh-os-a2a` | 0.1.0 tool | agent card + task protocol prototype |
+| **Kernel** | `dsh-os-kernel` | 0.4.0 core | taint gate + approval bridge |
+| **MCP** | `dsh-os-mcp` | 0.2.0 tool | read-only default + write approval path |
+| **A2A** | `dsh-os-a2a` | 0.1.0 tool | agent card + task protocol prototype |
 
-`Check`, `Trace`, `Root`, `Context`, `Cost`, `Backup`, `Notify`, `Shell`, `CLI`
-and `Contract` use the `@perrylink/` scope where npm's name-similarity rules
-require it; the product names stay bare.
+**All packages are unscoped.** Where the exact bare name was already taken or blocked by npm's name-similarity rule, the package uses a nearby bare name: **Check → `dsh-canary`**, **Root → `dsh-runtime-env`**, **Trace → `dsh-record`**, **Context → `dsh-scene`**, **Cost → `dsh-price`**, **Backup → `dsh-timecapsule`**, **Notify → `dsh-buzz`**. Product names stay Check/Root/Trace/Context/Cost/Backup/Notify.
 
 ## Install
 
@@ -79,33 +77,33 @@ dsh plugin --profile web add dsh-trigger
 dsh plugin --profile web add dsh-seek
 dsh plugin --profile web add dsh-stage
 dsh plugin --profile web add dsh-ring
-dsh plugin --profile web add @perrylink/dsh-check
-dsh plugin --profile web add @perrylink/dsh-root
-dsh plugin --profile web add @perrylink/dsh-trace
+dsh plugin --profile web add dsh-canary
+dsh plugin --profile web add dsh-runtime-env
+dsh plugin --profile web add dsh-record
 
 # AI gateway kernel (capability registry + os_* verbs)
-dsh plugin --profile web add @perrylink/dsh-os-kernel
+dsh plugin --profile web add dsh-os-kernel
 
 # optional small modules
 dsh plugin --profile web add dsh-help
-dsh plugin --profile web add @perrylink/dsh-context
-dsh plugin --profile web add @perrylink/dsh-cost
-dsh plugin --profile web add @perrylink/dsh-backup
-dsh plugin --profile web add @perrylink/dsh-notify
-dsh plugin --profile web add @perrylink/dsh-os-shell
+dsh plugin --profile web add dsh-scene
+dsh plugin --profile web add dsh-price
+dsh plugin --profile web add dsh-timecapsule
+dsh plugin --profile web add dsh-buzz
+dsh plugin --profile web add dsh-os-shell
 
 # catalog CLI (no network, prints install plans)
-npm i -g @perrylink/dsh-os-cli
+npm i -g dsh-os-cli
 dsh-os list
 dsh-os doctor
 dsh-os approvals list --state ~/.dsh/allow.json
 
 # read-only MCP server prototype
-npm i -g @perrylink/dsh-os-mcp
+npm i -g dsh-os-mcp
 dsh-os-mcp --help
 
 # A2A agent-card/task prototype (stdio)
-npm i -g @perrylink/dsh-os-a2a
+npm i -g dsh-os-a2a
 dsh-os-a2a --help
 ```
 
@@ -167,7 +165,7 @@ is `workflow_dispatch`-only: it takes a comma-separated `package` input
 same gates on Node 24, then `npm pack`s only the selected packages and uploads
 the tarballs as a build artifact. Publishing is a manual maintainer step: it
 needs the `NPM_TOKEN` repository secret (a granular npm token allowed to
-publish `dsh-*` and `@perrylink/*`), an approval-protected environment, and an
+publish `dsh-*`), an approval-protected environment, and an
 explicit `npm publish` of the reviewed tarballs. The workflow never runs
 `npm publish`.
 

@@ -8,7 +8,7 @@
  * `--timeout`: SIGINT first, then SIGKILL after a grace period. The child
  * environment is allowlisted so host API keys are not inherited, and captured
  * stdout is capped at 2 MiB.
- * @module @perrylink/dsh-check/runner
+ * @module dsh-canary/runner
  */
 import { spawn as nodeSpawn } from 'node:child_process'
 import { resolve } from 'node:path'

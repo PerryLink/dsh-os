@@ -25,22 +25,22 @@ for that module; the person must also hold the matching rank in §2.
 | Act — `dsh-act`, `ctx.act` | PerryLink | open | publish |
 | Allow — `dsh-allow`, `ctx.allow` | PerryLink | open | publish |
 | Snip — `dsh-snip`, `ctx.snip` | PerryLink | open | publish |
-| Check — `@perrylink/dsh-check`, `ctx.check` | PerryLink | open | publish |
+| Check — `dsh-canary`, `ctx.check` | PerryLink | open | publish |
 | Nest — `dsh-nest`, `ctx.nest` | PerryLink | open | publish |
 | Trigger — `dsh-trigger`, `ctx.triggers` | PerryLink | open | publish |
 | Seek — `dsh-seek`, `ctx.evidence` | PerryLink | open | publish |
-| Trace — `@perrylink/dsh-trace`, `ctx.trace` | PerryLink | open | publish |
+| Trace — `dsh-record`, `ctx.trace` | PerryLink | open | publish |
 | Stage — `dsh-stage`, `ctx.stage` | PerryLink | open | publish |
 | Ring — `dsh-ring`, `ctx.ring` | PerryLink | open | publish |
-| Root — `@perrylink/dsh-root`, `ctx.env` | PerryLink | open | publish |
+| Root — `dsh-runtime-env`, `ctx.env` | PerryLink | open | publish |
 | Help (optional) — `dsh-help`, `ctx.help` | PerryLink | open | publish |
-| Context (optional) — `@perrylink/dsh-context`, `ctx.context` | PerryLink | open | publish |
-| Cost (optional) — `@perrylink/dsh-cost` | PerryLink | open | publish |
-| Backup (optional) — `@perrylink/dsh-backup` | PerryLink | open | publish |
-| Notify (optional) — `@perrylink/dsh-notify` | PerryLink | open | publish |
-| Contract — `@perrylink/dsh-os-contract` | PerryLink | open | publish |
-| CLI — `@perrylink/dsh-os-cli` | PerryLink | open | publish |
-| Shell — `@perrylink/dsh-os-shell`, `ctx.osShell` | PerryLink | open | publish |
+| Context (optional) — `dsh-scene`, `ctx.context` | PerryLink | open | publish |
+| Cost (optional) — `dsh-price` | PerryLink | open | publish |
+| Backup (optional) — `dsh-timecapsule` | PerryLink | open | publish |
+| Notify (optional) — `dsh-buzz` | PerryLink | open | publish |
+| Contract — `dsh-os-contract` | PerryLink | open | publish |
+| CLI — `dsh-os-cli` | PerryLink | open | publish |
+| Shell — `dsh-os-shell`, `ctx.osShell` | PerryLink | open | publish |
 | Kit — `dsh-os-kit` | PerryLink | open | publish |
 
 `publish` means the person is a release manager (§2.5) and may run `npm

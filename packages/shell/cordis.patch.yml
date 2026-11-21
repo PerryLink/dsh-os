@@ -1,4 +1,4 @@
-# @perrylink/dsh-os-shell bundle patch: mount the optional shell.
+# dsh-os-shell bundle patch: mount the optional shell.
 - insert:
-    - id: '@perrylink/dsh-os-shell'
-      name: '@perrylink/dsh-os-shell'
+    - id: 'dsh-os-shell'
+      name: 'dsh-os-shell'

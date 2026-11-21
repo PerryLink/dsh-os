@@ -1,7 +1,7 @@
 /**
  * Types, constants and validation shared by dsh-os modules.
  * Not a framework: importing this registers nothing, starts nothing and pulls in nothing.
- * @module @perrylink/dsh-os-contract
+ * @module dsh-os-contract
  */
 
 /** @typedef {{ id: string, owner?: string, scope?: string, createdAt: number, updatedAt?: number, expiresAt?: number|null, auditRef?: string }} OsObject */

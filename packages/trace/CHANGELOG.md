@@ -79,5 +79,5 @@
 
 ## 0.0.1
 
-- Reserve the `@perrylink/dsh-trace` package name.
+- Reserve the `dsh-record` package name.
 - Publish the bundle manifest and an empty, side-effect-free plugin entry.

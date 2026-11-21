@@ -5,10 +5,10 @@
  * React comes from the host module table. There is no JSX, no bundler and no
  * React dependency in package.json. The page is the root `main` key `os`; the
  * sidebar icon registers into `sidebar.panellist` with the same id.
- * @module @perrylink/dsh-os-shell/client
+ * @module dsh-os-shell/client
  */
 window.__ModuleLoader__.load({
-  id: '@perrylink/dsh-os-shell',
+  id: 'dsh-os-shell',
   factory: function (require) {
     const React = require('react')
     const h = React.createElement

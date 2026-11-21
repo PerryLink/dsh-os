@@ -1,5 +1,5 @@
 {
-  "name": "@perrylink/dsh-os-kernel",
+  "name": "dsh-os-kernel",
   "version": "0.4.0",
   "description": "Thin capability kernel for dsh-os: descriptor protocol, registry, legacy tool bridge, six os_* verbs, Allow grant bridge, content-hash taint gate and optional idempotency journal.",
   "type": "module",

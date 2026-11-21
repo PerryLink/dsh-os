@@ -1,4 +1,4 @@
-# DSH 客户端 UI 接入调研（`@perrylink/dsh-os-shell` 0.2.0）
+# DSH 客户端 UI 接入调研（`dsh-os-shell` 0.2.0）
 
 > 基线：DSH checkout `/home/yy/deepseek-harness` = `0.2.2-rc.4` / `ca33fd6`（2026-11-17）。下文 `路径:行` 均指该 checkout。
 > 结论：**能做一个真实可用的页面，且不改 DSH、不引入构建链**。用 `ui/client.js` 手写一个 `window.__ModuleLoader__.load(...)` bundle，以 `React.createElement` 把 `main` 页 + `sidebar.panellist` 图标注册进 DSH Web；Host 用 `ctx.connection.fetch.register()` 暴露两条 `/api/os-shell/*` JSON 路由。React 是槽位组件的硬要求；但 JSX/TS/打包不是。
@@ -87,7 +87,7 @@ Host 侧每次按 `ctx.get('act'|'snip'|'check'|'osShell')` 取服务；缺服�
 
 ```js
 window.__ModuleLoader__.load({
-  id: '@perrylink/dsh-os-shell',
+  id: 'dsh-os-shell',
   factory: (require) => {
     const React = require('react')
     const h = React.createElement

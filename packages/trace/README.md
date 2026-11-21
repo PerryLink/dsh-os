@@ -1,4 +1,4 @@
-# Trace · `@perrylink/dsh-trace`
+# Trace · `dsh-record`
 
 > Auditable long-term memory governance for DeepSeek Harness: provenance, expiry,
 > conflict, forget, and a read-only `dsh-memento` bridge.
@@ -25,7 +25,7 @@ of their respective owners.
 ## Install
 
 ```sh
-dsh plugin --profile web add @perrylink/dsh-trace
+dsh plugin --profile web add dsh-record
 ```
 
 Plain ESM, Node.js 22+, no runtime dependencies and no build step.

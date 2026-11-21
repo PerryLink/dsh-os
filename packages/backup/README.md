@@ -1,4 +1,4 @@
-# Backup · `@perrylink/dsh-backup`
+# Backup · `dsh-timecapsule`
 
 > Read-only, allowlisted filesystem snapshot manifests and restore plans for
 > DeepSeek Harness.
@@ -22,12 +22,12 @@ is the validated manifest that a later restore executor can consume.
 of their respective owners.
 
 > The name `dsh-backup` on npm belongs to another project. This module is
-> published as `@perrylink/dsh-backup`; the product name is **Backup**.
+> published as `dsh-timecapsule`; the product name is **Backup**.
 
 ## Install
 
 ```sh
-dsh plugin --profile web add @perrylink/dsh-backup
+dsh plugin --profile web add dsh-timecapsule
 ```
 
 The bundle patch mounts the plugin and provides `ctx.backup`. No runtime
@@ -56,7 +56,7 @@ backup.forget(manifest.id)        // true when it existed
 
 ```js
 import { BackupService, DEFAULT_SENSITIVE_EXCLUDES, HARD_LIMITS }
-  from '@perrylink/dsh-backup'
+  from 'dsh-timecapsule'
 
 const backup = new BackupService({
   allowedRoots: ['/work/acme'],   // default: [process.cwd()]

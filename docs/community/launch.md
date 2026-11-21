@@ -29,7 +29,7 @@
 |---|---|---|
 | 仓库 | `https://github.com/PerryLink/dsh-os` | 浏览器打开，确认 public |
 | 产品包 | 11 个（act / allow / snip / check / nest / trigger / seek / trace / stage / ring / root） | `ls packages` + 各包 `package.json` |
-| npm 可安装版本 | 各包不同：`dsh-allow` 0.4.0 / `dsh-act` 0.3.0 / `dsh-snip` 0.2.0 / `@perrylink/dsh-check` 0.3.0 / `dsh-os-kit` 0.4.0；以 [`release-notes-0.4.md`](release-notes-0.4.md) 为准 | `npm view <pkg> version --registry=https://registry.npmjs.org/` |
+| npm 可安装版本 | 各包不同：`dsh-allow` 0.4.0 / `dsh-act` 0.3.0 / `dsh-snip` 0.2.0 / `dsh-canary` 0.3.0 / `dsh-os-kit` 0.4.0；以 [`release-notes-0.4.md`](release-notes-0.4.md) 为准 | `npm view <pkg> version --registry=https://registry.npmjs.org/` |
 | Node | 22.19–22.x（或 24.9+） | 各包 `engines.node` |
 | DSH | `>=0.2.1-rc.2 <0.3.0-0` | 各包 `engines.dsh` |
 | 演示 | `node examples/os-kit/demo.mjs` → `PASS: 6/6` | 在仓库根目录实跑 |
@@ -223,12 +223,12 @@ dsh plugin --profile web add dsh-trigger
 dsh plugin --profile web add dsh-seek
 dsh plugin --profile web add dsh-stage
 dsh plugin --profile web add dsh-ring
-dsh plugin --profile web add @perrylink/dsh-check
-dsh plugin --profile web add @perrylink/dsh-root
-dsh plugin --profile web add @perrylink/dsh-trace
+dsh plugin --profile web add dsh-canary
+dsh plugin --profile web add dsh-runtime-env
+dsh plugin --profile web add dsh-record
 ```
 
-`@perrylink/` 前缀不是随意加的：`dsh-check` / `dsh-root` / `dsh-trace` 这三个
+所有包已改为**裸名**。`dsh-check` / `dsh-root` / `dsh-trace` 这三个原名
 非 scoped 名称被 npm 的近名保护拒绝，所以用了 scope；安装命令以上面为准。
 
 **兼容矩阵：**
@@ -248,19 +248,19 @@ dsh plugin --profile web add @perrylink/dsh-trace
 | `dsh-act` | 注册/列出/调用动作；`echo`/`now`/`list` 内置；写/危险动作查 `act:invoke:<id>` Grant | 面板、NL 路由、CLI、预览/撤销 |
 | `dsh-allow` | 签发/检查/撤销/列出 Grant；TTL、scope、approver、evidence；审计；可选 JSON 状态 | 权限中心 UI；默认只暴露 `allow_check`，管理工具需显式开启 |
 | `dsh-snip` | 显式记录剪贴板、搜索、secret 排除、`clipboard://` handle | 后台监听、系统剪贴板轮询、加密 |
-| `@perrylink/dsh-check` | 对比两份 run JSON，回归时退出 1 | 启动 DSH、跑模型、读 session log（0.2.0） |
+| `dsh-canary` | 对比两份 run JSON，回归时退出 1 | 启动 DSH、跑模型、读 session log（0.2.0） |
 | `dsh-nest` | 版本化 workspace profile、diff、一级继承 | 读取 `nest.profile.yml`、应用到 workspace |
 | `dsh-trigger` | 内存触发器、条件 DSL、冷却、运行账本、4 个工具 | 订阅宿主事件、fs/webhook/agent 源、重试/持久化 |
 | `dsh-seek` | provider 协议、去重、排序、`dsh://` ref 校验 | 内置 provider（locator/library/memento/web） |
-| `@perrylink/dsh-trace` | 内存记忆治理账本、4 个工具 | memento/向量库/SQLite；重启即丢 |
+| `dsh-record` | 内存记忆治理账本、4 个工具 | memento/向量库/SQLite；重启即丢 |
 | `dsh-stage` | 拓扑/layout 协议、校验、记录 | 调原生窗口 API、真正移动窗口 |
 | `dsh-ring` | 审批 SLA 状态机、tick、回执 | 发送通知；ack 不等于批准 |
-| `@perrylink/dsh-root` | 环境档案账本、继承、deny、provenance、5 个工具 | 读写 `process.env`、注入 shell/子进程 |
+| `dsh-runtime-env` | 环境档案账本、继承、deny、provenance、5 个工具 | 读写 `process.env`、注入 shell/子进程 |
 
 **只想试一个的话：**
 
 - 想看“授权”这条线：`dsh-act` + `dsh-allow`，跑 `node examples/os-kit/demo.mjs`。
-- 想看 CI 回归门：`@perrylink/dsh-check`，跑 `bash examples/os-kit/check-demo/run-check-demo.sh`。
+- 想看 CI 回归门：`dsh-canary`，跑 `bash examples/os-kit/check-demo/run-check-demo.sh`。
 - 想看事件触发：`dsh-trigger`，在对话里让 Agent 调 `trigger_register` → `trigger_fire`
   → `trigger_runs`。
 

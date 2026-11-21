@@ -1,5 +1,5 @@
 {
-  "name": "@perrylink/dsh-context",
+  "name": "dsh-scene",
   "version": "0.1.0",
   "description": "Read-only context provider protocol for DeepSeek Harness: app, window, selection, clipboard metadata and files, with isolated provider snapshots.",
   "type": "module",

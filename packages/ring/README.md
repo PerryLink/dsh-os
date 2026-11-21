@@ -18,7 +18,7 @@ attempted send — success or failure — writes a `delivery` receipt with a
 approval seam.
 
 This is the approval-paging package, not the unrelated zero-star `dsh-ring`
-sound-effect plugin that may occupy the same npm name. A `@perrylink/dsh-ring`
+sound-effect plugin that may occupy the same npm name. The package is now the bare `dsh-ring`
 mirror is planned.
 
 **Not affiliated with DeepSeek.** DeepSeek and DeepSeek Harness are trademarks

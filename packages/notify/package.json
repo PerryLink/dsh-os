@@ -1,5 +1,5 @@
 {
-  "name": "@perrylink/dsh-notify",
+  "name": "dsh-buzz",
   "version": "0.1.0",
   "description": "Channel registry, routing and delivery ledger for DeepSeek Harness notifications.",
   "type": "module",

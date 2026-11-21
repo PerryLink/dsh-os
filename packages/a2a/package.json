@@ -1,5 +1,5 @@
 {
-  "name": "@perrylink/dsh-os-a2a",
+  "name": "dsh-os-a2a",
   "version": "0.1.0",
   "description": "A2A prototype for dsh-os: one Agent Card, 12 skills, in-memory tasks, an approval loop and a pluggable executor. Zero dependencies, stdio JSON-RPC 2.0.",
   "type": "module",

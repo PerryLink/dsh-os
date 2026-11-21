@@ -1,7 +1,7 @@
 /**
  * Minimal in-memory audit event. Nothing is written to disk or sent anywhere;
  * callers decide where to persist the returned record.
- * @module @perrylink/dsh-os-contract/lib/audit
+ * @module dsh-os-contract/lib/audit
  */
 import { newId } from './ids.js'
 

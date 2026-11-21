@@ -122,7 +122,7 @@ test('first_run returns the five ordered steps, each with a command', () => {
     ['install-check', 'generate-run', 'diff', 'install-act-allow', 'inspect-config'],
   )
   for (const step of guide.steps) assert.ok(step.command.trim().length > 0)
-  assert.match(guide.steps[0].command, /@perrylink\/dsh-check/)
+  assert.match(guide.steps[0].command, /dsh-canary/)
   assert.match(guide.steps[1].command, /dsh --profile headless --json/)
   assert.match(guide.steps[2].command, /dsh-check diff/)
   assert.match(guide.steps[3].command, /dsh-allow.*dsh-act/)
@@ -132,9 +132,9 @@ test('first_run returns the five ordered steps, each with a command', () => {
 test('install_plan orders Allow before Act and keeps Check independent', () => {
   const { service } = setup()
   const plan = service.installPlan(['act', 'check', 'allow'])
-  assert.deepEqual(plan.packages, ['@perrylink/dsh-check', 'dsh-allow', 'dsh-act'])
+  assert.deepEqual(plan.packages, ['dsh-canary', 'dsh-allow', 'dsh-act'])
   assert.deepEqual(plan.commands, [
-    'dsh plugin --profile web add @perrylink/dsh-check',
+    'dsh plugin --profile web add dsh-canary',
     'dsh plugin --profile web add dsh-allow',
     'dsh plugin --profile web add dsh-act',
   ])
@@ -145,9 +145,9 @@ test('install_plan orders Allow before Act and keeps Check independent', () => {
 
 test('install_plan accepts aliases, dedupes, and handles an empty array', () => {
   const { service } = setup()
-  const plan = service.installPlan(['@perrylink/dsh-root', 'Root', 'env', 'triggers'])
+  const plan = service.installPlan(['dsh-runtime-env', 'Root', 'env', 'triggers'])
   assert.deepEqual(plan.modules, ['triggers', 'env'])
-  assert.deepEqual(plan.packages, ['dsh-trigger', '@perrylink/dsh-root'])
+  assert.deepEqual(plan.packages, ['dsh-trigger', 'dsh-runtime-env'])
   assert.equal(plan.steps.length, 2)
 
   const empty = service.installPlan([])

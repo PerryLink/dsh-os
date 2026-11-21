@@ -1,4 +1,4 @@
-# @perrylink/dsh-notify bundle patch: mount the plugin.
+# dsh-buzz bundle patch: mount the plugin.
 - insert:
-    - id: '@perrylink/dsh-notify'
-      name: '@perrylink/dsh-notify'
+    - id: 'dsh-buzz'
+      name: 'dsh-buzz'
