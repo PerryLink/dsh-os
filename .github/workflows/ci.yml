@@ -27,6 +27,9 @@ jobs:
           # the npm cache on the package manifests instead.
           cache-dependency-path: '**/package.json'
 
+      - name: README media guard
+        run: node scripts/check-readme-media.mjs
+
       - name: Test every package
         run: node scripts/test-all.mjs
 
