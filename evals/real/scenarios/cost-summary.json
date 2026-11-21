@@ -1,0 +1,46 @@
+{
+  "id": "cost-summary",
+  "title": "usage 汇总",
+  "goal": "从 NDJSON usage 事件计算 token 与错误汇总，写 cost.json。",
+  "initial": [
+    "events.ndjson：3 个 step_end、2 个 tool_call、1 个 tool_result error；第 3 个 usage 没有 totalTokens",
+    "工作区可写 cost.json；输入只读",
+    "汇总规则：totalTokens 缺省用 inputTokens+outputTokens；errors 计 tool_result error 与 error 事件"
+  ],
+  "prompt": "读取工作区的 events.ndjson，汇总：inputTokens 总和、outputTokens 总和、totalTokens 总和（每个 step_end 的 usage.totalTokens，缺省用 inputTokens+outputTokens）、step_end 数、错误数（tool_result status=error 计 1，独立 error 事件也计 1）。写 cost.json，字段为 totalTokens/inputTokens/outputTokens/steps/errors，数值为整数。不要修改 events.ndjson。",
+  "timeoutMs": 180000,
+  "maxSteps": 25,
+  "expectedFirstTool": [
+    "read",
+    "bash"
+  ],
+  "setup": [
+    {
+      "path": "events.ndjson",
+      "content": "{\"type\":\"session\",\"sessionId\":\"s1\"}\n{\"type\":\"status\",\"phase\":\"step_start\"}\n{\"type\":\"status\",\"phase\":\"step_end\",\"usage\":{\"inputTokens\":10,\"outputTokens\":5,\"totalTokens\":15}}\n{\"type\":\"tool_call\",\"callId\":\"c1\",\"tool\":\"read\",\"input\":{\"path\":\"a.txt\"}}\n{\"type\":\"tool_result\",\"callId\":\"c1\",\"status\":\"completed\"}\n{\"type\":\"status\",\"phase\":\"step_start\"}\n{\"type\":\"status\",\"phase\":\"step_end\",\"usage\":{\"inputTokens\":20,\"outputTokens\":7,\"totalTokens\":27}}\n{\"type\":\"tool_call\",\"callId\":\"c2\",\"tool\":\"bash\",\"input\":{\"command\":\"false\"}}\n{\"type\":\"tool_result\",\"callId\":\"c2\",\"status\":\"error\",\"error\":{\"code\":\"EXIT_1\"}}\n{\"type\":\"status\",\"phase\":\"step_start\"}\n{\"type\":\"status\",\"phase\":\"step_end\",\"usage\":{\"inputTokens\":5,\"outputTokens\":3}}\n"
+    }
+  ],
+  "checks": [
+    {
+      "id": "cost-totals",
+      "kind": "json",
+      "path": "cost.json",
+      "expect": {
+        "totalTokens": 50,
+        "inputTokens": 35,
+        "outputTokens": 15,
+        "steps": 3,
+        "errors": 1
+      }
+    },
+    {
+      "id": "events-unchanged",
+      "kind": "file",
+      "path": "events.ndjson",
+      "contains": [
+        "\"sessionId\":\"s1\"",
+        "\"code\":\"EXIT_1\""
+      ]
+    }
+  ]
+}

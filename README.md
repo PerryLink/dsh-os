@@ -23,8 +23,10 @@ needs only Node 22+; nothing is installed or published.
 
 **Docs:** [Quickstart](docs/quickstart.md) ·
 [AI handbook](docs/ai-handbook.md) ·
+[Real-model eval](docs/eval-real.md) ·
 [Architecture 0.3](docs/architecture-0.3.md) ·
 [AI handbook](docs/ai-handbook.md) ·
+[Real-model eval](docs/eval-real.md) ·
 [Architecture 0.3](docs/architecture-0.3.md) ·
 [AI capability cards](docs/ai-capability-cards.md) ·
 [Validation plan](docs/validation/PLAN.md) ·
@@ -58,6 +60,7 @@ needs only Node 22+; nothing is installed or published.
 | **Kit** | `dsh-os-kit` | 0.4.0 meta bundle | installs Act/Allow 0.4 + Snip/Check 0.3 |
 | **Kernel** | `@perrylink/dsh-os-kernel` | 0.2.0 core | 76 legacy tools + `os_*` verbs |
 | **MCP** | `@perrylink/dsh-os-mcp` | 0.2.0 tool | read-only default + write approval path |
+| **A2A** | `@perrylink/dsh-os-a2a` | 0.1.0 tool | agent card + task protocol prototype |
 
 `Check`, `Trace`, `Root`, `Context`, `Cost`, `Backup`, `Notify`, `Shell`, `CLI`
 and `Contract` use the `@perrylink/` scope where npm's name-similarity rules
@@ -102,6 +105,10 @@ dsh-os approvals list --state ~/.dsh/allow.json
 # read-only MCP server prototype
 npm i -g @perrylink/dsh-os-mcp
 dsh-os-mcp --help
+
+# A2A agent-card/task prototype (stdio)
+npm i -g @perrylink/dsh-os-a2a
+dsh-os-a2a --help
 ```
 
 ## Repository layout
@@ -115,7 +122,7 @@ scripts/     scaffold, test and publish helpers
 
 ## Status
 
-Twenty-two packages ship a 0.1.x/0.2.x/0.3.x MVP: services, agent tools, tests and a bundle
+Twenty-three packages ship a 0.1.x/0.2.x/0.3.x MVP: services, agent tools, tests and a bundle
 manifest (libraries/CLI where applicable). 0.2.0 added real adapters; 0.3.0 adds the kernel + permission request flow + Act fs actions + human oversight:
 Check headless runner, Snip clipboard capture, Trigger agent/fs/webhook sources,
 Seek locator/memento providers, Stage macOS/Windows windows, Trace memento

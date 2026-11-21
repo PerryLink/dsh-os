@@ -1,0 +1,75 @@
+{
+  "id": "fix-failing-test",
+  "title": "修失败测试",
+  "goal": "修复 src/math.mjs 的差一错误，使 node --test 通过；不改测试文件。",
+  "initial": [
+    "临时工作区：src/math.mjs 返回 a+b+1，src/math.test.mjs 期望 add(2,2)=4",
+    "Node 24 内置 node:test；工作目录可写",
+    "没有网络依赖，测试可离线运行"
+  ],
+  "prompt": "仓库里的测试失败了。请读取 src/math.mjs 和 src/math.test.mjs，找出失败原因并修复源码；只允许修改 src/math.mjs，禁止修改测试文件。修复后运行 `node --test src/math.test.mjs` 确认通过，并验证隐藏用例 add(3,5) 应等于 8。",
+  "timeoutMs": 180000,
+  "maxSteps": 30,
+  "expectedFirstTool": [
+    "read",
+    "bash",
+    "grep",
+    "glob"
+  ],
+  "setup": [
+    {
+      "path": "src/math.mjs",
+      "content": "export const add = (a, b) => a + b + 1\n"
+    },
+    {
+      "path": "src/math.test.mjs",
+      "content": "import test from 'node:test'\nimport assert from 'node:assert/strict'\nimport { add } from './math.mjs'\ntest('adds 2+2', () => { assert.equal(add(2, 2), 4) })\n"
+    }
+  ],
+  "checks": [
+    {
+      "id": "test-green",
+      "kind": "command",
+      "args": [
+        "node",
+        "--test",
+        "src/math.test.mjs"
+      ],
+      "expect": {
+        "exitCode": 0
+      }
+    },
+    {
+      "id": "test-unchanged",
+      "kind": "file",
+      "path": "src/math.test.mjs",
+      "equals": "import test from 'node:test'\nimport assert from 'node:assert/strict'\nimport { add } from './math.mjs'\ntest('adds 2+2', () => { assert.equal(add(2, 2), 4) })\n"
+    },
+    {
+      "id": "source-fixed",
+      "kind": "file",
+      "path": "src/math.mjs",
+      "contains": [
+        "add"
+      ],
+      "notContains": [
+        "a + b + 1",
+        "a+b+1"
+      ]
+    },
+    {
+      "id": "hidden-case",
+      "kind": "command",
+      "args": [
+        "node",
+        "--input-type=module",
+        "-e",
+        "import {add} from './src/math.mjs'; console.log(add(3,5))"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stdoutTrimEquals": "8"
+      }
+    }
+  ]
+}

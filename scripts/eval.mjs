@@ -16,6 +16,12 @@ if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
   console.error(`invalid threshold: ${value} (expected 0..1)`)
   process.exit(2)
 }
+if (args.includes('--real')) {
+  const { spawnSync } = await import('node:child_process')
+  const script = fileURLToPath(new URL('../evals/real-run.mjs', import.meta.url))
+  const result = spawnSync(process.execPath, [script, ...args.filter(arg => arg !== '--real')], { stdio: 'inherit' })
+  process.exit(result.status ?? 1)
+}
 const report = await runAll()
 const paths = writeReports(report)
 const m = report.metrics

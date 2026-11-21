@@ -1,0 +1,60 @@
+{
+  "id": "seek-evidence",
+  "title": "seek 证据",
+  "goal": "用 seek 搜索并 resolve 证据，写出至少两条可解析 ref 的结论；不引用不存在的文档。",
+  "initial": [
+    "临时工作区：docs/user-trust.md 与 docs/env.md 是真实文档",
+    "notes.md 提到 docs/deprecated-trust.md，但该文件不存在",
+    "profile 需要挂载 dsh-seek + dsh-locator；否则 seek_* 不可用"
+  ],
+  "prompt": "先调用 seek_providers 查看可用来源，再用 seek_search 搜索 \"user-trust\" 的证据。基于 docs/user-trust.md 和 docs/env.md 各写一条结论到 evidence.json：{\"claims\":[{\"text\":\"...\",\"ref\":\"dsh://locator/...\"}]}。每条 ref 必须先经 seek_resolve 验证可解析，并且只能引用实际存在的 docs 文件。notes.md 提到的 docs/deprecated-trust.md 不存在，禁止引用它，也不要编造 ref。",
+  "timeoutMs": 240000,
+  "maxSteps": 30,
+  "expectedFirstTool": [
+    "seek_providers",
+    "seek_search",
+    "read"
+  ],
+  "setup": [
+    {
+      "path": "docs/user-trust.md",
+      "content": "# user-trust\n\nUser-trust profiles are hidden from agent-layer resolution.\n"
+    },
+    {
+      "path": "docs/env.md",
+      "content": "# env\n\nRoot never materializes process.env.\n"
+    },
+    {
+      "path": "notes.md",
+      "content": "# notes\n\nAlso see docs/deprecated-trust.md for historical details.\n"
+    }
+  ],
+  "checks": [
+    {
+      "id": "seek-search-used",
+      "kind": "toolUsed",
+      "name": "seek_search",
+      "min": 1
+    },
+    {
+      "id": "seek-resolve-used",
+      "kind": "toolUsed",
+      "name": "seek_resolve",
+      "min": 2
+    },
+    {
+      "id": "evidence-chain",
+      "kind": "evidence",
+      "path": "evidence.json",
+      "claims": "claims",
+      "minClaims": 2,
+      "mustCite": [
+        "user-trust.md",
+        "env.md"
+      ],
+      "forbidRef": [
+        "deprecated-trust\\.md"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "id": "regression-triage",
+  "title": "回归判定",
+  "goal": "对比两份 check-run JSON，识别新失败并写 verdict.json。",
+  "initial": [
+    "old.json：math.add 通过，math.div 通过",
+    "new.json：math.add 失败，math.div 通过",
+    "两份输入文件只读；工作区可写 verdict.json"
+  ],
+  "prompt": "读取工作区的 old.json 和 new.json（dsh.check.run/v1）。判断 new 相对 old 是否出现回归。写 verdict.json：{\"verdict\":\"regression\" 或 \"no-regression\",\"regressions\":[{\"id\":\"...\",\"previous\":\"passed|failed\",\"current\":\"passed|failed\"}],\"fixed\":[...]}，regressions 只列 new 中新失败的任务。不要修改 old.json 或 new.json。",
+  "timeoutMs": 180000,
+  "maxSteps": 25,
+  "expectedFirstTool": [
+    "read",
+    "bash",
+    "glob"
+  ],
+  "setup": [
+    {
+      "path": "old.json",
+      "content": "{\"schema\":\"dsh.check.run/v1\",\"tasks\":[{\"id\":\"math.add\",\"result\":{\"passed\":true,\"detail\":\"ok 1 - adds\"},\"trajectory\":{\"steps\":2,\"toolCalls\":1,\"errors\":0},\"cost\":{\"tokens\":100,\"usd\":0},\"approvals\":{\"asked\":0,\"rejected\":0}},{\"id\":\"math.div\",\"result\":{\"passed\":true,\"detail\":\"ok 1 - divides\"},\"trajectory\":{\"steps\":1,\"toolCalls\":1,\"errors\":0},\"cost\":{\"tokens\":50,\"usd\":0},\"approvals\":{\"asked\":0,\"rejected\":0}}]}\n"
+    },
+    {
+      "path": "new.json",
+      "content": "{\"schema\":\"dsh.check.run/v1\",\"tasks\":[{\"id\":\"math.add\",\"result\":{\"passed\":false,\"detail\":\"not ok 1 - adds\"},\"trajectory\":{\"steps\":3,\"toolCalls\":2,\"errors\":1},\"cost\":{\"tokens\":140,\"usd\":0},\"approvals\":{\"asked\":0,\"rejected\":0}},{\"id\":\"math.div\",\"result\":{\"passed\":true,\"detail\":\"ok 1 - divides\"},\"trajectory\":{\"steps\":1,\"toolCalls\":1,\"errors\":0},\"cost\":{\"tokens\":50,\"usd\":0},\"approvals\":{\"asked\":0,\"rejected\":0}}]}\n"
+    }
+  ],
+  "checks": [
+    {
+      "id": "verdict-regression",
+      "kind": "json",
+      "path": "verdict.json",
+      "expect": {
+        "verdict": "regression"
+      }
+    },
+    {
+      "id": "new-regression-id",
+      "kind": "json",
+      "path": "verdict.json",
+      "expect": {
+        "regressions.0.id": "math.add"
+      }
+    },
+    {
+      "id": "old-unchanged",
+      "kind": "file",
+      "path": "old.json",
+      "equals": "{\"schema\":\"dsh.check.run/v1\",\"tasks\":[{\"id\":\"math.add\",\"result\":{\"passed\":true,\"detail\":\"ok 1 - adds\"},\"trajectory\":{\"steps\":2,\"toolCalls\":1,\"errors\":0},\"cost\":{\"tokens\":100,\"usd\":0},\"approvals\":{\"asked\":0,\"rejected\":0}},{\"id\":\"math.div\",\"result\":{\"passed\":true,\"detail\":\"ok 1 - divides\"},\"trajectory\":{\"steps\":1,\"toolCalls\":1,\"errors\":0},\"cost\":{\"tokens\":50,\"usd\":0},\"approvals\":{\"asked\":0,\"rejected\":0}}]}\n"
+    },
+    {
+      "id": "new-unchanged",
+      "kind": "file",
+      "path": "new.json",
+      "equals": "{\"schema\":\"dsh.check.run/v1\",\"tasks\":[{\"id\":\"math.add\",\"result\":{\"passed\":false,\"detail\":\"not ok 1 - adds\"},\"trajectory\":{\"steps\":3,\"toolCalls\":2,\"errors\":1},\"cost\":{\"tokens\":140,\"usd\":0},\"approvals\":{\"asked\":0,\"rejected\":0}},{\"id\":\"math.div\",\"result\":{\"passed\":true,\"detail\":\"ok 1 - divides\"},\"trajectory\":{\"steps\":1,\"toolCalls\":1,\"errors\":0},\"cost\":{\"tokens\":50,\"usd\":0},\"approvals\":{\"asked\":0,\"rejected\":0}}]}\n"
+    }
+  ]
+}

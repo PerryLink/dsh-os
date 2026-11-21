@@ -1,0 +1,54 @@
+{
+  "name": "@perrylink/dsh-os-a2a",
+  "version": "0.1.0",
+  "description": "A2A prototype for dsh-os: one Agent Card, 12 skills, in-memory tasks, an approval loop and a pluggable executor. Zero dependencies, stdio JSON-RPC 2.0.",
+  "type": "module",
+  "bin": {
+    "dsh-os-a2a": "bin/dsh-os-a2a.js"
+  },
+  "main": "lib/server.mjs",
+  "exports": {
+    ".": "./lib/server.mjs",
+    "./card": "./lib/card.mjs",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": ["dsh", "dsh-os", "deepseek-harness", "a2a", "agent2agent", "agent-card", "protocol", "stdio", "json-rpc", "prototype"],
+  "license": "MIT",
+  "author": "PerryLink contributors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PerryLink/dsh-os.git",
+    "directory": "packages/a2a"
+  },
+  "homepage": "https://github.com/PerryLink/dsh-os/tree/main/packages/a2a#readme",
+  "bugs": {
+    "url": "https://github.com/PerryLink/dsh-os/issues"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "os": {
+      "service": null,
+      "provides": [],
+      "capabilities": [],
+      "tools": [],
+      "stability": "experimental",
+      "since": "0.1.0"
+    }
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}
