@@ -53,7 +53,7 @@ test('manifest stays dependency-only and points at the patch', () => {
   const manifest = JSON.parse(readFileSync(PACKAGE_URL, 'utf8'))
 
   assert.equal(manifest.name, 'dsh-os-kit')
-  assert.equal(manifest.version, '0.7.0')
+  assert.equal(manifest.version, '0.8.0')
   assert.deepEqual(
     Object.keys(manifest.dependencies).sort(),
     EXPECTED.map(row => row.name).sort(),
@@ -76,7 +76,7 @@ test('manifest stays dependency-only and points at the patch', () => {
     capabilities: [],
     tools: [],
     stability: 'experimental',
-    since: '0.7.0',
+    since: '0.8.0',
   })
 })
 
