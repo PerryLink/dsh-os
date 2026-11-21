@@ -51,12 +51,18 @@ test('manifest stays dependency-only and points at the patch', () => {
   const manifest = JSON.parse(readFileSync(PACKAGE_URL, 'utf8'))
 
   assert.equal(manifest.name, 'dsh-os-kit')
-  assert.equal(manifest.version, '0.1.0')
+  assert.equal(manifest.version, '0.2.0')
   assert.deepEqual(
     Object.keys(manifest.dependencies).sort(),
     EXPECTED.map(row => row.name).sort(),
   )
-  for (const range of Object.values(manifest.dependencies)) assert.equal(range, '^0.1.0')
+  const ranges = {
+    'dsh-act': '^0.1.1',
+    'dsh-allow': '^0.1.2',
+    'dsh-snip': '^0.2.0',
+    '@perrylink/dsh-check': '^0.2.0',
+  }
+  for (const [name, range] of Object.entries(manifest.dependencies)) assert.equal(range, ranges[name])
 
   assert.deepEqual(manifest.dsh.bundle, { patch: './cordis.patch.yml' })
   assert.deepEqual(manifest.dsh.os, {
@@ -65,7 +71,7 @@ test('manifest stays dependency-only and points at the patch', () => {
     capabilities: [],
     tools: [],
     stability: 'experimental',
-    since: '0.1.0',
+    since: '0.2.0',
   })
 })
 

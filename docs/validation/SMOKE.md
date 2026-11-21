@@ -9,9 +9,9 @@ been interviewed or installed the toolkit yet.
 | Conformance | `node scripts/conformance.mjs` | 20 packages, 0 error / 0 warning |
 | Pack | `node scripts/pack-smoke.mjs` | 20 packages, 0 failed |
 | Versions | `node scripts/check-versions.mjs` | 20 packages, 0 failed |
-| OS kit demo | `node examples/os-kit/demo.mjs` | 6/6 PASS |
+| OS kit demo | `node examples/os-kit/demo.mjs` | 6/6 PASS (also `npm run examples-smoke`) |
 | Check gate demo | `bash examples/os-kit/check-demo/run-check-demo.sh` | `REGRESSION`, inner exit 1 |
-| Kit install | `dsh plugin add dsh-os-kit@0.1.0` | 5 packages, 4 patch rows in `--dump-config` |
+| Kit install | `dsh plugin add dsh-os-kit@0.2.0` | 5 packages, 4 patch rows in `--dump-config` |
 | Catalog CLI | `node packages/cli/bin/dsh-os.js list` | 18 entries, versions correct |
 
 ## Platform reality on this machine

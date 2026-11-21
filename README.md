@@ -50,7 +50,7 @@ needs only Node 22+; nothing is installed or published.
 | **Shell** | `@perrylink/dsh-os-shell` | 0.2.0 optional | React client (Act/Snip/Check tabs) |
 | **CLI** | `@perrylink/dsh-os-cli` | 0.1.0 tool | `dsh-os list/doctor/install` |
 | **Contract** | `@perrylink/dsh-os-contract` | 0.1.0 library | constants, refs, manifest/tool validation |
-| **Kit** | `dsh-os-kit` | 0.1.0 meta bundle | installs Act + Allow + Snip + Check |
+| **Kit** | `dsh-os-kit` | 0.2.0 meta bundle | installs Act + Allow + Snip + Check 0.2.0 |
 
 `Check`, `Trace`, `Root`, `Context`, `Cost`, `Backup`, `Notify`, `Shell`, `CLI`
 and `Contract` use the `@perrylink/` scope where npm's name-similarity rules

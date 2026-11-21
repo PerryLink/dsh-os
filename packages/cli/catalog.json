@@ -162,7 +162,7 @@
     "name": "dsh-os-kit",
     "product": "Kit",
     "service": null,
-    "version": "0.1.0",
+    "version": "0.2.0",
     "stability": "experimental",
     "description": "Thin meta bundle that installs and mounts the four core dsh-os modules: Act, Allow, Snip and Check.",
     "install": "dsh plugin --profile web add dsh-os-kit",
