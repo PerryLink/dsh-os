@@ -36,13 +36,13 @@ needs only Node 22+; nothing is installed or published.
 
 | Product | Package | Status | Design |
 |---|---|---|---|
-| **Act** | `dsh-act` | 0.4.0 (fs + envelope) | [design](docs/design/01-act.md) |
+| **Act** | `dsh-act` | 0.5.0 (fs + taint gate) | [design](docs/design/01-act.md) |
 | **Allow** | `dsh-allow` | 0.4.0 (one-time grants) | [design](docs/design/02-allow.md) |
-| **Snip** | `dsh-snip` | 0.3.0 (capture + envelope) | [design](docs/design/03-snip.md) |
+| **Snip** | `dsh-snip` | 0.4.0 (capture + taint) | [design](docs/design/03-snip.md) |
 | **Check** | `@perrylink/dsh-check` | 0.4.0 (runner + envelope) | [design](docs/design/04-check.md) |
 | **Nest** | `dsh-nest` | 0.1.0 MVP | [design](docs/design/05-nest.md) |
-| **Trigger** | `dsh-trigger` | 0.3.0 (payload + sources) | [design](docs/design/06-trigger.md) |
-| **Seek** | `dsh-seek` | 0.4.0 (providers + envelope) | [design](docs/design/07-seek.md) |
+| **Trigger** | `dsh-trigger` | 0.4.0 (payload + taint) | [design](docs/design/06-trigger.md) |
+| **Seek** | `dsh-seek` | 0.5.0 (trace + taint) | [design](docs/design/07-seek.md) |
 | **Trace** | `@perrylink/dsh-trace` | 0.3.0 (memento + ref verify) | [design](docs/design/08-trace.md) |
 | **Stage** | `dsh-stage` | 0.2.0 (macOS/Windows adapters) | [design](docs/design/09-stage.md) |
 | **Ring** | `dsh-ring` | 0.4.0 (Grant-gated delivery) | [design](docs/design/10-ring.md) |
@@ -55,7 +55,7 @@ needs only Node 22+; nothing is installed or published.
 | **Shell** | `@perrylink/dsh-os-shell` | 0.3.0 optional | approvals + activity tabs |
 | **CLI** | `@perrylink/dsh-os-cli` | 0.2.0 tool | `dsh-os list/doctor/install/approvals` |
 | **Contract** | `@perrylink/dsh-os-contract` | 0.2.0 library | result/error/handle protocols |
-| **Kit** | `dsh-os-kit` | 0.5.0 meta bundle | installs 6: core four + Kernel + Shell |
+| **Kit** | `dsh-os-kit` | 0.6.0 meta bundle | installs 6 latest modules |
 | **Kernel** | `@perrylink/dsh-os-kernel` | 0.3.0 core | 76 legacy tools + approval bridge |
 | **MCP** | `@perrylink/dsh-os-mcp` | 0.2.0 tool | read-only default + write approval path |
 | **A2A** | `@perrylink/dsh-os-a2a` | 0.1.0 tool | agent card + task protocol prototype |

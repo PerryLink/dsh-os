@@ -53,17 +53,17 @@ test('manifest stays dependency-only and points at the patch', () => {
   const manifest = JSON.parse(readFileSync(PACKAGE_URL, 'utf8'))
 
   assert.equal(manifest.name, 'dsh-os-kit')
-  assert.equal(manifest.version, '0.5.0')
+  assert.equal(manifest.version, '0.6.0')
   assert.deepEqual(
     Object.keys(manifest.dependencies).sort(),
     EXPECTED.map(row => row.name).sort(),
   )
   const ranges = {
-    'dsh-act': '^0.3.0',
+    'dsh-act': '^0.5.0',
     'dsh-allow': '^0.4.0',
-    'dsh-snip': '^0.2.0',
-    '@perrylink/dsh-check': '^0.3.0',
-    '@perrylink/dsh-os-kernel': '^0.2.0',
+    'dsh-snip': '^0.4.0',
+    '@perrylink/dsh-check': '^0.4.0',
+    '@perrylink/dsh-os-kernel': '^0.3.0',
     '@perrylink/dsh-os-shell': '^0.3.0',
   }
   for (const [name, range] of Object.entries(manifest.dependencies)) assert.equal(range, ranges[name])
@@ -76,7 +76,7 @@ test('manifest stays dependency-only and points at the patch', () => {
     capabilities: [],
     tools: [],
     stability: 'experimental',
-    since: '0.5.0',
+    since: '0.6.0',
   })
 })
 

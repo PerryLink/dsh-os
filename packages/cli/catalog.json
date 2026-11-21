@@ -3,7 +3,7 @@
     "name": "dsh-act",
     "product": "Act",
     "service": "act",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "stability": "experimental",
     "description": "Typed action registry with filesystem actions, previews and undo for DeepSeek Harness.",
     "install": "dsh plugin --profile web add dsh-act"
@@ -21,7 +21,7 @@
     "name": "dsh-snip",
     "product": "Snip",
     "service": "snip",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "stability": "experimental",
     "description": "Local-first, searchable clipboard ledger for DeepSeek Harness with explicit OS clipboard capture, secret exclusion and clipboard:// agent handles.",
     "install": "dsh plugin --profile web add dsh-snip"
@@ -48,7 +48,7 @@
     "name": "dsh-trigger",
     "product": "Trigger",
     "service": "triggers",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "stability": "experimental",
     "description": "Event-to-action trigger fabric for DeepSeek Harness: condition DSL, cooldown, run ledger and real agent / fs / webhook event sources.",
     "install": "dsh plugin --profile web add dsh-trigger"
@@ -57,9 +57,9 @@
     "name": "dsh-seek",
     "product": "Seek",
     "service": "evidence",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "stability": "experimental",
-    "description": "Cross-source evidence search for DeepSeek Harness with verifiable refs, resolvable markers, resolve routing and real locator/memento providers.",
+    "description": "Cross-source evidence search for DeepSeek Harness with verifiable refs, resolvable/tainted markers, resolve routing and real locator/memento/trace providers.",
     "install": "dsh plugin --profile web add dsh-seek"
   },
   {
@@ -171,7 +171,7 @@
     "name": "dsh-os-kit",
     "product": "Kit",
     "service": null,
-    "version": "0.5.0",
+    "version": "0.6.0",
     "stability": "experimental",
     "description": "Thin meta bundle that installs and mounts the six core dsh-os modules: Act, Allow, Snip, Check, Kernel and Shell.",
     "install": "dsh plugin --profile web add dsh-os-kit",
