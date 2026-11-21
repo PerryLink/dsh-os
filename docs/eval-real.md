@@ -95,3 +95,45 @@ evals/real/reports/<ISO 时间戳>.md     # 同内容的人类可读报告
 报告含 `env`（Node/profile/commit/keyVar，不含 key 值）、逐场景 `steps/checks/failures/approvals`、汇总 `metrics`。时间戳来自运行时刻，不复用 `latest.*` 掩盖历史。
 
 再次声明：**截至 2026-11-21 本运行器未真跑过模型，仓库中没有真实成绩。**
+
+## 7. 首次真机结果（2026-11-21，DeepSeek key，本地 profile）
+
+使用当前 DSH `0.2.2-rc.4`、本机 DeepSeek key、`/tmp/dsh-real-home/profiles/eval`（挂载本地 dsh-os 包）跑了 4 个场景。key 不写入报告，只记录“已提供”。
+
+| 场景 | 结果 | 步数 | tokens | 耗时 | 审批 | 失败点 |
+|---|---|---:|---:|---:|---:|---|
+| `kernel-discovery` | ✅ | 5 | 91,385 | 7.0s | 0 | — |
+| `regression-triage` | ✅ | 6 | 107,733 | 9.3s | 0 | — |
+| `fix-failing-test` | ✅ | 17 | 272,707 | 77.3s | 1（unavailable） | — |
+| `seek-evidence` | ❌ | 59 | 1,283,692 | 105.3s | 1（unavailable） | `evidence.json` 不存在 |
+
+**可用的真实结论：**
+
+- 真模型能用 `os_status → os_find → os_do` 完成一次只读剪贴板搜索（`kernel-discovery`），说明 gateway 的最小闭环成立。
+- 真模型能完成“读两份 run JSON → 写 verdict”的回归判定（`regression-triage`）。
+- 真模型能修测试（`fix-failing-test`），但花了 **17 步 / 272k tokens / 77s**，且触发 1 次不可用审批。
+- `seek-evidence` 失败：模型在 59 步内反复读文件、没有写 `evidence.json`，吃掉 **1.28M tokens** 后触发 step limit/exit 130。这不是“架构通过”，是真实失败，保留。
+
+**gateway-only preset 真机测试失败：**
+
+- 建了 `eval-gw` 副本，加 `docs/presets/os-gateway.cordis.yml` 和 `@deepseek-ai/dsh-agent-preset-registry`。
+- registry 导入失败（缺 `@deepseek-ai/cordis` 等 peer），`preset-os-gateway` 一直 `pending (waiting for service: agentPresets)`。
+- 结果：模型仍然看到并可调用 `read` / `glob`；`os_status` 只报告 kernel 自己的 6 个工具，不代表全局 tool surface。
+- **所以“模型只看到 5 个动词”尚未在真机成立**，只是代码路径和 preset 文档存在。
+
+**复现：**
+
+```bash
+# 一次性准备 profile（用本地包）
+DSH_HOME=/tmp/dsh-real-home dsh --profile eval --from-default-profile headless
+DSH_HOME=/tmp/dsh-real-home dsh plugin --profile eval add /path/to/dsh-os/packages/{allow,act,snip,check,seek,trace,ring,trigger,kernel}
+DSH_HOME=/tmp/dsh-real-home dsh plugin --profile eval add dsh-locator@0.20.1
+
+# 跑真机（key 只从环境读，不落盘）
+DSH_BIN=/home/yy/deepseek-harness/apps/cli/lib/bin.js \
+DSH_PROFILE=eval DSH_REAL_HOME=/tmp/dsh-real-home \
+DEEPSEEK_API_KEY=... \
+node evals/real-run.mjs --scenario=kernel-discovery
+```
+
+> 真机数字与 `evals/BASELINE.md` 的 P 层脚本基线**不可横比**；温度、模型版本、profile 都会改变结果。

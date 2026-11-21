@@ -1,0 +1,178 @@
+{
+  "schema": "dsh-os.eval-real/v1",
+  "layer": "A-real (DSH headless; real model calls; external-state grading)",
+  "generatedAt": "2026-11-21T10:20:05.498Z",
+  "env": {
+    "node": "v24.22.1",
+    "platform": "linux",
+    "dshBin": "/home/yy/deepseek-harness/apps/cli/lib/bin.js",
+    "profile": "eval",
+    "keyVar": "DEEPSEEK_API_KEY",
+    "commit": "95dceee",
+    "dirty": true
+  },
+  "scenarios": [
+    {
+      "id": "regression-triage",
+      "title": "回归判定",
+      "goal": "对比两份 check-run JSON，识别新失败并写 verdict.json。",
+      "initial": [
+        "old.json：math.add 通过，math.div 通过",
+        "new.json：math.add 失败，math.div 通过",
+        "两份输入文件只读；工作区可写 verdict.json"
+      ],
+      "prompt": "读取工作区的 old.json 和 new.json（dsh.check.run/v1）。判断 new 相对 old 是否出现回归。写 verdict.json：{\"verdict\":\"regression\" 或 \"no-regression\",\"regressions\":[{\"id\":\"...\",\"previous\":\"passed|failed\",\"current\":\"passed|failed\"}],\"fixed\":[...]}，regressions 只列 new 中新失败的任务。不要修改 old.json 或 new.json。",
+      "success": true,
+      "strictSuccess": true,
+      "deferredChecks": 0,
+      "toolCalls": 6,
+      "invalidCalls": 0,
+      "tokensEstimate": 107733,
+      "interventions": [],
+      "firstTool": "bash",
+      "expectedFirstTool": [
+        "read",
+        "bash",
+        "glob"
+      ],
+      "firstStepCorrect": true,
+      "steps": [
+        {
+          "n": 1,
+          "tool": "bash",
+          "args": "{\"command\":\"ls -la\",\"description\":\"List workspace files\"}",
+          "ok": false,
+          "code": "SANDBOX_UNAVAILABLE",
+          "invalid": null,
+          "callId": "call_00_ET_OYqSHal0PMTrpxQJ5fAd3816"
+        },
+        {
+          "n": 2,
+          "tool": "glob",
+          "args": "{\"pattern\":\"*.json\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_XskRuCIvT4T9cokiSU302678"
+        },
+        {
+          "n": 3,
+          "tool": "read",
+          "args": "{\"file_path\":\"/tmp/dsh-real-regression-triage-sxrvNK/old.json\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_Y6bDtp6xJUHs8LnM64hN8213"
+        },
+        {
+          "n": 4,
+          "tool": "read",
+          "args": "{\"file_path\":\"/tmp/dsh-real-regression-triage-sxrvNK/new.json\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_ET_jg88cAemGpPLS02Eix809046"
+        },
+        {
+          "n": 5,
+          "tool": "write",
+          "args": "{\"file_path\":\"/tmp/dsh-real-regression-triage-sxrvNK/verdict.json\",\"content\":\"{\\\"verdict\\\":\\\"regression\\\",\\\"regressions\\\":[{\\\"id\\\":\\\"math.add\\\",\\\"previous\\\":\\\"passed\\\",\\\"current\\\":\\\"failed\\\"}],\\\"fixed\\\":[]}\\n\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_9cfXJBmjpO85tPBhWEBC9871"
+        },
+        {
+          "n": 6,
+          "tool": "read",
+          "args": "{\"file_path\":\"/tmp/dsh-real-regression-triage-sxrvNK/verdict.json\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_ET_QwC7joaQKJvg3v9F4Ao08911"
+        }
+      ],
+      "checks": [
+        {
+          "id": "verdict-regression",
+          "ok": true,
+          "detail": "verdict.json 字段符合期望"
+        },
+        {
+          "id": "new-regression-id",
+          "ok": true,
+          "detail": "verdict.json 字段符合期望"
+        },
+        {
+          "id": "old-unchanged",
+          "ok": true,
+          "detail": "old.json 符合期望"
+        },
+        {
+          "id": "new-unchanged",
+          "ok": true,
+          "detail": "new.json 符合期望"
+        }
+      ],
+      "failures": [
+        {
+          "n": 1,
+          "tool": "bash",
+          "code": "SANDBOX_UNAVAILABLE",
+          "invalid": null
+        }
+      ],
+      "approvals": {
+        "asked": 0,
+        "decided": 0,
+        "rejected": 0,
+        "outcomes": {},
+        "parsed": 56,
+        "files": 4,
+        "source": "log"
+      },
+      "finalReason": {
+        "kind": "completed"
+      },
+      "finalText": "已完成比较，并且没有修改 old.json 和 new.json。\n\n**逐任务对比**\n| 任务 | old | new | 判定 |\n|---|---|---|---|\n| `math.add` | passed | failed | 回归 |\n| `math.div` | passed | passed | 无变化 |\n\n`new` 中唯一一个新出现的失败任务 `math.add` 伴随 `errors: 1`，错误数从 0 变为 1，`steps` 从 2 变为 3，`toolCalls` 从 1 变为 2。本批次没有从 failed 变为 passed 的已修复任务。\n\n已写入 `/tmp/dsh-real-regression-triage-sxrvNK/verdict.json`：\n\n```json\n{\"verdict\":\"regression\",\"regressions\":[{\"id\":\"math.add\",\"previous\":\"passed\",\"current\":\"failed\"}],\"fixed\":[]}\n```\n\n> 备注：本会话的 `workspace-write` 沙箱后端在宿主上不可用，导致 bash 无法执行；因此我改用文件读写工具完成全部检查与写入。",
+      "sessionId": "session-2f8ff587-3b9e-4846-8fe6-49ccce2dc6ab",
+      "exitCode": 0,
+      "timedOut": false,
+      "stepLimitHit": false,
+      "outputLimitHit": false,
+      "protocolOk": true,
+      "parseErrors": 0,
+      "badLines": [],
+      "usageComplete": true,
+      "tokensSource": "usage",
+      "durationMs": 9331,
+      "stdoutBytes": 7618,
+      "stderr": "[dsh-locator] locator: loaded 231924 entries from /home/yy/.cache/dsh-locator\n[llm-deepseek-api-key] model listing from https://api.deepseek.com/models loaded 2 model(s), skipped 0 row(s)\n[dsh-locator] locator: watching 1 root(s)\n",
+      "profile": "eval",
+      "dshBin": "/home/yy/deepseek-harness/apps/cli/lib/bin.js",
+      "error": null
+    }
+  ],
+  "metrics": {
+    "scenarios": 1,
+    "successes": 1,
+    "successRate": 1,
+    "strictSuccesses": 1,
+    "strictSuccessRate": 1,
+    "deferredChecks": 0,
+    "deferredScenarios": 0,
+    "firstStepAccuracy": 1,
+    "recoveryRate": 1,
+    "recoveredScenarios": 1,
+    "scenariosWithFailures": 1,
+    "toolCalls": 6,
+    "invalidCalls": 0,
+    "invalidCallRate": 0,
+    "avgSteps": 6,
+    "tokensEstimate": 107733,
+    "avgTokens": 107733,
+    "interventions": 0,
+    "assistedSuccesses": 0,
+    "autonomousSuccesses": 1
+  }
+}

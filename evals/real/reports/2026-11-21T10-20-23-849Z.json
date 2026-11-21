@@ -1,0 +1,161 @@
+{
+  "schema": "dsh-os.eval-real/v1",
+  "layer": "A-real (DSH headless; real model calls; external-state grading)",
+  "generatedAt": "2026-11-21T10:20:23.849Z",
+  "env": {
+    "node": "v24.22.1",
+    "platform": "linux",
+    "dshBin": "/home/yy/deepseek-harness/apps/cli/lib/bin.js",
+    "profile": "eval",
+    "keyVar": "DEEPSEEK_API_KEY",
+    "commit": "95dceee",
+    "dirty": true
+  },
+  "scenarios": [
+    {
+      "id": "kernel-discovery",
+      "title": "Kernel 发现与执行",
+      "goal": "用 os_status/os_find 找到剪贴板搜索能力，并通过 os_do 执行一次只读搜索，写 kernel.json。",
+      "initial": [
+        "profile 已挂载 dsh-os-kernel + dsh-snip",
+        "剪贴板账本可为空；只读搜索不应需要 Grant",
+        "工作区可写 kernel.json"
+      ],
+      "prompt": "先调用 os_status 看已挂载模块，再调用 os_find，intent 为 \"search clipboard history\"。从返回的卡里选一个只读能力，用 os_do 调用它，args 为 {\"query\":\"invoice\",\"limit\":5}。最后写 kernel.json：{\"found\":true,\"capability\":\"<你选的能力 id>\",\"resultOk\":true}。不要安装任何东西，不要写其他文件。",
+      "success": true,
+      "strictSuccess": true,
+      "deferredChecks": 0,
+      "toolCalls": 5,
+      "invalidCalls": 0,
+      "tokensEstimate": 91385,
+      "interventions": [],
+      "firstTool": "os_status",
+      "expectedFirstTool": [
+        "os_status",
+        "os_find"
+      ],
+      "firstStepCorrect": true,
+      "steps": [
+        {
+          "n": 1,
+          "tool": "os_status",
+          "args": "{}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_ET_7lzKqBqMsS30M52buemR7165"
+        },
+        {
+          "n": 2,
+          "tool": "os_find",
+          "args": "{\"intent\":\"search clipboard history\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_ET_o9UT7R1gaDmYCbzNwDNZ3402"
+        },
+        {
+          "n": 3,
+          "tool": "os_do",
+          "args": "{\"id\":\"legacy.snip_search\",\"args\":{\"query\":\"invoice\",\"limit\":5}}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_zs7N8rFLHrGRR1Q1I13q7210"
+        },
+        {
+          "n": 4,
+          "tool": "write",
+          "args": "{\"file_path\":\"/tmp/dsh-real-kernel-discovery-qk30xB/kernel.json\",\"content\":\"{\\\"found\\\":true,\\\"capability\\\":\\\"legacy.snip_search\\\",\\\"resultOk\\\":true}\\n\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_ECZvlelt3czeQMdWKpw94719"
+        },
+        {
+          "n": 5,
+          "tool": "read",
+          "args": "{\"file_path\":\"/tmp/dsh-real-kernel-discovery-qk30xB/kernel.json\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_ET_VWL2lbkI3m0tda2qFjeE7572"
+        }
+      ],
+      "checks": [
+        {
+          "id": "os-status-used",
+          "ok": true,
+          "detail": "os_status 调用 1 次（至少 1）"
+        },
+        {
+          "id": "os-find-used",
+          "ok": true,
+          "detail": "os_find 调用 1 次（至少 1）"
+        },
+        {
+          "id": "os-do-used",
+          "ok": true,
+          "detail": "os_do 调用 1 次（至少 1）"
+        },
+        {
+          "id": "kernel-json",
+          "ok": true,
+          "detail": "kernel.json 字段符合期望"
+        }
+      ],
+      "failures": [],
+      "approvals": {
+        "asked": 0,
+        "decided": 0,
+        "rejected": 0,
+        "outcomes": {},
+        "parsed": 48,
+        "files": 4,
+        "source": "log"
+      },
+      "finalReason": {
+        "kind": "completed"
+      },
+      "finalText": "完成。整个过程如下：\n\n1. **os_status**：版本 0.3.0，health 正常。已挂载模块为 0 个（`modules: []`），但 legacy 能力注册了 85 个（`legacy: 85`，`capabilities: 0`）。\n\n2. **os_find**（intent: \"search clipboard history\"）：返回 5 张卡片，其中与剪贴板历史直接相关的只读能力为 `legacy.snip_search`（Search the local Snip ledger，risk: `read`）。其他候选如 `legacy.locator_search` 风险为 write，`legacy.seek_search`/`trace_search`/`web_search` 不属于剪贴板域。\n\n3. **os_do**：调用 `legacy.snip_search`，args `{\"query\":\"invoice\",\"limit\":5}`，返回 `ok: true`，`items: []`，0 条匹配（无匹配属正常空结果，非错误）。\n\n4. **写入 kernel.json**，内容为：\n   ```json\n   {\"found\":true,\"capability\":\"legacy.snip_search\",\"resultOk\":true}\n   ```\n\n未安装任何东西，也未写其他文件。",
+      "sessionId": "session-feced04c-8c36-48d3-abdf-17cb71174050",
+      "exitCode": 0,
+      "timedOut": false,
+      "stepLimitHit": false,
+      "outputLimitHit": false,
+      "protocolOk": true,
+      "parseErrors": 0,
+      "badLines": [],
+      "usageComplete": true,
+      "tokensSource": "usage",
+      "durationMs": 7047,
+      "stdoutBytes": 8816,
+      "stderr": "[dsh-locator] locator: replayed 18 journal entries (2157 bytes) from /home/yy/.cache/dsh-locator\n[dsh-locator] locator: loaded 231924 entries from /home/yy/.cache/dsh-locator\n[dsh-locator] locator: watching 1 root(s)\n[llm-deepseek-api-key] model listing from https://api.deepseek.com/models loaded 2 model(s), skipped 0 row(s)\n",
+      "profile": "eval",
+      "dshBin": "/home/yy/deepseek-harness/apps/cli/lib/bin.js",
+      "error": null
+    }
+  ],
+  "metrics": {
+    "scenarios": 1,
+    "successes": 1,
+    "successRate": 1,
+    "strictSuccesses": 1,
+    "strictSuccessRate": 1,
+    "deferredChecks": 0,
+    "deferredScenarios": 0,
+    "firstStepAccuracy": 1,
+    "recoveryRate": 0,
+    "recoveredScenarios": 0,
+    "scenariosWithFailures": 0,
+    "toolCalls": 5,
+    "invalidCalls": 0,
+    "invalidCallRate": 0,
+    "avgSteps": 5,
+    "tokensEstimate": 91385,
+    "avgTokens": 91385,
+    "interventions": 0,
+    "assistedSuccesses": 0,
+    "autonomousSuccesses": 1
+  }
+}

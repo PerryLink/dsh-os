@@ -1,0 +1,297 @@
+{
+  "schema": "dsh-os.eval-real/v1",
+  "layer": "A-real (DSH headless; real model calls; external-state grading)",
+  "generatedAt": "2026-11-21T10:21:44.579Z",
+  "env": {
+    "node": "v24.22.1",
+    "platform": "linux",
+    "dshBin": "/home/yy/deepseek-harness/apps/cli/lib/bin.js",
+    "profile": "eval",
+    "keyVar": "DEEPSEEK_API_KEY",
+    "commit": "95dceee",
+    "dirty": true
+  },
+  "scenarios": [
+    {
+      "id": "fix-failing-test",
+      "title": "修失败测试",
+      "goal": "修复 src/math.mjs 的差一错误，使 node --test 通过；不改测试文件。",
+      "initial": [
+        "临时工作区：src/math.mjs 返回 a+b+1，src/math.test.mjs 期望 add(2,2)=4",
+        "Node 24 内置 node:test；工作目录可写",
+        "没有网络依赖，测试可离线运行"
+      ],
+      "prompt": "仓库里的测试失败了。请读取 src/math.mjs 和 src/math.test.mjs，找出失败原因并修复源码；只允许修改 src/math.mjs，禁止修改测试文件。修复后运行 `node --test src/math.test.mjs` 确认通过，并验证隐藏用例 add(3,5) 应等于 8。",
+      "success": true,
+      "strictSuccess": true,
+      "deferredChecks": 0,
+      "toolCalls": 17,
+      "invalidCalls": 0,
+      "tokensEstimate": 272707,
+      "interventions": [
+        {
+          "kind": "approval.asked",
+          "outcome": "unavailable"
+        }
+      ],
+      "firstTool": "read",
+      "expectedFirstTool": [
+        "read",
+        "bash",
+        "grep",
+        "glob"
+      ],
+      "firstStepCorrect": true,
+      "steps": [
+        {
+          "n": 1,
+          "tool": "read",
+          "args": "{\"file_path\":\"/tmp/dsh-real-fix-failing-test-8YV0CL/src/math.mjs\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_8fS3Qk2fHrF8VGfw3msJ8017"
+        },
+        {
+          "n": 2,
+          "tool": "read",
+          "args": "{\"file_path\":\"/tmp/dsh-real-fix-failing-test-8YV0CL/src/math.test.mjs\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_aJUdHEeCuAT6BjDO9CUq5569"
+        },
+        {
+          "n": 3,
+          "tool": "edit",
+          "args": "{\"file_path\":\"/tmp/dsh-real-fix-failing-test-8YV0CL/src/math.mjs\",\"old_string\":\"export const add = (a, b) => a + b + 1\",\"new_string\":\"export const add = (a, b) => a + b\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_1GJuCByJEMW2SIE45cVe6682"
+        },
+        {
+          "n": 4,
+          "tool": "bash",
+          "args": "{\"description\":\"Run tests and verify hidden case\",\"command\":\"node --test src/math.test.mjs && node --input-type=module -e \\\"import {add} from './src/math.mjs'; console.log('add(3,5) =', add(3,5)); if (add(3,5) !== 8) process.exit(1);\\\"\",\"workdir\":\"/tmp/dsh-real-fix-failing-test-8YV0CL\"}",
+          "ok": false,
+          "code": "SANDBOX_UNAVAILABLE",
+          "invalid": null,
+          "callId": "call_00_NDHSNrXDl8UJrgSdE4WU4464"
+        },
+        {
+          "n": 5,
+          "tool": "bash",
+          "args": "{\"description\":\"Run tests and verify hidden case\",\"command\":\"node --test src/math.test.mjs && node --input-type=module -e \\\"import {add} from './src/math.mjs'; console.log('add(3,5) =', add(3,5)); if (add(3,5) !== 8) process.exit(1);\\\"\",\"workdir\":\"/tmp/dsh-real-fix-failing-test-8YV0CL\",\"justification\":\"工作区沙箱后端在本机不可用，无法以 workspace-write 模式运行 node 测试；需用 danger-full-access 执行测试命令验证修复。\",\"sandbox_permissions\":\"danger-full-access\"}",
+          "ok": false,
+          "code": "SANDBOX_ESCALATION_UNAVAILABLE",
+          "invalid": null,
+          "callId": "call_00_C5ZBFPAiheZ9LdJJnRnj1471"
+        },
+        {
+          "n": 6,
+          "tool": "act_list",
+          "args": "{}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_0G8ftakNa42yS4ZNyunn2371"
+        },
+        {
+          "n": 7,
+          "tool": "os_status",
+          "args": "{}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_LB0TfERMjGjbYuK2KyG65900"
+        },
+        {
+          "n": 8,
+          "tool": "os_find",
+          "args": "{\"intent\":\"run a shell command like node --test in the workspace\",\"limit\":10}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_w4V8SC5eprjpSeStivLk0461"
+        },
+        {
+          "n": 9,
+          "tool": "os_help",
+          "args": "{\"task\":\"Run node test command in workspace to verify a fix\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_FIAZqAUf4CmeYNLXgfxk2885"
+        },
+        {
+          "n": 10,
+          "tool": "bash",
+          "args": "{\"command\":\"echo hi\",\"description\":\"Probe shell availability\"}",
+          "ok": false,
+          "code": "SANDBOX_UNAVAILABLE",
+          "invalid": null,
+          "callId": "call_00_a7LdR5zaE5BHKWHZv1xk6397"
+        },
+        {
+          "n": 11,
+          "tool": "capability_search",
+          "args": "{\"intent\":\"execute a shell command / run tests in the current workspace\",\"kinds\":[\"tool\",\"mcp\"],\"limit\":20}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_8IzJM5rUJfyYhURlJc547085"
+        },
+        {
+          "n": 12,
+          "tool": "allow_requests",
+          "args": "{\"subject\":\"agent:lead\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_gCxzWVxdCFYdwDJxG0zZ9848"
+        },
+        {
+          "n": 13,
+          "tool": "allow_request",
+          "args": "{\"capability\":\"exec\",\"reason\":\"需要在工作区运行 `node --test src/math.test.mjs` 验证修复；本机无可用 workspace-write 沙箱后端，需 danger-full-access 执行一次测试命令。\",\"scope\":\"danger-full-access\",\"subject\":\"agent:lead\",\"ttlMs\":120000}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_ybhYkQhkCOlTQWcIxGfA0004"
+        },
+        {
+          "n": 14,
+          "tool": "allow_wait",
+          "args": "{\"requestId\":\"req_4ea67b0f-10a2-46cf-a500-4fe04a61aa73\",\"subject\":\"agent:lead\",\"timeoutMs\":20000}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_c8oMqzH5KCj4PdTLEaE40150"
+        },
+        {
+          "n": 15,
+          "tool": "glob",
+          "args": "{\"pattern\":\"*\",\"path\":\"/tmp/dsh-real-fix-failing-test-8YV0CL\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_Uo03aUpRtRreE7fgBYZn6545"
+        },
+        {
+          "n": 16,
+          "tool": "read",
+          "args": "{\"file_path\":\"/tmp/dsh-real-fix-failing-test-8YV0CL/src/math.mjs\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_EICgsNufV1UiZjtheWu19221"
+        },
+        {
+          "n": 17,
+          "tool": "allow_wait",
+          "args": "{\"requestId\":\"req_4ea67b0f-10a2-46cf-a500-4fe04a61aa73\",\"subject\":\"agent:lead\",\"timeoutMs\":25000}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_G1DzcEfcx7nBlO10FcaC2154"
+        }
+      ],
+      "checks": [
+        {
+          "id": "test-green",
+          "ok": true,
+          "detail": "exit 0，stdout 符合期望"
+        },
+        {
+          "id": "test-unchanged",
+          "ok": true,
+          "detail": "src/math.test.mjs 符合期望"
+        },
+        {
+          "id": "source-fixed",
+          "ok": true,
+          "detail": "src/math.mjs 符合期望"
+        },
+        {
+          "id": "hidden-case",
+          "ok": true,
+          "detail": "exit 0，stdout 符合期望"
+        }
+      ],
+      "failures": [
+        {
+          "n": 4,
+          "tool": "bash",
+          "code": "SANDBOX_UNAVAILABLE",
+          "invalid": null
+        },
+        {
+          "n": 5,
+          "tool": "bash",
+          "code": "SANDBOX_ESCALATION_UNAVAILABLE",
+          "invalid": null
+        },
+        {
+          "n": 10,
+          "tool": "bash",
+          "code": "SANDBOX_UNAVAILABLE",
+          "invalid": null
+        }
+      ],
+      "approvals": {
+        "asked": 1,
+        "decided": 1,
+        "rejected": 1,
+        "outcomes": {
+          "unavailable": 1
+        },
+        "parsed": 110,
+        "files": 4,
+        "source": "log"
+      },
+      "finalReason": {
+        "kind": "completed"
+      },
+      "finalText": "修复完成，但先说结论：源码已改好，`node --test` 在本机无法实际执行（环境问题，见下），代码逻辑已静态确认。\n\n## 失败原因\n\n`src/math.mjs` 只有一行，实现多加了 `1`：\n\n```js\nexport const add = (a, b) => a + b + 1   // add(2,2) 返回 5\n```\n\n而测试断言 `add(2, 2) === 4`，因此必然失败。\n\n## 修复（仅改 `src/math.mjs`，未动测试）\n\n```js\nexport const add = (a, b) => a + b\n```\n\n文件已确认写入如下：\n\n```js\nexport const add = (a, b) => a + b\n```\n\n- `add(2, 2)` → `4`，测试断言成立\n- `add(3, 5)` → `8`，隐藏用例满足\n\n## 关于运行验证\n\n我尝试执行 `node --test src/math.test.mjs`，但本机没有可用的沙箱后端，命令被拒绝执行：\n\n```\nsandbox mode \"workspace-write\" is requested but no sandbox backend is usable on this host;\nrefusing to run the command unconfined. ... otherwise switch the consumer to danger-full-access.\n```\n\n改用 `danger-full-access` 重试时提示 `requires approval, but no approval channel is available`；我已发起审批请求 `req_4ea67b0f-10a2-46cf-a500-4fe04a61aa73`，但无人在线批准，请求仍为 pending。因此这一步测试运行我无法在本会话内完成，属实未执行，而不是已通过。\n\n在有可用沙箱（安装 bubblewrap / Landlock，或切换为 `danger-full-access`）的环境中，直接运行即可确认：\n\n```bash\nnode --test src/math.test.mjs\n# 同时验证隐藏用例：\nnode --input-type=module -e \"import {add} from './src/math.mjs'; console.log(add(3,5))\"  # 8\n```\n\n## 改动摘要\n\n| 文件 | 改动 |\n|---|---|\n| `src/math.mjs` | `a + b + 1` → `a + b` |\n| `src/math.test.mjs` | 未修改 |",
+      "sessionId": "session-3956691d-94f9-4088-9f4f-17d5e5ac4d7c",
+      "exitCode": 0,
+      "timedOut": false,
+      "stepLimitHit": false,
+      "outputLimitHit": false,
+      "protocolOk": true,
+      "parseErrors": 0,
+      "badLines": [],
+      "usageComplete": true,
+      "tokensSource": "usage",
+      "durationMs": 77322,
+      "stdoutBytes": 37874,
+      "stderr": "[dsh-locator] locator: replayed 37 journal entries (4628 bytes) from /home/yy/.cache/dsh-locator\n[dsh-locator] locator: loaded 231926 entries from /home/yy/.cache/dsh-locator\n[dsh-locator] locator: watching 1 root(s)\n[llm-deepseek-api-key] model listing from https://api.deepseek.com/models loaded 2 model(s), skipped 0 row(s)\n",
+      "profile": "eval",
+      "dshBin": "/home/yy/deepseek-harness/apps/cli/lib/bin.js",
+      "error": null
+    }
+  ],
+  "metrics": {
+    "scenarios": 1,
+    "successes": 1,
+    "successRate": 1,
+    "strictSuccesses": 1,
+    "strictSuccessRate": 1,
+    "deferredChecks": 0,
+    "deferredScenarios": 0,
+    "firstStepAccuracy": 1,
+    "recoveryRate": 1,
+    "recoveredScenarios": 1,
+    "scenariosWithFailures": 1,
+    "toolCalls": 17,
+    "invalidCalls": 0,
+    "invalidCallRate": 0,
+    "avgSteps": 17,
+    "tokensEstimate": 272707,
+    "avgTokens": 272707,
+    "interventions": 1,
+    "assistedSuccesses": 1,
+    "autonomousSuccesses": 0
+  }
+}

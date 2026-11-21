@@ -1,0 +1,20 @@
+{
+  "id": "kernel-discovery",
+  "title": "Kernel 发现与执行",
+  "goal": "用 os_status/os_find 找到剪贴板搜索能力，并通过 os_do 执行一次只读搜索，写 kernel.json。",
+  "initial": [
+    "profile 已挂载 dsh-os-kernel + dsh-snip",
+    "剪贴板账本可为空；只读搜索不应需要 Grant",
+    "工作区可写 kernel.json"
+  ],
+  "prompt": "先调用 os_status 看已挂载模块，再调用 os_find，intent 为 \"search clipboard history\"。从返回的卡里选一个只读能力，用 os_do 调用它，args 为 {\"query\":\"invoice\",\"limit\":5}。最后写 kernel.json：{\"found\":true,\"capability\":\"<你选的能力 id>\",\"resultOk\":true}。不要安装任何东西，不要写其他文件。",
+  "timeoutMs": 180000,
+  "maxSteps": 20,
+  "expectedFirstTool": ["os_status", "os_find"],
+  "checks": [
+    { "id": "os-status-used", "kind": "toolUsed", "name": "os_status", "min": 1 },
+    { "id": "os-find-used", "kind": "toolUsed", "name": "os_find", "min": 1 },
+    { "id": "os-do-used", "kind": "toolUsed", "name": "os_do", "min": 1 },
+    { "id": "kernel-json", "kind": "json", "path": "kernel.json", "expect": { "found": true } }
+  ]
+}

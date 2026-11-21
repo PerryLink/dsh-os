@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** dsh-os real-agent eval runner (A layer): spawn DSH headless per scenario JSON, parse NDJSON,
  *  grade external state only. No model call here; without DSH_BIN + a model key the CLI exits 2. */
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { spawn as nodeSpawn, spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
@@ -326,6 +326,15 @@ export async function runScenario(scenario, options = {}) {
   const dshHome = mkdtempSync(join(tmpdir(), 'dsh-real-home-'))
   const profile = options.profile ?? process.env.DSH_PROFILE ?? 'headless'
   const dshBin = options.dshBin ?? process.env.DSH_BIN
+  // A prepared profile can be shared read-only via DSH_REAL_HOME; sessions stay
+  // in the per-run temp DSH_HOME so approval logs cannot leak between scenarios.
+  const sourceHome = process.env.DSH_REAL_HOME ? resolve(process.env.DSH_REAL_HOME) : null
+  if (sourceHome) {
+    const sourceProfile = join(sourceHome, 'profiles', profile)
+    if (!existsSync(sourceProfile)) throw Object.assign(new Error(`profile "${profile}" not found under DSH_REAL_HOME/profiles`), { code: 'E_NO_PROFILE' })
+    mkdirSync(join(dshHome, 'profiles'), { recursive: true })
+    symlinkSync(sourceProfile, join(dshHome, 'profiles', profile), 'dir')
+  }
   let run
   try {
     setupSandbox(scenario, sandbox)
