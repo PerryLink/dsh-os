@@ -3,14 +3,15 @@
 > A local-first clipboard ledger for DeepSeek Harness with opt-in OS clipboard
 > capture, secret exclusion and `clipboard://` agent handles.
 
-**Status: 0.2.0.** Snip records a clipping only when a caller explicitly calls
+**Status: 0.3.0.** Snip records a clipping only when a caller explicitly calls
 `snip.add(...)`, `snip.capture(...)`, or one of the agent tools. **Clipboard
 capture is off by default**: mounting the plugin never reads the OS clipboard,
 never starts a watcher and never enables a timer. Set `capture.enabled: true`
 to allow `snip_capture` / `snip_watch_start`; nothing else turns capture on.
 
-In one sentence: **0.2.0 reads the clipboard only when explicitly asked,
-redacts secrets by default, and stores clippings locally.**
+In one sentence: **0.3.0 reads the clipboard only when explicitly asked,
+redacts secrets by default, stores clippings locally, and pages search results
+through an `os.result/v1` envelope.**
 
 **Not affiliated with DeepSeek.** DeepSeek and DeepSeek Harness are trademarks
 of their respective owners.
@@ -96,15 +97,22 @@ dependency):
 | `snip_capture` | `sourceApp` | safe capture summary; **no text or preview** |
 | `snip_watch_start` | `intervalMs` | `{ ok, watching, intervalMs }` |
 | `snip_watch_stop` | none | `{ ok, watching, stopped, lastError }` |
-| `snip_search` | `query` (required), `limit` | `{ query, entries }` |
+| `snip_search` | `query` (required), `limit` (default 20, max 100), `offset` | `os.result/v1` envelope `{ schema, ok, summary, items, page, truncated, next, error }` plus the legacy `{ query, entries }`; `items` and `entries` are the same page |
 | `snip_get` | `id` (id or `clipboard://` handle) | full entry including `text` |
 | `snip_list` | `kind`, `limit` | `{ entries }` |
 | `snip_forget` | `id` | `{ ok, removed }` |
 | `snip_clear` | none | `{ removed }` |
 
-`entries` are newest-first summaries. `snip_get` returns the full text, which
+`entries` are newest-first summaries. `snip_search` reports the full match
+count in `page.total`; `page.hasMore`/`truncated` say whether another page
+exists, and `next` suggests the next `offset` or `snip_get` for a match.
+`snip_get` returns the full text, which
 then becomes part of the append-only conversation session log — read only what
 you need. `snip_capture` intentionally returns a handle and metadata only.
+
+`snip_search` failures return `{ ok: false, code, error }`; the original
+`SNIP_*` code is preserved at the top level and inside
+`error: { code, message, retryable, remediation, nextTools }`.
 
 ## Configuration
 

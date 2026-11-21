@@ -51,13 +51,16 @@ export function createTools(service) {
     tool('ring_channels', 'List configured notification channels. No network is used unless a channel is explicitly configured.',
       argsSchema({}),
       async () => ({ channels: service.channels() })),
-    tool('ring_notify', 'Send one notification for a case through a configured channel; omit channel to use the current chain label. A delivery receipt is recorded for success and failure.',
+    tool('ring_notify', 'Send one notification for a case through a configured channel; requires an Allow Grant for "ring:notify" on the calling subject (exec.subject). A delivery receipt is recorded on success and failure.',
       argsSchema({
         id: { type: 'string' },
         channel: { type: 'string', description: 'webhook, ntfy, console, local or voice.' },
       }, ['id']),
-      async args => service.notify(args?.id, args?.channel === undefined ? {} : { channel: args.channel })),
-    tool('ring_tick', 'Advance every open case to `at` (default: the service clock): expire, deliver t0 and escalate due levels. Returns receipts, changed cases and delivery results.',
+      async (args, exec) => service.notify(args?.id, {
+        ...(args?.channel === undefined ? {} : { channel: args.channel }),
+        ...(exec?.subject === undefined ? {} : { subject: exec.subject }),
+      })),
+    tool('ring_tick', 'Advance every open case to `at` (default: the service clock): expire, deliver t0 and escalate due levels. Automatic delivery needs the "ring:notify" Grant; without it a blocked receipt is written and nothing is sent. Returns receipts, changed cases and delivery results.',
       argsSchema({
         at: { type: 'number', minimum: 0, description: 'Unix epoch milliseconds; omit to use the current clock.' },
       }),

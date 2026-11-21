@@ -9,7 +9,7 @@
 import { fingerprint } from './registry.js'
 
 export const RESULT_SCHEMA = 'os.result/v1'
-export const VERSION = '0.2.0'
+export const VERSION = '0.3.0'
 export const ERROR_CLASSES = Object.freeze([
   'E_INVALID_ARGUMENT', 'E_DENIED', 'E_NOT_FOUND', 'E_CONFLICT', 'E_UNAVAILABLE',
   'E_LIMIT', 'E_STATE', 'E_TIMEOUT', 'E_INTERNAL',

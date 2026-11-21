@@ -1,11 +1,22 @@
 # dsh-os 社区发布手册
 
-> **范围：** 官方 GitHub Discussions、`awesome-dsh-plugin` 收录、`dsh-market` 上架。
+> **范围（2026-11-21 起）：** 只保留 `awesome-dsh-plugin` 单条收录 → `dsh-market`
+> 自动收录。**官方 GitHub Discussions 展示帖是用户已停投动作，不发布、不私信
+> 维护者**；§1 仅作历史存档，不要执行。
 > **本文只写文档，不发帖、不私信、不提交 PR。** 所有对外动作由维护者在核对后手动执行。
 >
-> ⚠️ **官方 Discussions 展示帖属于用户已停投动作（AGENTS.md §1）**：§1 只保留草稿，不要发布；不要私信维护者。
-> **基线日期：** 2026-11-20（仓库与 npm 包的实际状态以执行当天为准）。
-> **一句话原则：** **没有可运行 demo 就不发；不是官方就显著写清楚；一个项目一条讨论；不刷票。**
+> 提交包：[awesome-pr.md](awesome-pr.md) · [dsh-market.md](dsh-market.md) · [0.4 说明](release-notes-0.4.md)
+> **基线日期：** 2026-11-20。§0 的事实表写于 0.1.x，**已过期**；数字以执行当天和
+> [`release-notes-0.4.md`](release-notes-0.4.md) 为准。
+> **一句话原则：** **没有可运行 demo 就不发；不是官方就显著写清楚；只投 1 条；不刷票。**
+
+**当前路径状态（只有前两条是活跃路径）：**
+
+| 路径 | 状态 | 入口 |
+|---|---|---|
+| `awesome-dsh-plugin` 单条收录 | 已准备，**21:22 +08 后**可投；只投 `dsh-allow` | [`awesome-pr.md`](awesome-pr.md) |
+| `dsh-market` 自动收录 | **等 awesome 合并**；不向市场提条目 PR | [`dsh-market.md`](dsh-market.md) |
+| 官方 Discussions 展示帖 | **用户已停投，不发布** | 本文 §1 仅存档 |
 
 ---
 
@@ -18,26 +29,34 @@
 |---|---|---|
 | 仓库 | `https://github.com/PerryLink/dsh-os` | 浏览器打开，确认 public |
 | 产品包 | 11 个（act / allow / snip / check / nest / trigger / seek / trace / stage / ring / root） | `ls packages` + 各包 `package.json` |
-| npm 可安装版本 | 11 个产品包均为 `0.1.x` | `npm view <pkg> version` |
+| npm 可安装版本 | 各包不同：`dsh-allow` 0.4.0 / `dsh-act` 0.3.0 / `dsh-snip` 0.2.0 / `@perrylink/dsh-check` 0.3.0 / `dsh-os-kit` 0.4.0；以 [`release-notes-0.4.md`](release-notes-0.4.md) 为准 | `npm view <pkg> version --registry=https://registry.npmjs.org/` |
 | Node | 22.19–22.x（或 24.9+） | 各包 `engines.node` |
 | DSH | `>=0.2.1-rc.2 <0.3.0-0` | 各包 `engines.dsh` |
 | 演示 | `node examples/os-kit/demo.mjs` → `PASS: 6/6` | 在仓库根目录实跑 |
 | Check 演示 | `bash examples/os-kit/check-demo/run-check-demo.sh` → `PASS` | 需要 bash（Windows 用 Git Bash 或 WSL） |
 | 终端卡片 | `docs/assets/check-demo.svg` | 确认已提交到 `main`，raw 链接返回 200 |
-| 遥测 | 无（运行时代码无网络调用） | 读 [`docs/telemetry.md`](../telemetry.md)，复跑 grep |
+| 遥测 | 默认无遥测；除 Check 的模型调用与 Trigger/Ring 的显式外发外，运行时代码不主动联网 | 读 [`docs/telemetry.md`](../telemetry.md)，复跑 grep |
 | 许可 | MIT | `LICENSE` |
-| 仓库年龄 | 2026-11-20 创建 | **2026-11-21 之后**才满足 awesome 的 1 天门槛 |
+| 仓库年龄 | 创建 `2026-11-20T13:21:58Z`；**24h 门槛 2026-11-21 21:22 +08** | GitHub API `created_at` + 24h；不要按日历天算 |
 
-**两个硬门槛：**
+**当前硬门槛（只针对 awesome 单条）：**
 
-1. **官方帖：** 演示链接必须可访问、安装命令在干净 profile 上成功、正文里的每个
-   “能做 X”都能在 README/代码里找到对应。否则不发。
-2. **awesome PR：** 仓库创建满 1 天（CI 自动检查）+ 每个包有 `dsh.bundle` +
-   仓库有 `dsh-plugin` topic。否则不投。
+1. **仓库：** 创建满 24h（CI 自动检查；精确到 2026-11-21 21:22 +08）+ 有
+   `dsh-plugin` topic。
+2. **包：** 提交的子包声明 `dsh.bundle.patch`，旁边有 `cordis.patch.yml`，并且
+   npm 版本 = 仓库版本。
+3. **条目：** 只 1 条、不手改 README、描述能逐句对到代码。
+4. **市场：** 不是独立投稿；等 awesome 合并后自动抓取，不向 `dsh-market` 提 PR。
+
+官方 Discussions 已停投，不再有“官方帖门槛”。
 
 ---
 
-## 1. 官方 Discussions 帖（草稿，不投）
+## 1. 官方 Discussions 帖（已停投 · 仅存档，不执行）
+
+> ⛔ **用户已停投：不要复制、不要发布、不要按 §1.5 操作。** 以下仅保留为历史
+> 记录；当前对外路径只有 awesome → dsh-market，见
+> [`awesome-pr.md`](awesome-pr.md) 与 [`dsh-market.md`](dsh-market.md)。
 
 ### 1.1 发在哪里、遵守什么
 
@@ -466,7 +485,7 @@ curl -s https://awesome-dsh-plugin.com/plugins.json | grep -o 'PerryLink/dsh-os#
 
 ---
 
-## 4. 四周日历：demo → Discussions → awesome → 复盘
+## 4. 四周日历：demo → 设计伙伴 → awesome → 复盘
 
 日期按 2026-11-20（周五）之后的周一开始；如果某一周的 gate 没过，**顺延一周，
 不要跳过 gate**。
@@ -491,17 +510,19 @@ curl -s https://awesome-dsh-plugin.com/plugins.json | grep -o 'PerryLink/dsh-os#
 - 产出：`docs/assets/demo.gif`（或 release 附件）+ 一张 PNG 封面。
 - **Gate：** 没有可播放的 demo 文件，不进入 W2。
 
-### W2 — Discussions（只发 1 帖）
+### W2 — 设计伙伴（官方 Discussions 已停投）
 
-- 按 §1 复制正文，替换 demo 链接；先在自己的浏览器确认图片能显示。
-- 发布后立刻补首评；首评不要重复正文。
-- 24 小时内只回复，不主动私信；48 小时内把高频问题补进 README。
-- **Gate：** 如果评论指出“这不是一个项目”或“别打包推广”，按 §1.1 的拆分预案
-  处理，不要争辩；拆分后每帖间隔 ≥3 天。
+- **不要执行 §1**：官方展示帖不再发布，也不要私信维护者。
+- 按 [`../validation/STATUS.md`](../validation/STATUS.md) 的 0/10 计划，1:1 邀约
+  10 个设计伙伴；用 [`../validation/interview.md`](../validation/interview.md) 记录。
+- 目标是 3 个真实安装、1 个真实 case、5 条反馈；**没有证据就不改 STATUS 的数字**。
+- **不要把设计伙伴数量当成 awesome 的准入门槛：** W3 只查仓库满 24h、
+  `dsh.bundle`、干净 profile 安装、只 1 条。设计伙伴是验证，不是发 PR 的前置。
 
 ### W3 — awesome（一次 1 条）
 
-- 2026-11-21 之后才满足仓库年龄；W3 时肯定满足。
+- 仓库年龄的**精确** 24h 门槛是 2026-11-21 21:22 +08（`created_at` +
+  24h）；W3 时肯定满足。提前投会先红，CI 到点自动转绿。
 - 只投 `dsh-allow`；等合并后再考虑 Act，不要同周连投。
 - 合并后 24 小时检查 catalog 与 dsh-market；没出现先等，不重复投。
 - **Gate：** 第一条 PR 没合并，不投第二条；如果被拒，先按评论修描述/分类，再重投。
@@ -510,13 +531,13 @@ curl -s https://awesome-dsh-plugin.com/plugins.json | grep -o 'PerryLink/dsh-os#
 
 回答五个问题，写进 `docs/community/retro-YYYY-MM.md`（如果维护者同意再建）：
 
-1. 官方帖带来了什么：views / upvotes / comments / 真实安装问题各多少？
+1. 官方帖：**未发布（用户停投），不计**。设计伙伴：通了几人、装了几人、真实 case 几个？
 2. 哪条安装路径失败最多：DSH 版本、Node 版本、profile、构建授权？
 3. awesome PR 的状态：merged / held / closed；原因是什么？
 4. dsh-market 是否收录？一键安装是否成功？
-5. 哪 1 个包被真实使用最多？0.2.0 应该先补哪个适配器？
+5. 哪 1 个包被真实使用最多？下一个版本应该先补哪个适配器？
 
-**Decide：** 继续（投 Act/Trigger + 补适配器）／ 只修 0.2.0（暂停新帖）／ 停（把
+**Decide：** 继续（投 Act/Trigger + 补适配器）／ 只修稳定性（暂停新帖）／ 停（把
 仓库标为 experimental，不再推广）。不要因为“已经发了”就继续发。
 
 ---
@@ -579,12 +600,12 @@ curl -s https://awesome-dsh-plugin.com/plugins.json | grep -o 'PerryLink/dsh-os#
 - [ ] `dsh plugin --profile web add dsh-act` 在干净 profile 成功
 - [ ] `dsh plugin --profile web add dsh-allow` 在干净 profile 成功
 - [ ] `dsh plugin --profile web add dsh-trigger` 在干净 profile 成功
-- [ ] 帖子里的 demo 图片/GIF 链接返回 200，且画面无敏感信息
-- [ ] 标题符合 `DSH｜项目名｜一句话用途`，正文有非官方声明
-- [ ] 文中每个“能做 X”都能在 README/代码里找到；没有把 0.2.0 写成现在
+- [ ] 任何对外文案里的 demo 图片/GIF 链接返回 200，且画面无敏感信息
+- [ ] **官方帖已停投：不生成标题、不发帖**；awesome 文案按 [`awesome-pr.md`](awesome-pr.md)
+- [ ] 文中每个“能做 X”都能在 README/代码里找到；没有把未发布版本/路线图写成现在
 - [ ] GitHub topic `dsh-plugin` 已添加
 - [ ] npm 最新版本与仓库版本一致，或条目描述只写 npm 版本已有的能力
-- [ ] awesome 条目只 1 条、YAML 可解析、`url` 指向子目录、仓库满 1 天
+- [ ] awesome 条目只 1 条、YAML 可解析、`url` 指向子目录、仓库满 24h
 - [ ] `git status` 干净；没有把 token/密钥/本地路径带进提交
 
 **最后一条：** 如果以上任何一项不确定，**推迟发布**。推迟的成本远小于被维护者

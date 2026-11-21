@@ -4,7 +4,12 @@
 > verifiable `dsh://` refs, ref resolution, and partial results when a provider
 > fails.
 
-**Status: 0.3.0 adds ref resolution.** `ctx.evidence.resolve` and the
+**Status: 0.4.0 adds search result envelopes.** `seek_search` now returns the
+legacy `{ query, hits, total, errors }` plus an `os.result/v1` envelope
+(`summary`, `items`, `page`, `truncated`, `next`, `error`): default limit 10,
+max 50, optional `offset`. `page.hasMore`/`truncated` say whether more merged
+hits exist; `next` suggests the next page or `seek_resolve` for the top hit.
+0.3.0 added ref resolution. `ctx.evidence.resolve` and the
 `seek_resolve` tool route one `dsh://<source>/<id>` ref to its provider, bound
 the call with a deadline, and report `found`/`status` without inventing
 freshness. `locator` resolves through dsh-locator's `locator_resolve`;
@@ -197,13 +202,18 @@ Invalid or mismatched hits are omitted from the result and reported as one
 
 | Tool | Arguments | Result |
 | --- | --- | --- |
-| `seek_search` | `query` (required), `sources?`, `limit?` | `{ query, hits, total, errors }`; each hit has `resolvable`; forwards `exec.signal` and the caller's cwd/agentKey |
+| `seek_search` | `query` (required), `sources?`, `limit?` (default 10, max 50), `offset?` | `os.result/v1` envelope `{ schema, ok, summary, items, page, truncated, next, error }` plus the legacy `{ query, hits, total, errors }`; each hit has `resolvable`; forwards `exec.signal` and the caller's cwd/agentKey |
 | `seek_resolve` | `ref` (required) | `{ ref, found, status, source, title?, freshness?, checkedAt }`, or `status: "unsupported"`/`"timeout"`/`"error"` with an `error` block. Read-only |
 | `seek_providers` | none | `{ providers: string[], sources: [{ name, status: "ready" or "unavailable", reason? }] }` |
 | `seek_register_defaults` | none | retries locator/memento registration, then returns the same report |
 
 All are plain-object tools (no `@deepseek-ai/dsh-tools` dependency) and return
-lossless JSON through the host tool pipeline.
+lossless JSON through the host tool pipeline. `seek_search` reports the hits
+observed within the provider fetch window as `page.total`; it fetches one extra
+hit to set `page.hasMore` honestly, so the total is a lower bound when more
+hits exist. Documented argument errors (`invalid_query`, `invalid_limit`,
+`invalid_sources`, `invalid_signal`, `aborted`) still throw; unexpected
+failures return `{ ok: false, code, error }` with the original code preserved.
 
 ## Errors
 

@@ -3,7 +3,11 @@
 > **Upgrade canary, not an update checker.** Compare two paired runs across
 > result, trajectory, cost and approvals, then fail CI only on a real regression.
 
-**Status: 0.3.0 — safety defaults on the real headless runner.** `dsh-check run`
+**Status: 0.4.0 — result envelopes on `check_compare`.** 0.4.0 keeps the
+`dsh.check.diff/v1` report unchanged and adds a bounded `os.result/v1`
+envelope: `summaryText` (≤200 chars), `regressions`/`warnings` detail arrays,
+`page`, `truncated`, `next` and `error`; the legacy `summary` counts object,
+`verdict`, `tasks` and `allowFlaky` are untouched. `dsh-check run`
 launches `dsh --profile headless --json "<task>"` once per task, maps the four
 dimensions, and writes one diffable `run-<id>.json` per task. A real runner
 needs a **DSH checkout (or installed CLI) and a model key**; CI should pin
@@ -290,9 +294,16 @@ const report = ctx.get('check').compare(oldRun, newRun, {
 ```
 
 It also registers the plain-object agent tool `check_compare`, with `old` and
-`new` run objects as parameters (optional `allowFlaky` array). The service is
-usable without the tool registry, so tests and other plugins can call it
-directly.
+`new` run objects as parameters (optional `allowFlaky` array). The tool returns
+the report plus the envelope: `{ ok, schema, summaryText, regressions, warnings,
+page, truncated, next, error }`. `summaryText` is a one-line verdict capped at
+200 characters; `regressions`/`warnings` flatten the per-task diffs with
+`taskId`, `dimension`, optional `metric` and `message` (at most 20 each; the
+full `old`/`new` values stay in the legacy `tasks` array); `next`
+suggests `check_run` for a regression or `check_compare` with `allowFlaky` for a
+warning. A validation failure returns `{ ok: false, code, error }` without
+changing the original `code`. The service (`ctx.check.compare`) is unchanged
+and usable without the tool registry.
 
 To enable the real runner, give the plugin a DSH binary or an injected runner:
 

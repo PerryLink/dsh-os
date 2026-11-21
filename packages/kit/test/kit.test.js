@@ -10,6 +10,8 @@ const EXPECTED = [
   { id: 'dsh-allow', name: 'dsh-allow' },
   { id: 'dsh-snip', name: 'dsh-snip' },
   { id: '@perrylink/dsh-check', name: '@perrylink/dsh-check' },
+  { id: 'dsh-os-kernel', name: '@perrylink/dsh-os-kernel' },
+  { id: '@perrylink/dsh-os-shell', name: '@perrylink/dsh-os-shell' },
 ]
 
 function unquote(value) {
@@ -36,10 +38,10 @@ function parseInsertRows(text) {
   return rows
 }
 
-test('cordis.patch.yml inserts exactly the four core modules', () => {
+test('cordis.patch.yml inserts exactly the six core modules', () => {
   const patch = readFileSync(PATCH_URL, 'utf8')
   assert.deepEqual(parseInsertRows(patch), EXPECTED)
-  assert.equal((patch.match(/^\s*-\s+id:/gm) ?? []).length, 4)
+  assert.equal((patch.match(/^\s*-\s+id:/gm) ?? []).length, 6)
 })
 
 test('patch rows carry no config payload', () => {
@@ -51,7 +53,7 @@ test('manifest stays dependency-only and points at the patch', () => {
   const manifest = JSON.parse(readFileSync(PACKAGE_URL, 'utf8'))
 
   assert.equal(manifest.name, 'dsh-os-kit')
-  assert.equal(manifest.version, '0.4.0')
+  assert.equal(manifest.version, '0.5.0')
   assert.deepEqual(
     Object.keys(manifest.dependencies).sort(),
     EXPECTED.map(row => row.name).sort(),
@@ -61,9 +63,12 @@ test('manifest stays dependency-only and points at the patch', () => {
     'dsh-allow': '^0.4.0',
     'dsh-snip': '^0.2.0',
     '@perrylink/dsh-check': '^0.3.0',
+    '@perrylink/dsh-os-kernel': '^0.2.0',
+    '@perrylink/dsh-os-shell': '^0.3.0',
   }
   for (const [name, range] of Object.entries(manifest.dependencies)) assert.equal(range, ranges[name])
 
+  assert.equal(manifest.engines.dsh, '>=0.2.1-rc.2 <0.3.0-0')
   assert.deepEqual(manifest.dsh.bundle, { patch: './cordis.patch.yml' })
   assert.deepEqual(manifest.dsh.os, {
     service: null,
@@ -71,7 +76,7 @@ test('manifest stays dependency-only and points at the patch', () => {
     capabilities: [],
     tools: [],
     stability: 'experimental',
-    since: '0.4.0',
+    since: '0.5.0',
   })
 })
 

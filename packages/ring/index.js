@@ -7,11 +7,18 @@
  * explicit `configureChannels()` lets a tick or `notify()` deliver through
  * webhook, ntfy or console. `notify()` records a delivery receipt on success
  * and failure, deduped per case/channel/level. Delivery is bounded, best-effort
- * and never approves anything. Plain ESM, no runtime dependencies.
+ * and never approves anything.
+ *
+ * 0.4.0 gates egress behind an Allow Grant for `ring:notify`: `notify()` needs
+ * `options.subject`, tick uses the configured `subject`, and a missing Grant
+ * fails closed (`E_DENIED`/`grant_required`) or records a `blocked` receipt.
+ * `requireGrant: false` restores the old behavior for tests; the default is
+ * true. Plain ESM, no runtime dependencies.
  * @module dsh-ring
  */
 import { randomUUID } from 'node:crypto'
 import { buildChannels, buildMessage, providerForLabel } from './lib/channels/index.js'
+import { authorize, grantDenied } from './lib/grant.js'
 import { createTools } from './lib/tools.js'
 import { DEFAULT_ESCALATION_CHAIN, DEFAULT_TTL_MS, RISKS, STATES } from './lib/constants.js'
 
@@ -88,12 +95,18 @@ export class RingService {
   #receipts = []
   #channels = new Map()
   #deliveries = new Map()
+  #requireGrant
+  #subject
 
   constructor(ctx, config = {}) {
     this.ctx = ctx
     if (!isObject(config)) fail('E_INPUT', 'config must be an object')
     this.clock = typeof config.now === 'function' ? config.now : () => Date.now()
     readTimestamp(this.clock(), 'config.now()')
+    const requireGrant = config.requireGrant === undefined ? true : config.requireGrant
+    if (typeof requireGrant !== 'boolean') fail('E_INPUT', 'requireGrant must be a boolean')
+    this.#requireGrant = requireGrant
+    if (config.subject !== undefined) this.#subject = readText(config.subject, 'config.subject', 'E_INPUT', 256)
     if (config.channels !== undefined) this.configureChannels(config.channels)
   }
 
@@ -246,10 +259,23 @@ export class RingService {
    * (success or failure); a repeated successful case+channel+level is returned
    * as `{ delivery, deduped: true }` without a second send. Failure rejects
    * with `E_UNAVAILABLE` after the receipt is recorded.
+   *
+   * When `requireGrant` is on (the default), `options.subject` is mandatory
+   * and must hold an active Allow Grant for `ring:notify` at scope `*`. A
+   * missing subject rejects with `E_INVALID_ARGUMENT`; a missing/denied Grant
+   * rejects with `E_DENIED` (`subcode: grant_required`) before any channel is
+   * resolved, so nothing is sent and no receipt is written.
    */
   async notify(caseOrId, options = {}) {
     const kase = this.#mustGet(typeof caseOrId === 'string' ? caseOrId : caseOrId?.id)
     if (!isObject(options)) fail('E_INPUT', 'notify options must be an object')
+    const subject = options.subject === undefined
+      ? undefined
+      : readText(options.subject, 'subject', 'E_INVALID_ARGUMENT', 256)
+    if (this.#requireGrant) {
+      if (subject === undefined) fail('E_INVALID_ARGUMENT', 'notify requires subject when requireGrant is enabled')
+      if (!(await authorize(this.#allow(), subject))) throw grantDenied(subject)
+    }
     const label = options.channel === undefined
       ? kase.escalationChain.find(entry => entry.level === kase.level)?.channel
       : readText(options.channel, 'channel', 'E_INPUT', 64)
@@ -281,6 +307,10 @@ export class RingService {
    * Advance open cases to `now`: expire, deliver t0, then at most one
    * escalation. Configured channels are called best-effort; failures are
    * returned in `deliveries` and never roll back the state machine.
+   *
+   * Automatic delivery uses the configured `subject` and the same
+   * `ring:notify` check; without a Grant tick appends a `blocked` receipt
+   * (`reason: 'grant_required'`) and never calls the channel.
    */
   async tick(now = this.clock()) {
     const at = readTimestamp(now, 'now')
@@ -305,10 +335,16 @@ export class RingService {
         kase.notifiedAt = at
         kase.updatedAt = at
         const sent = await this.#deliver(kase, t0.channel, at, deliveries)
-        receipts.push(this.#record(kase, 'delivery', at, {
-          channel: t0.channel, to: 't0', source: 'tick',
-          ...(sent === null ? { delivered: false } : { delivered: true, ...sent }),
-        }))
+        if (sent?.blocked === true) {
+          receipts.push(this.#record(kase, 'blocked', at, {
+            channel: t0.channel, to: 't0', source: 'tick', reason: 'grant_required', delivered: false,
+          }))
+        } else {
+          receipts.push(this.#record(kase, 'delivery', at, {
+            channel: t0.channel, to: 't0', source: 'tick',
+            ...(sent === null ? { delivered: false } : { delivered: true, ...sent }),
+          }))
+        }
         changed.add(kase.id)
       }
       if (!['notified', 'escalated'].includes(kase.state)) continue
@@ -323,7 +359,12 @@ export class RingService {
       kase.updatedAt = at
       receipts.push(this.#record(kase, 'escalation', at, { channel: next.channel, to: `t${next.level}`, source: 'tick' }))
       changed.add(kase.id)
-      await this.#deliver(kase, next.channel, at, deliveries)
+      const sent = await this.#deliver(kase, next.channel, at, deliveries)
+      if (sent?.blocked === true) {
+        receipts.push(this.#record(kase, 'blocked', at, {
+          channel: next.channel, to: `t${next.level}`, source: 'tick', reason: 'grant_required', delivered: false,
+        }))
+      }
     }
     return {
       now: at,
@@ -342,6 +383,9 @@ export class RingService {
     if (prior !== undefined) {
       return { ok: prior.ok, error: prior.error, dedupeKey, ...(prior.status === undefined ? {} : { status: prior.status }) }
     }
+    if (this.#requireGrant && !(await authorize(this.#allow(), this.#subject))) {
+      return { blocked: true, reason: 'grant_required', channel: provider, dedupeKey }
+    }
     let delivery
     try {
       const result = await this.#channels.get(provider).send(buildMessage(kase, label, at))
@@ -357,6 +401,21 @@ export class RingService {
 
   #dedupeKey(kase, channel) {
     return `${kase.id}:t${kase.level}:${channel ?? 'none'}`
+  }
+
+  /** Resolve the optional Allow service through `ctx.get('allow')` or `ctx.allow`. */
+  #allow() {
+    const ctx = this.ctx
+    if (ctx === undefined || ctx === null) return null
+    if (typeof ctx.get === 'function') {
+      try {
+        const service = ctx.get('allow')
+        if (service !== undefined && service !== null) return service
+      } catch {
+        // A throwing service is not a Grant.
+      }
+    }
+    return ctx.allow ?? null
   }
 
   #recordDelivery(kase, delivery) {

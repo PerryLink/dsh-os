@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.4.0
+
+- Add an `os.result/v1` envelope to `seek_search`:
+  `{ schema, ok, tool, summary, items, page, truncated, next, error }` next to
+  the unchanged `{ query, hits, total, errors }`. `items` and `hits` are the
+  same page; `summary` reports the merged hit count (≤200 chars).
+- Default limit is 10 and is capped at 50; add the optional `offset` argument.
+  `page` reports `{ limit, offset, returned, total, hasMore }`; `next` suggests
+  the next `seek_search` page, `seek_resolve` for the top hit, or
+  `seek_providers` when no provider returned a hit.
+- Add `SeekService.searchPage()` with an `offset` window and one-hit probe so
+  `page.hasMore` is honest; `SeekService.search()` still returns exactly
+  `{ query, hits, total, errors }`.
+- Documented argument errors still throw with their existing codes; unexpected
+  failures return `{ ok: false, code, error }` without changing the code.
+- Ship the zero-dependency helper `lib/result.js`; add envelope tests for the
+  default limit, the 50 cap, offset paging, truncation, legacy fields and the
+  failure path.
+
 ## 0.3.0
 
 - Add `SeekService.resolve(ref, { signal, timeoutMs, cwd, agentKey, agent })`.

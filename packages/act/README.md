@@ -2,9 +2,12 @@
 
 > Typed action registry and agent-facing action bus for DeepSeek Harness.
 
-**Status: 0.3.0 — real filesystem actions, previews and undo**
+**Status: 0.4.0 — result envelopes on `act_list`**
 
-0.3.0 turns Act from a demo registry into a usable action bus: the 0.1
+0.4.0 keeps every 0.1/0.3 field and adds a bounded `os.result/v1` envelope to
+`act_list`: `schema`, `ok`, `items`, `summary`, `page`, `truncated`, `next` and
+`error`, with the legacy `actions` array untouched. 0.3.0 turned Act from a
+demo registry into a usable action bus: the 0.1
 `echo` / `now` / `list` actions stay compatible, and four filesystem actions
 (`fs.read` / `fs.write` / `fs.list` / `fs.undo`) execute real work behind one
 grant, preview and undo pipeline. The action panel and `dsh-act` CLI are still
@@ -212,8 +215,12 @@ original `reason`.
 
 ## Agent tools
 
-- `act_list` — read-only; optional `query` string; returns `{ actions }` with
-  `id`, `title`, `risk` and optional `description`.
+- `act_list` — read-only; optional `query` string. Returns the `os.result/v1`
+  envelope plus the unchanged `actions` array (each with `id`, `title`, `risk`
+  and optional `description`). `summary` is `"N actions"`; `page` reports the
+  returned/total count; `next` suggests `act_invoke` and, for a write/danger
+  action, `allow_request`. Failures return `{ ok: false, code, error }` while
+  keeping the original `code`.
 - `act_invoke` — `id` required, `args` optional object, `preview` optional
   boolean. The effective risk is the target descriptor's risk; `write` /
   `danger` actions still go through the Allow check above.
@@ -227,7 +234,8 @@ node --test
 
 The suite covers reads, writes, listing, path traversal and symlink escapes,
 missing grants and hints, previews that do not touch disk, undo (restore,
-created-file removal, stale detection), read/write caps and `act_list` risks.
+created-file removal, stale detection), read/write caps, `act_list` risks and
+the 0.4.0 envelope (summary/page/next, legacy `actions`, failure `error`).
 
 ## License
 

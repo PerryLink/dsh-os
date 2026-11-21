@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.4.0
+
+- Add a bounded `os.result/v1` envelope to `check_compare` while leaving the
+  `dsh.check.diff/v1` report fields untouched: `schema`, `ok`, `tool`,
+  `summaryText` (≤200 chars), `regressions`, `warnings`, `page`, `truncated`,
+  `next` and `error`. The legacy `summary` counts object, `verdict`, `tasks`
+  and `allowFlaky` keep their existing shape and values.
+- `regressions`/`warnings` flatten the per-task diffs with `taskId`,
+  `dimension`, optional `metric` and `message` (full `old`/`new` stay in `tasks`);
+at most 20 of each
+  are returned and `page.hasMore`/`truncated` report the cut.
+- `next` suggests `check_run` for a regression and `check_compare` with
+  `allowFlaky` for warnings; a clean pass returns `next: []`.
+- Validation failures (for example an invalid run shape) return
+  `{ ok: false, code, error }` without changing the original `code`; missing
+  `old`/`new` arguments still throw as before.
+- Ship the zero-dependency helpers `lib/result.js` and
+  `lib/compare-envelope.js`; add envelope tests for pass/regression/warning,
+  field compatibility and the failure path.
+
 ## 0.3.0
 
 - Gate the `check_run` agent tool behind an Allow Grant for capability

@@ -1,6 +1,8 @@
 /**
  * dsh-snip — local-first clipboard ledger for DeepSeek Harness.
  *
+ * 0.3.0 adds an `os.result/v1` envelope to `snip_search` (default limit 20,
+ * max 100, `page`/`truncated`/`next`/`error`) while keeping `query`/`entries`.
  * 0.2.0 adds explicit OS clipboard capture through `lib/capture.js`. Capture
  * is disabled by default: nothing is read until the caller sets
  * `capture.enabled` or asks via `snip_capture` / `snip_watch_start`. Secret
@@ -8,6 +10,7 @@
  * @module dsh-snip
  */
 import { KINDS, SENSITIVITIES, SnipService, fail } from './lib/ledger.js'
+import { failEnvelope, okEnvelope, pageOf, step } from './lib/result.js'
 
 export { SnipService, detectSecret } from './lib/ledger.js'
 export {
@@ -25,6 +28,18 @@ export const inject = ['tools']
 const TOOL_OUTPUT = {
   schema: { type: 'object', additionalProperties: true },
   render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
+}
+
+const DEFAULT_SEARCH_LIMIT = 20
+const MAX_SEARCH_LIMIT = 100
+
+/** Clamp search paging to the tool budget; invalid values fall back to defaults. */
+function searchLimit(value) {
+  return Number.isInteger(value) && value >= 1 ? Math.min(value, MAX_SEARCH_LIMIT) : DEFAULT_SEARCH_LIMIT
+}
+
+function searchOffset(value) {
+  return Number.isInteger(value) && value >= 0 ? value : 0
 }
 
 function tool(name, description, parameters, run) {
@@ -90,17 +105,63 @@ export function makeTools(service) {
     ),
     tool(
       'snip_search',
-      'Search the local Snip ledger (case-insensitive substring) and return matching handles and previews.',
+      'Search the local Snip ledger (case-insensitive substring) and return matching handles and previews. '
+        + 'Returns an os.result/v1 envelope with paging (default limit 20, max 100).',
       {
         type: 'object',
         additionalProperties: false,
         required: ['query'],
         properties: {
           query: { type: 'string', description: 'Text to look for.' },
-          limit: { type: 'integer', minimum: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: MAX_SEARCH_LIMIT, default: DEFAULT_SEARCH_LIMIT, description: 'Matches per page (default 20, max 100).' },
+          offset: { type: 'integer', minimum: 0, default: 0, description: 'Matches to skip for the next page.' },
         },
       },
-      args => ({ query: args.query, entries: service.search(args.query, { limit: args.limit }) }),
+      async args => {
+        const limit = searchLimit(args.limit)
+        const offset = searchOffset(args.offset)
+        try {
+          const found = service.searchPage(args.query, { limit, offset })
+          const items = found.entries
+          const page = pageOf({ limit, offset, returned: items.length, total: found.total })
+          const next = []
+          if (page.hasMore) {
+            next.push(step('snip_search', { query: args.query, limit, offset: offset + items.length }, 'Fetch the next page of matches.'))
+          }
+          if (items.length > 0) {
+            next.push(step('snip_get', { id: items[0].id }, 'Read the full text of the newest match.'))
+          }
+          if (items.length === 0 && offset > 0) {
+            next.push(step('snip_search', { query: args.query, limit, offset: Math.max(0, offset - limit) }, 'Go back to the previous page.'))
+          }
+          if (items.length === 0 && offset === 0) {
+            next.push(step('snip_list', { limit }, 'No matches; browse recent clippings.'))
+          }
+          const summary = found.total === 0
+            ? `No clippings matching "${args.query}"`
+            : `${found.total} clipping${found.total === 1 ? '' : 's'} matching "${args.query}"`
+          return okEnvelope('snip_search', {
+            items,
+            summary,
+            page,
+            truncated: page.hasMore,
+            next,
+            legacy: { query: args.query, entries: items },
+          })
+        } catch (error) {
+          const retryable = error?.code === 'SNIP_STATE_WRITE_FAILED'
+          return failEnvelope('snip_search', error, {
+            retryable,
+            remediation: error?.code === 'SNIP_BAD_QUERY'
+              ? 'Pass a non-empty query string, then retry.'
+              : retryable
+                ? 'Check ledger disk space and permissions, then retry.'
+                : 'Check the ledger state, then retry.',
+            nextTools: [step('snip_list', { limit }, 'Browse clippings without a query.')],
+            legacy: { query: args.query, entries: [] },
+          })
+        }
+      },
     ),
     tool(
       'snip_get',

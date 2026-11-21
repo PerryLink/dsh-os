@@ -1,23 +1,24 @@
 /**
  * dsh-check — paired-environment regression canary for DeepSeek Harness.
  *
+ * 0.4.0 adds a bounded `os.result/v1` envelope to `check_compare`
+ * (`summaryText` ≤200 chars, `page`, `truncated`, `next`, `error`) while keeping
+ * the legacy `summary` counts object, `verdict`, `tasks` and `allowFlaky`.
  * 0.3.0 adds safety defaults to the real headless runner: `check_run` needs a
  * Grant, a rolling-hour budget, an allowlisted env and a prompt-free audit.
  * @module dsh-check
  */
 import { isDeepStrictEqual } from 'node:util'
+import { compareEnvelope, compareFailure } from './lib/compare-envelope.js'
 import {
   CAP_ACT_CHECK_RUN, CAP_CHECK_RUN, RunBudget, granted, meterFrom, refusal,
 } from './lib/guard.js'
 import { CheckRunner } from './lib/runner.js'
-
 export {
   CheckRunner, DEFAULT_TIMEOUT_MS, MAX_OUTPUT_BYTES, parseOutput, sanitizeEnv, summarizeEvents,
 } from './lib/runner.js'
-
 /** Cordis plugin name. */
 export const name = 'dsh-check'
-
 /** The diff service works without tools; the agent tool needs the registry. */
 export const inject = ['tools']
 
@@ -365,7 +366,11 @@ function compareTool(check) {
       if (!isObject(args) || args.old === undefined || args.new === undefined) {
         throw fail('invalid_arguments', 'check_compare requires old and new run objects')
       }
-      return check.compare(args.old, args.new, { allowFlaky: args.allowFlaky })
+      try {
+        return compareEnvelope(check.compare(args.old, args.new, { allowFlaky: args.allowFlaky }))
+      } catch (error) {
+        return compareFailure(error)
+      }
     },
   }
 }

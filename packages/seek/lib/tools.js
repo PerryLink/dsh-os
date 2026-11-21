@@ -6,9 +6,30 @@
 
 import { registerDefaultProviders } from './providers/index.js'
 import { agentKeyOf } from './providers/util.js'
+import { failEnvelope, okEnvelope, pageOf, step } from './result.js'
 
-/** Keep in sync with `MAX_LIMIT` in index.js. */
-const MAX_LIMIT = 100
+/** Tool paging budget; `MAX_LIMIT` here is deliberately tighter than the service's. */
+const DEFAULT_LIMIT = 10
+const MAX_LIMIT = 50
+/** Errors the service already exposes as stable, documented codes: keep throwing them. */
+const THROWN_CODES = new Set([
+  'invalid_query', 'invalid_options', 'invalid_limit', 'invalid_sources',
+  'invalid_timeout', 'invalid_signal', 'aborted',
+])
+
+/** Validate and clamp the tool page size, matching the service's `invalid_limit`. */
+function limitOf(value) {
+  if (value === undefined) return DEFAULT_LIMIT
+  if (!Number.isInteger(value) || value < 1) {
+    throw Object.assign(new Error('seek: limit must be a positive integer'), { code: 'invalid_limit' })
+  }
+  return Math.min(value, MAX_LIMIT)
+}
+
+/** Clamp the tool page offset. */
+function offsetOf(value) {
+  return Number.isInteger(value) && value >= 0 ? value : 0
+}
 
 /** Build a plain-object tool definition accepted by the host. */
 function tool(name, description, parameters, execute) {
@@ -39,7 +60,9 @@ function callerOf(exec) {
 function searchTool(service) {
   return tool(
     'seek_search',
-    'Search registered evidence providers and return deduplicated hits with dsh:// refs, a resolvable marker and per-provider errors.',
+    'Search registered evidence providers and return deduplicated hits with dsh:// refs, '
+      + 'a resolvable marker and per-provider errors. Returns an os.result/v1 envelope '
+      + 'with paging (default limit 10, max 50).',
     {
       type: 'object',
       additionalProperties: false,
@@ -55,15 +78,70 @@ function searchTool(service) {
           type: 'integer',
           minimum: 1,
           maximum: MAX_LIMIT,
-          description: 'Maximum hits to return (default 10).',
+          default: DEFAULT_LIMIT,
+          description: 'Maximum hits per page (default 10, max 50).',
+        },
+        offset: {
+          type: 'integer',
+          minimum: 0,
+          default: 0,
+          description: 'Merged hits to skip for the next page.',
         },
       },
     },
-    async (args, exec) => service.search(args?.query, {
-      sources: args?.sources,
-      limit: args?.limit,
-      ...callerOf(exec),
-    }),
+    async (args, exec) => {
+      const limit = limitOf(args?.limit)
+      const offset = offsetOf(args?.offset)
+      try {
+        const found = await service.searchPage(args?.query, {
+          sources: args?.sources,
+          limit,
+          offset,
+          probe: true,
+          ...callerOf(exec),
+        })
+        const items = found.hits
+        const page = pageOf({ limit, offset, returned: items.length, total: found.matched })
+        const retry = {
+          query: found.query,
+          ...(Array.isArray(args?.sources) ? { sources: args.sources } : {}),
+          limit,
+        }
+        const next = []
+        if (page.hasMore) {
+          next.push(step('seek_search', { ...retry, offset: offset + items.length }, 'Fetch the next page of merged hits.'))
+        }
+        if (items.length > 0) {
+          next.push(step('seek_resolve', { ref: items[0].ref }, 'Verify the top hit through its provider.'))
+        }
+        if (items.length === 0 && offset > 0) {
+          next.push(step('seek_search', { ...retry, offset: Math.max(0, offset - limit) }, 'Go back to the previous page.'))
+        }
+        if (items.length === 0 && offset === 0) {
+          next.push(step('seek_providers', {}, 'No hits; check which providers are ready.'))
+        }
+        const errorCount = found.errors.length
+        const count = page.hasMore ? `${found.matched}+` : String(found.matched)
+        const summary = found.matched === 0
+          ? `No hits for "${found.query}"${errorCount > 0 ? ` (${errorCount} provider error(s))` : ''}`
+          : `${count} hits for "${found.query}"${errorCount > 0 ? ` (${errorCount} provider error(s))` : ''}`
+        return okEnvelope('seek_search', {
+          items,
+          summary,
+          page,
+          truncated: page.hasMore,
+          next,
+          legacy: { query: found.query, hits: items, total: found.total, errors: found.errors },
+        })
+      } catch (error) {
+        if (THROWN_CODES.has(error?.code)) throw error
+        return failEnvelope('seek_search', error, {
+          remediation: 'Check provider health with seek_providers, then retry.',
+          nextTools: [step('seek_providers', {}, 'Check which providers are ready.')],
+          legacy: { query: args?.query, hits: [], total: 0, errors: [] },
+        })
+      }
+    },
   )
 }
 

@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.4.0
+
+- **Grant-gated egress.** Every outbound delivery now asks Allow for
+  capability `ring:notify` at scope `*` before it reaches a channel. The gate
+  is on by default (`requireGrant: true`); `requireGrant: false` restores the
+  0.3 behavior for tests and staged migrations and is not for production.
+- `notify(caseOrId, { channel?, subject })`: `subject` is required while the
+  gate is on and is checked before any channel or receipt is touched. A
+  missing/blank subject rejects with `E_INVALID_ARGUMENT`; no Allow service,
+  no matching Grant, a scope mismatch, a revoked/exhausted Grant or a throwing
+  `check()` rejects with `E_DENIED`, `subcode: 'grant_required'`, and
+  `nextTools: [{ tool: 'allow_request', ... }]`. A denial sends nothing and
+  writes **no** receipt, because the page never executed.
+- `ring_notify` forwards the calling `exec.subject`; it has no subject
+  argument, so a model cannot assert an identity, and it never falls back to
+  `'anonymous'`.
+- `tick()` / `ring_tick` automatic delivery goes through the same check using
+  the plugin-level `subject` config. Without a Grant (or without a configured
+  subject) the SLA still advances, but tick appends a `blocked` receipt with
+  `reason: 'grant_required'` and `delivered: false` and never calls the
+  channel.
+- Add `lib/grant.js` (capability constant, fail-closed Allow adapter, refusal
+  builder) and `blocked` to the receipt kinds. README documents the Grant
+  contract, the subject rules and the `requireGrant` escape hatch.
+- Tests cover denial without receipt/send, a real Allow Grant send plus
+  receipt, missing/blank subject, missing Allow service, a throwing Allow
+  service, tick blocked without a Grant (and without a subject), and tick
+  delivery with a Grant.
+
 ## 0.3.0
 
 - `notify()` now writes a `delivery` receipt for **both** outcomes, so an agent

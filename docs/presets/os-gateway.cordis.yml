@@ -1,0 +1,36 @@
+# dsh-os gateway preset: only the six os_* verbs reach the model.
+# Merge this `insert` row into $DSH_HOME/profiles/<profile>/cordis.patch.yml.
+# Install @perrylink/dsh-os-kernel; keep dsh-allow mounted in the same profile
+# (outside this preset) so the kernel can resolve ctx.allow.
+- insert:
+    - id: preset-os-gateway
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: os-gateway
+        name: OS Gateway
+        description: Only os_find / os_do / os_request / os_observe / os_help / os_status.
+        order: 4
+        plugins:
+          - id: os-persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              prefix: >-
+                You reach the operating system only through the six os_* verbs.
+                Discover with os_find, request write/execute access with
+                os_request, refresh an approval with os_observe, then execute
+                with os_do. Never assume a grant exists.
+              complete: true
+              includeRuntimeContext: false
+          # Isolate the kernel service so this preset can coexist with a
+          # globally mounted kernel without registering the service twice.
+          - id: os-kernel-group
+            name: cordis:group
+            group: true
+            isolate:
+              kernel: true
+            config:
+              - id: os-kernel
+                name: '@perrylink/dsh-os-kernel'
+                config:
+                  gatewayOnly: true
+                  # stateFile: /home/you/.dsh/os-kernel-idempotency.json

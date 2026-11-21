@@ -107,7 +107,7 @@ export async function runScenario(scenario) {
 
   async function intervene(kind) {
     if (!scenario.allowedInterventions?.includes(kind)) throw new Error(`intervention not allowed: ${kind}`)
-    if (interventions.some(item => item.kind === kind)) throw new Error(`intervention already used: ${kind}`)
+    if (kind !== 'human.approve' && interventions.some(item => item.kind === kind)) throw new Error(`intervention already used: ${kind}`)
     const allow = () => env.ctx.get('allow')
     const implementations = {
       'human.approve': () => {

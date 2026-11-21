@@ -24,7 +24,7 @@ export default {
     'Ring 默认无 channel',
     'trigger run 现记录 path 与脱敏 payload；ring_notify 成功/失败都写 delivery receipt',
   ],
-  allowedInterventions: ['host.configureChannel'],
+  allowedInterventions: ['host.configureChannel', 'human.approve'],
   success: [
     'check_compare verdict=regression',
     'fs.change 事件产生 trigger run',
@@ -33,9 +33,9 @@ export default {
     'trigger run 记录 fs.change 及变更路径 app.txt',
     'ring receipts 含 delivery（ok=true）',
   ],
-  maxSteps: 16,
+  maxSteps: 20,
   expectedFirstTool: 'trigger_register',
-  allowedTools: ['trigger_register', 'trigger_source_start', 'trigger_sources', 'trigger_runs', 'trigger_source_stop', 'check_compare', 'ring_raise', 'ring_escalate', 'ring_notify', 'ring_channels', 'ring_receipts'],
+  allowedTools: ['trigger_register', 'trigger_source_start', 'trigger_sources', 'trigger_runs', 'trigger_source_stop', 'check_compare', 'ring_raise', 'ring_escalate', 'ring_notify', 'ring_channels', 'ring_receipts', 'allow_request', 'allow_wait'],
   async setup(env) {
     const dir = env.temp('dsh-eval-upgrade-')
     env.cwd = dir
@@ -59,11 +59,15 @@ export default {
     const id = raised?.case?.id
     ai.state.caseId = id
     await ai.call('ring_escalate', { id })
+    // Ring 0.4 requires a Grant for external delivery; ask the human once.
+    await ai.approval('ring:notify', 'deliver the escalation receipt')
     // No channel yet: this is a real recoverable failure, not a scripted pass.
     const early = await ai.call('ring_notify', { id })
     ai.state.earlyNotify = early?.ok === false ? early?.error?.code ?? early?.code ?? 'failed' : 'unexpected-ok'
     await ai.call('ring_channels', {})
     await ai.intervene('host.configureChannel')
+    // A failed delivery still consumed the one-time Grant; ask once more.
+    await ai.approval('ring:notify', 'deliver after the channel is configured')
     const notified = await ai.call('ring_notify', { id })
     ai.state.delivery = notified?.delivery ?? null
     await ai.call('ring_receipts', { id })

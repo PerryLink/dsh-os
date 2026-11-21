@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.0
+
+- Add a bounded `os.result/v1` envelope to `act_list`:
+  `{ schema, ok, tool, summary, items, page, truncated, next, error }`.
+  `summary` is `"N actions"` (≤200 chars), `page` reports
+  `{ limit, offset, returned, total, hasMore }`, and `next` suggests
+  `act_invoke` (plus `allow_request` for a write/danger action).
+- Keep the legacy `actions` array byte-for-byte compatible; it still carries
+  each action's `id`, `title`, `risk` and optional `description`.
+- Return failures as `{ ok: false, code, error }` without changing the original
+  `code`; `error` carries `{ code, message, retryable, remediation, nextTools }`.
+- Ship the zero-dependency helper `lib/result.js`; add envelope tests for
+  fields, filtering, `next`, and failure compatibility.
+
 ## 0.3.0
 
 - Add four real filesystem actions:

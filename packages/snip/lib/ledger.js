@@ -349,14 +349,23 @@ export class SnipService {
 
   /** Case-insensitive substring search over stored text (redacted text included). */
   search(query, options = {}) {
+    return this.searchPage(query, options).entries
+  }
+
+  /**
+   * Paged search: returns the requested window plus the full match count so a
+   * tool envelope can report `page.total`/`hasMore` without re-scanning.
+   */
+  searchPage(query, options = {}) {
     const needle = typeof query === 'string' ? query.trim().toLowerCase() : ''
     if (!needle) throw fail('SNIP_BAD_QUERY', 'snip: query must be a non-empty string')
     this.#sweepAndCommit()
-    return [...this.#entries.values()]
+    const matches = [...this.#entries.values()]
       .reverse()
       .filter(entry => entry.text.toLowerCase().includes(needle))
-      .slice(0, requestedLimit(options?.limit, this.#maxEntries))
-      .map(summaryOf)
+    const limit = requestedLimit(options?.limit, this.#maxEntries)
+    const offset = Number.isInteger(options?.offset) && options.offset >= 1 ? options.offset : 0
+    return { total: matches.length, limit, offset, entries: matches.slice(offset, offset + limit).map(summaryOf) }
   }
 
   /** Full entry (including text) by id or `clipboard://` handle; null if absent. */

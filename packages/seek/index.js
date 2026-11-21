@@ -1,6 +1,10 @@
 /**
  * dsh-seek — cross-source evidence search for DeepSeek Harness.
  *
+ * 0.4.0 adds an `os.result/v1` envelope to `seek_search` (default limit 10,
+ * max 50, `page`/`truncated`/`next`/`error`) while keeping the legacy
+ * `{ query, hits, total, errors }` fields.
+ *
  * `ctx.evidence` fans one query out to named providers, normalizes and
  * deduplicates their hits, and returns a partial result plus per-provider
  * errors. It also routes one `dsh://` ref to the matching provider's optional
@@ -21,6 +25,8 @@ export const inject = ['tools']
 
 const DEFAULT_LIMIT = 10
 const MAX_LIMIT = 100
+/** Fetch window used by `searchPage` so an offset page has candidates to skip. */
+const MAX_FETCH_LIMIT = 500
 /** Default per-provider budget; a hanging provider never blocks the query for longer. */
 export const DEFAULT_TIMEOUT_MS = 10_000
 /** Refs longer than this are rejected instead of being passed around as evidence. */
@@ -87,6 +93,15 @@ function limitOf(value) {
     throw fail('invalid_limit', 'seek: limit must be a positive integer')
   }
   return Math.min(value, MAX_LIMIT)
+}
+
+/** Normalize a page offset; only used by `searchPage`. */
+function offsetOf(value) {
+  if (value === undefined) return 0
+  if (!Number.isInteger(value) || value < 0) {
+    throw fail('invalid_offset', 'seek: offset must be a non-negative integer')
+  }
+  return value
 }
 
 /**
@@ -215,6 +230,15 @@ export class SeekService {
    * @returns {Promise<{ query: string, hits: object[], total: number, errors: object[] }>}
    */
   async search(query, options = {}) {
+    const result = await this.searchPage(query, plainObject(options) ? { ...options, probe: false } : options)
+    return { query: result.query, hits: result.hits, total: result.total, errors: result.errors }
+  }
+
+  /**
+   * `search` plus `matched` (the deduplicated count before the page window) and
+   * an `offset` option, used by the tool envelope for paging.
+   */
+  async searchPage(query, options = {}) {
     if (typeof query !== 'string' || query.trim() === '') {
       throw fail('invalid_query', 'seek: query must be a non-empty string')
     }
@@ -224,6 +248,9 @@ export class SeekService {
 
     const text = query.trim()
     const limit = limitOf(options.limit)
+    const offset = offsetOf(options.offset)
+    const probe = options.probe === true ? 1 : 0
+    const fetchLimit = Math.min(offset + limit + probe, MAX_FETCH_LIMIT)
     const timeoutMs = timeoutOf(options.timeoutMs)
     const signal = signalOf(options.signal)
     if (signal !== undefined && signal.aborted) throw abortedError()
@@ -234,7 +261,7 @@ export class SeekService {
     }
     const selected = this.#select(options.sources)
     const settled = await Promise.allSettled(
-      selected.map(provider => askProvider(provider, text, { limit, timeoutMs, signal, ...caller })),
+      selected.map(provider => askProvider(provider, text, { limit: fetchLimit, timeoutMs, signal, ...caller })),
     )
     if (signal !== undefined && signal.aborted) throw abortedError()
 
@@ -284,8 +311,8 @@ export class SeekService {
 
     const hits = [...byRef.values()].sort((a, b) => scoreOf(b) - scoreOf(a)
       || (a.source < b.source ? -1 : a.source > b.source ? 1 : 0))
-    if (hits.length > limit) hits.length = limit
-    return { query: text, hits, total: hits.length, errors }
+    const page = hits.slice(offset, offset + limit)
+    return { query: text, hits: page, total: page.length, matched: hits.length, errors }
   }
 
   /**

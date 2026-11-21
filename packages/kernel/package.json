@@ -1,7 +1,7 @@
 {
   "name": "@perrylink/dsh-os-kernel",
-  "version": "0.2.0",
-  "description": "Thin capability kernel for dsh-os: descriptor protocol, registry, legacy tool bridge and six os_* agent verbs.",
+  "version": "0.3.0",
+  "description": "Thin capability kernel for dsh-os: descriptor protocol, registry, legacy tool bridge, six os_* verbs, Allow grant bridge and optional idempotency journal.",
   "type": "module",
   "main": "index.js",
   "exports": {
@@ -12,7 +12,8 @@
     "./gateway": "./lib/gateway.js",
     "./package.json": "./package.json",
     "./service": "./lib/service.js",
-    "./envelope": "./lib/envelope.js"
+    "./envelope": "./lib/envelope.js",
+    "./state": "./lib/state.js"
   },
   "files": [
     "index.js",

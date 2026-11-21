@@ -25,12 +25,10 @@ needs only Node 22+; nothing is installed or published.
 [AI handbook](docs/ai-handbook.md) ·
 [Real-model eval](docs/eval-real.md) ·
 [Architecture 0.3](docs/architecture-0.3.md) ·
-[AI handbook](docs/ai-handbook.md) ·
-[Real-model eval](docs/eval-real.md) ·
-[Architecture 0.3](docs/architecture-0.3.md) ·
 [AI capability cards](docs/ai-capability-cards.md) ·
 [Validation plan](docs/validation/PLAN.md) ·
-[0.2.0 smoke](docs/validation/SMOKE.md) ·
+[Validation status](docs/validation/STATUS.md) ·
+[Local smoke (0.2.0)](docs/validation/SMOKE.md) ·
 [Recipes](docs/recipes/) (CI gate, agent writes, clipboard) ·
 [Troubleshooting](docs/troubleshooting.md).
 
@@ -38,16 +36,16 @@ needs only Node 22+; nothing is installed or published.
 
 | Product | Package | Status | Design |
 |---|---|---|---|
-| **Act** | `dsh-act` | 0.3.0 (real fs actions) | [design](docs/design/01-act.md) |
+| **Act** | `dsh-act` | 0.4.0 (fs + envelope) | [design](docs/design/01-act.md) |
 | **Allow** | `dsh-allow` | 0.4.0 (one-time grants) | [design](docs/design/02-allow.md) |
-| **Snip** | `dsh-snip` | 0.2.0 (Win/mac/Linux capture) | [design](docs/design/03-snip.md) |
-| **Check** | `@perrylink/dsh-check` | 0.3.0 (runner + security) | [design](docs/design/04-check.md) |
+| **Snip** | `dsh-snip` | 0.3.0 (capture + envelope) | [design](docs/design/03-snip.md) |
+| **Check** | `@perrylink/dsh-check` | 0.4.0 (runner + envelope) | [design](docs/design/04-check.md) |
 | **Nest** | `dsh-nest` | 0.1.0 MVP | [design](docs/design/05-nest.md) |
 | **Trigger** | `dsh-trigger` | 0.3.0 (payload + sources) | [design](docs/design/06-trigger.md) |
-| **Seek** | `dsh-seek` | 0.3.0 (providers + resolve) | [design](docs/design/07-seek.md) |
+| **Seek** | `dsh-seek` | 0.4.0 (providers + envelope) | [design](docs/design/07-seek.md) |
 | **Trace** | `@perrylink/dsh-trace` | 0.3.0 (memento + ref verify) | [design](docs/design/08-trace.md) |
 | **Stage** | `dsh-stage` | 0.2.0 (macOS/Windows adapters) | [design](docs/design/09-stage.md) |
-| **Ring** | `dsh-ring` | 0.3.0 (channels + receipts) | [design](docs/design/10-ring.md) |
+| **Ring** | `dsh-ring` | 0.4.0 (Grant-gated delivery) | [design](docs/design/10-ring.md) |
 | **Root** | `@perrylink/dsh-root` | 0.1.2 MVP | [design](docs/design/11-root.md) |
 | **Help** | `dsh-help` | 0.1.0 optional | install doctor / first run |
 | **Context** | `@perrylink/dsh-context` | 0.1.0 optional | context provider protocol |
@@ -57,8 +55,8 @@ needs only Node 22+; nothing is installed or published.
 | **Shell** | `@perrylink/dsh-os-shell` | 0.3.0 optional | approvals + activity tabs |
 | **CLI** | `@perrylink/dsh-os-cli` | 0.2.0 tool | `dsh-os list/doctor/install/approvals` |
 | **Contract** | `@perrylink/dsh-os-contract` | 0.2.0 library | result/error/handle protocols |
-| **Kit** | `dsh-os-kit` | 0.4.0 meta bundle | installs Act/Allow 0.4 + Snip/Check 0.3 |
-| **Kernel** | `@perrylink/dsh-os-kernel` | 0.2.0 core | 76 legacy tools + `os_*` verbs |
+| **Kit** | `dsh-os-kit` | 0.5.0 meta bundle | installs 6: core four + Kernel + Shell |
+| **Kernel** | `@perrylink/dsh-os-kernel` | 0.3.0 core | 76 legacy tools + approval bridge |
 | **MCP** | `@perrylink/dsh-os-mcp` | 0.2.0 tool | read-only default + write approval path |
 | **A2A** | `@perrylink/dsh-os-a2a` | 0.1.0 tool | agent card + task protocol prototype |
 
@@ -69,7 +67,7 @@ require it; the product names stay bare.
 ## Install
 
 ```sh
-# one-shot: the four core modules
+# one-shot: core four + Kernel + Shell
 dsh plugin --profile web add dsh-os-kit
 
 # or individually
@@ -122,13 +120,16 @@ scripts/     scaffold, test and publish helpers
 
 ## Status
 
-Twenty-three packages ship a 0.1.x/0.2.x/0.3.x MVP: services, agent tools, tests and a bundle
+Twenty-three packages ship a 0.1.x–0.4.x MVP: services, agent tools, tests and a bundle
 manifest (libraries/CLI where applicable). 0.2.0 added real adapters; 0.3.0 adds the kernel + permission request flow + Act fs actions + human oversight:
 Check headless runner, Snip clipboard capture, Trigger agent/fs/webhook sources,
 Seek locator/memento providers, Stage macOS/Windows windows, Trace memento
 adapter, Ring webhook/ntfy/console channels and the React shell.
+0.4.0 adds one-time/use-budgeted grants (Allow 0.4), the kernel legacy-tool bridge,
+MCP write approval, safer Check runs and the four-module `dsh-os-kit` 0.4.
 `node scripts/test-all.mjs` runs 21 suites; `npm run verify` runs the full
-four-gate release check.
+four-gate release check. See [0.4 release notes](docs/community/release-notes-0.4.md)
+for what is installable and what is still a known limitation.
 
 ## Development
 
@@ -170,17 +171,24 @@ publish `dsh-*` and `@perrylink/*`), an approval-protected environment, and an
 explicit `npm publish` of the reviewed tarballs. The workflow never runs
 `npm publish`.
 
-## Community, RFCs and feedback
+## Community / Validation
 
-- **Launch and support notes:** [docs/community/launch.md](docs/community/launch.md)
-  — what works today, what is still 0.4.0, and the official post / directory
-  submission drafts.
+- **Submission package (prepared, not sent):** [awesome-dsh-plugin PR](docs/community/awesome-pr.md)
+  — exactly one entry (`dsh-allow`); [dsh-market readiness](docs/community/dsh-market.md)
+  — waits for the awesome merge. [launch.md](docs/community/launch.md) is kept as
+  historical notes.
+- **0.4 release notes:** [中文 / English](docs/community/release-notes-0.4.md).
+- **Validation:** [STATUS](docs/validation/STATUS.md) — **0/10 design partner
+  calls, 0/3 active external installs, 0/1 Check POC** as of 2026-11-21; maintainer
+  smoke is separate in [SMOKE.md](docs/validation/SMOKE.md). No invented data.
+- **Official Discussions showcase:** **not posted** — a user-stopped action. The
+  only active path is awesome → dsh-market.
 - **Upstream RFCs (suggestions, not requirements):**
   [`ctx.actions`](docs/rfcs/ctx-actions.md),
   [`ctx.grant`](docs/rfcs/ctx-grant.md),
   [`ctx.triggers`](docs/rfcs/ctx-triggers.md).
-- **Telemetry:** [docs/telemetry.md](docs/telemetry.md) — off by default; no
-  telemetry or network code ships in 0.1.x.
+- **Telemetry:** [docs/telemetry.md](docs/telemetry.md) — off by default; the
+  default runtime ships no telemetry or network code.
 - **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md),
   [issue templates](.github/ISSUE_TEMPLATE/) and the
   [pull request template](.github/PULL_REQUEST_TEMPLATE.md).

@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.3.0 — 2026-11-21
+
+### Added
+
+- **Permission bridge closes the loop.** `os_observe({requestId})` pulls the
+  latest request from Allow (`ctx.allow.requests`, then `wait`/`get`), and on
+  `approved` calls `ctx.allow.check` once, caches the consumed Grant and
+  reports `grantAvailable`. The next `os_do` with the same id, args and subject
+  uses it automatically; no host-injected grant is needed. Replays and
+  exhausted Grants stay `E_DENIED`. Cached approvals are bound to
+  `subject + capability + args fingerprint`; `os_request` records only the
+  fingerprint, never the args.
+- **Optional idempotency journal.** `apply(ctx, { stateFile })` persists
+  `{ argsHash, result }` per subject + capability + key, returns the original
+  `OsResult` after a restart, and rejects key reuse with different args as
+  `E_CONFLICT`. Atomic writes, mode `0600`, 500-entry bound, no args stored.
+- **`config.gatewayOnly`.** In a scoped agent/preset mount it registers the six
+  verbs and calls `ctx.tools.restrict({ deny: [...] })` for every inherited
+  non-`os_*` tool; a global mount fails closed. The legacy bridge enumerates
+  the global view under this mode, so hidden tools remain reachable as
+  capabilities.
+- `docs/presets/os-gateway.md` + `.cordis.yml`: copyable preset row and the
+  `toolFilter` vs. `ctx.tools.restrict` distinction.
+- Exports `capabilityName()`, `CAPABILITY_PREFIX`, `createStateStore`,
+  `STATE_VERSION`, `MAX_ENTRIES`; tests for the real `dsh-allow` bridge,
+  observe refresh, one-shot replay, args binding, restart-safe idempotency,
+  gatewayOnly and the preset.
+
+### Changed
+
+- **Capability naming is unified to `cap:<descriptor.id>`.** `os_request` used
+  to ask for `<id>` while `allowedByHost` checked `cap:<id>`; both now use
+  `cap:<id>`, matching what `os_observe` consumes. Plain `<id>` grants no
+  longer match (module grants such as `act:invoke:<action>` are unaffected).
+- `os_do` checks the idempotency journal before authorization, so a restart
+  replay needs no fresh Grant; entries are scoped by subject + capability + key.
+- The Allow check omits `scope`, so a human-narrowed approval still authorizes
+  its one use. `isGrant()` rejects `used` or exhausted Grants.
+- `VERSION` and the package version are `0.3.0`.
+
+### Compatibility
+
+- The result schema remains `os.result/v1`; `legacyTools`, explicit `grant`
+  args and in-memory idempotency are unchanged.
+- `stateFile` and `gatewayOnly` are opt-in; without them 0.2.0 behavior is
+  unchanged apart from the capability name.
+
 ## 0.2.0 — 2026-11-21
 
 ### Added

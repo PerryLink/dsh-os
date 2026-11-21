@@ -32,12 +32,62 @@ or fromTool       |          os_observe / os_help / os_status
    - `os_do({id, args, preview?, idempotencyKey?, grant?})` → `os.result/v1`;
      `write`/`execute`/`destructive` capabilities without a grant return
      `E_DENIED` with `remediation` and `nextTools: [os_request]`;
-   - `os_request({id, args, reason})` → `ctx.allow.request` (or
-     `E_UNAVAILABLE` when the Allow service is absent);
-   - `os_observe({requestId?, jobId?, handle?})`;
+   - `os_request({id, args, reason})` → `ctx.allow.request` for capability
+     `cap:<descriptor.id>` (or `E_UNAVAILABLE` when Allow is absent);
+   - `os_observe({requestId?, jobId?, handle?})` → refreshes a request from
+     Allow, and when approved consumes the Grant once and caches it;
    - `os_help({task})` → 4 steps + candidate capabilities + risks;
    - `os_status({})` → modules, `legacy` / `capabilities` counts, health,
      version.
+
+## Permission bridge
+
+One name crosses the bridge in both directions: `cap:<descriptor.id>` (for
+example `cap:act.fs.write`). `os_request` asks Allow for it, `allowedByHost`
+checks it, and the grant cached by `os_observe` is issued for it. A plain
+`<id>` grant does not match; module-owned grants stay separate (Act uses
+`act:invoke:<action>`).
+
+The recovery loop is closed inside the kernel:
+
+1. `os_do` on a gated capability returns `E_DENIED` + `nextTools: [os_request]`.
+2. `os_request` creates a one-use Allow Request and records the subject and an
+   args fingerprint in memory (never the args).
+3. `os_observe` pulls the latest request from Allow; when `approved`, it calls
+   `allow.check` once, consumes the Grant and caches it (`grantAvailable`).
+4. The next `os_do` with the same id, args and subject uses that cache — no
+   host injection. The approval is gone, so a replay or exhausted Grant stays
+   `E_DENIED`. The cache is bound to `subject + id + args fingerprint`, and
+   the Allow check omits `scope` so a narrowed approval still works.
+
+## Idempotency journal
+
+`os_do` reuses `idempotencyKey` in memory; `config.stateFile` makes it survive
+a restart:
+
+```js
+apply(ctx, { stateFile: '/absolute/path/kernel-idempotency.json' })
+```
+
+The journal stores `{ argsHash, result }` per subject + capability + key,
+writes atomically with mode `0600`, and is bounded to 500 entries. Args are
+never stored. A replay returns the original `OsResult` before consuming a new
+grant; different args under the same key return `E_CONFLICT`. A write failure
+keeps the result and appends a warning instead of claiming persistence.
+
+## Gateway-only mount
+
+`config.gatewayOnly: true` hides every inherited non-`os_*` tool for one agent
+scope via `ctx.tools.restrict({ deny: [...] })`. It requires a scoped mount (an
+agent preset or `agent.ctx`); a global mount fails closed because it would mask
+every agent. The legacy bridge keeps enumerating the global view, so hidden
+tools remain reachable as `legacy.<tool>` capabilities through
+`os_find`/`os_do`.
+
+See [`docs/presets/os-gateway.md`](../../docs/presets/os-gateway.md) and
+[`docs/presets/os-gateway.cordis.yml`](../../docs/presets/os-gateway.cordis.yml).
+DSH presets are plugin lists; `toolFilter` (`ToolRestriction`) is the
+subagent-level restriction, not a preset YAML key.
 
 ## Mount
 
@@ -45,6 +95,8 @@ or fromTool       |          os_observe / os_help / os_status
 import { apply } from '@perrylink/dsh-os-kernel'
 // ctx.tools must exist (inject: ['tools']); apply() provides ctx.kernel
 const kernel = apply(ctx)          // six tools registered into ctx.tools
+// Optional: apply(ctx, { gatewayOnly: true }) inside an agent preset,
+// or apply(ctx, { stateFile: '/abs/kernel-idempotency.json' }).
 await kernel.refreshLegacy()       // optional: os_find/os_status do this lazily
 kernel.register({
   id: 'snip.search', title: 'Search clippings', summary: 'Find a copied item.',
@@ -74,7 +126,9 @@ touching any module:
 
 `apply()` does not enumerate eagerly. The first `os_find` or `os_status` calls
 `refreshLegacy({ scope: exec.agent })`; a direct `os_do` on an unknown
-`legacy.*` id does the same. After that the gateway searches descriptors and
+`legacy.*` id does the same. Under `gatewayOnly` the bridge enumerates the
+global view instead, because the agent's own tool view is intentionally
+restricted to the six verbs. After that the gateway searches descriptors and
 legacy tools together, so `os_find` returns top-k cards from both surfaces and
 `os_status` reports `{ legacy: N, capabilities: M, total }`.
 
@@ -86,13 +140,15 @@ classes with `details.legacyCode`.
 
 ## Boundary
 
-- **Kernel is thin.** It has no business modules, no persistence and no network.
+- **Kernel is thin.** It has no business modules and no network. The only
+  optional persistence is the idempotency journal above.
 - **Modules stay independent.** A module may register a descriptor when the
   kernel is present (`ctx.get('kernel')?.register`) and must still work when it
   is absent. The kernel never imports a module.
-- **Zero runtime dependencies**, plain ESM, no Node built-ins in `lib/`.
+- **Zero runtime dependencies**, plain ESM. `lib/state.js` uses only Node
+  built-ins (`node:fs`, `node:path`) and only when `config.stateFile` is set;
   `lib/envelope.js` mirrors `@perrylink/dsh-os-contract`'s `ok()`/`err()`
-  helpers instead of importing them, so the package stays standalone; its
+  helpers instead of importing them, so the package stays standalone. Its
   success schema remains the published `os.result/v1`.
 - **No publish** in this package's scripts; release is owned by the monorepo.
 
@@ -102,9 +158,7 @@ classes with `details.legacyCode`.
 node --test
 ```
 
-Covers descriptor validation, registry CRUD/conflict/search/lazy invoke,
-`fromTool` against two real dsh-os tools, the six gateway verbs including
-deny → request recovery and help/status, plus the legacy bridge: fake `ctx`
-with read/write/execute tools, lazy `os_find`/`os_status`, `os_do` execution
-and denied writes, envelope normalization, repeated refresh, missing
-`schemas`/`get`, alias/id conflicts and status counts.
+Covers descriptors, registry CRUD/conflict/search/lazy invoke, `fromTool`,
+the six verbs, legacy bridge and envelopes, the permission bridge against the
+real `dsh-allow` service (`cap:<id>`, observe refresh, one-shot grant, args
+binding), idempotency across a restart, `gatewayOnly` and the shipped preset.

@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
+import { AllowService } from '../../allow/index.js'
 import { apply, RingService } from '../index.js'
 
 /** Fake Cordis context from docs/implementation-contract.md. */
@@ -24,7 +25,8 @@ const TTL = 60 * 60 * 1000
 
 function setup(config = {}) {
   const ctx = fakeContext()
-  const service = apply(ctx, { now: () => 0, ...config })
+  // Legacy coverage opts out of the 0.4.0 Grant gate; grant tests pass true.
+  const service = apply(ctx, { now: () => 0, requireGrant: false, ...config })
   return { ctx, service }
 }
 
@@ -661,4 +663,183 @@ test('tick maps the voice level to a configured ntfy channel', async () => {
   } finally {
     mock.restore()
   }
+})
+
+// --- 0.4.0 egress Grant gate ------------------------------------------------
+
+const GRANT = { subject: 'agent:test', capability: 'ring:notify', scope: '*' }
+
+function allowStub(decision, calls = []) {
+  return {
+    async check(input) {
+      calls.push(input)
+      return typeof decision === 'function' ? decision(input) : decision
+    },
+  }
+}
+
+test('ring_notify without a Grant is denied before sending and writes no receipt', async () => {
+  const { ctx, service } = setup({ requireGrant: true })
+  ctx.provide('allow', allowStub({ allowed: false, reason: 'no-grant' }))
+  const lines = []
+  service.configureChannels({ console: { write: line => lines.push(line) } })
+  const kase = service.raise({ source: 'manual' })
+
+  await assert.rejects(
+    () => ctx._tools.get('ring_notify').execute({ id: kase.id, channel: 'console' }, { subject: 'agent:test' }),
+    error => {
+      assert.equal(error.code, 'E_DENIED')
+      assert.equal(error.subcode, 'grant_required')
+      assert.equal(error.capability, 'ring:notify')
+      assert.equal(error.nextTools.length, 1)
+      assert.deepEqual(error.nextTools[0].tool, 'allow_request')
+      assert.equal(error.nextTools[0].args.subject, 'agent:test')
+      assert.equal(error.nextTools[0].args.capability, 'ring:notify')
+      assert.match(error.hint, /allow_request/)
+      return true
+    },
+  )
+  assert.equal(lines.length, 0)
+  assert.deepEqual(service.receipts(kase.id), [])
+
+  // A missing Allow service is not a Grant either: egress stays closed.
+  const bare = setup({ requireGrant: true })
+  bare.service.configureChannels({ console: { write: () => assert.fail('must not send') } })
+  const other = bare.service.raise({ source: 'manual' })
+  await assert.rejects(
+    () => bare.ctx._tools.get('ring_notify').execute({ id: other.id, channel: 'console' }, { subject: 'agent:test' }),
+    { code: 'E_DENIED', subcode: 'grant_required' },
+  )
+  assert.deepEqual(bare.service.receipts(other.id), [])
+
+  // A throwing Allow service also fails closed.
+  const broken = setup({ requireGrant: true })
+  broken.ctx.provide('allow', { check: async () => { throw new Error('state file unavailable') } })
+  const third = broken.service.raise({ source: 'manual' })
+  await assert.rejects(
+    () => broken.ctx._tools.get('ring_notify').execute({ id: third.id, channel: 'console' }, { subject: 'agent:test' }),
+    { code: 'E_DENIED' },
+  )
+})
+
+test('a real ring:notify Grant allows the send and records one delivery receipt', async () => {
+  const { ctx, service } = setup({ requireGrant: true })
+  const allow = new AllowService(ctx)
+  ctx.provide('allow', allow)
+  allow.issue(GRANT)
+  const lines = []
+  service.configureChannels({ console: { write: line => lines.push(line) } })
+  const kase = service.raise({ source: 'manual' })
+
+  const notified = await ctx._tools.get('ring_notify').execute(
+    { id: kase.id, channel: 'console' },
+    { subject: GRANT.subject },
+  )
+  assert.equal(notified.delivery.ok, true)
+  assert.equal(notified.delivery.channel, 'console')
+  assert.equal(lines.length, 1)
+  const receipts = service.receipts(kase.id)
+  assert.deepEqual(receipts.map(receipt => receipt.kind), ['delivery'])
+  assert.equal(receipts[0].source, 'notify')
+  assert.equal(receipts[0].ok, true)
+  assert.equal(allow.list({ subject: GRANT.subject, capability: GRANT.capability })[0].uses, 1)
+})
+
+test('a ring:notify Grant with a narrower scope does not authorize egress', async () => {
+  const { ctx, service } = setup({ requireGrant: true })
+  const allow = new AllowService(ctx)
+  ctx.provide('allow', allow)
+  allow.issue({ subject: 'agent:test', capability: 'ring:notify', scope: 'case:*' })
+  service.configureChannels({ console: { write: () => assert.fail('must not send') } })
+  const kase = service.raise({ source: 'manual' })
+
+  // notify() asks for scope '*' so only a wildcard Grant covers the request.
+  await assert.rejects(
+    () => service.notify(kase.id, { channel: 'console', subject: 'agent:test' }),
+    { code: 'E_DENIED', subcode: 'grant_required' },
+  )
+  assert.deepEqual(service.receipts(kase.id), [])
+})
+
+test('ring_notify without a subject fails closed instead of using anonymous', async () => {
+  const { ctx, service } = setup({ requireGrant: true })
+  const checks = []
+  ctx.provide('allow', allowStub({ allowed: true }, checks))
+  const lines = []
+  service.configureChannels({ console: { write: line => lines.push(line) } })
+  const kase = service.raise({ source: 'manual' })
+
+  await assert.rejects(
+    () => ctx._tools.get('ring_notify').execute({ id: kase.id, channel: 'console' }, {}),
+    { code: 'E_INVALID_ARGUMENT' },
+  )
+  await assert.rejects(
+    () => ctx._tools.get('ring_notify').execute({ id: kase.id, channel: 'console' }, { subject: '  ' }),
+    { code: 'E_INVALID_ARGUMENT' },
+  )
+  await assert.rejects(
+    () => service.notify(kase.id, { channel: 'console' }),
+    { code: 'E_INVALID_ARGUMENT' },
+  )
+  assert.equal(checks.length, 0, 'a missing subject must not reach Allow')
+  assert.equal(lines.length, 0)
+  assert.deepEqual(service.receipts(kase.id), [])
+})
+
+test('tick without a ring:notify Grant records blocked and never sends', async () => {
+  const { ctx, service } = setup({ requireGrant: true, subject: 'ring:service' })
+  const checks = []
+  ctx.provide('allow', allowStub({ allowed: false, reason: 'no-grant' }, checks))
+  const lines = []
+  service.configureChannels({ console: { write: line => lines.push(line) } })
+  const kase = service.raise({ source: 'approval' })
+
+  const ticked = await service.tick(T0)
+  assert.deepEqual(checks, [{ subject: 'ring:service', capability: 'ring:notify', scope: '*' }])
+  assert.equal(lines.length, 0)
+  assert.deepEqual(ticked.deliveries, [])
+  assert.deepEqual(ticked.receipts, [{
+    id: ticked.receipts[0].id,
+    caseId: kase.id,
+    kind: 'blocked',
+    at: T0,
+    channel: 'local',
+    to: 't0',
+    source: 'tick',
+    reason: 'grant_required',
+    delivered: false,
+  }])
+  // The SLA advances even though egress is blocked; the receipt is the evidence.
+  assert.equal(state(service, kase.id).state, 'notified')
+  assert.deepEqual(service.receipts(kase.id), ticked.receipts)
+
+  // Without a configured service subject, tick fails closed before Allow.
+  const bare = setup({ requireGrant: true })
+  const ignored = []
+  bare.ctx.provide('allow', allowStub({ allowed: true }, ignored))
+  bare.service.configureChannels({ console: { write: () => assert.fail('must not send') } })
+  const other = bare.service.raise({ source: 'approval' })
+  const blocked = await bare.service.tick(T0)
+  assert.deepEqual(ignored, [])
+  assert.deepEqual(blocked.receipts.map(receipt => receipt.kind), ['blocked'])
+  assert.equal(state(bare.service, other.id).state, 'notified')
+})
+
+test('a ring:notify Grant lets tick deliver and record a delivery receipt', async () => {
+  const { ctx, service } = setup({ requireGrant: true, subject: 'ring:service' })
+  const checks = []
+  ctx.provide('allow', allowStub({ allowed: true }, checks))
+  const lines = []
+  service.configureChannels({ console: { write: line => lines.push(line) } })
+  const kase = service.raise({ source: 'approval' })
+
+  const ticked = await service.tick(T0)
+  assert.deepEqual(checks, [{ subject: 'ring:service', capability: 'ring:notify', scope: '*' }])
+  assert.equal(lines.length, 1)
+  assert.deepEqual(ticked.receipts.map(receipt => receipt.kind), ['delivery'])
+  assert.equal(ticked.receipts[0].source, 'tick')
+  assert.equal(ticked.receipts[0].delivered, true)
+  assert.equal(ticked.deliveries.length, 1)
+  assert.equal(ticked.deliveries[0].ok, true)
+  assert.equal(state(service, kase.id).state, 'notified')
 })

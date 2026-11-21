@@ -5,9 +5,18 @@
 import { RISKS } from './descriptor.js'
 import { fingerprint } from './registry.js'
 import { VERSION, RESULT_SCHEMA, ok as makeResult, err as failure, legacyOutcome } from './envelope.js'
+import { createStateStore } from './state.js'
 
 export { VERSION, RESULT_SCHEMA }
 export const TOOL_NAMES = Object.freeze(['os_find', 'os_do', 'os_request', 'os_observe', 'os_help', 'os_status'])
+/**
+ * Permission names are namespaced `cap:<descriptor.id>` on BOTH sides of the
+ * Allow bridge: `os_request` asks for this exact string and `allowedByHost`
+ * checks it. The prefix keeps kernel capability grants distinct from a
+ * module's own grants (for example Act's `act:invoke:<action>`).
+ */
+export const CAPABILITY_PREFIX = 'cap:'
+export const capabilityName = id => `${CAPABILITY_PREFIX}${id}`
 
 const RISK_RANK = Object.freeze({ read: 0, write: 1, execute: 2, network: 2, approval: 2, secret: 3 })
 const OUTPUT = {
@@ -35,6 +44,7 @@ const isGrant = grant => {
   if (grant.revoked === true) return false
   if (typeof grant.status === 'string' && !['active', 'granted', 'issued', 'approved'].includes(grant.status)) return false
   if (typeof grant.expiresAt === 'number' && grant.expiresAt <= Date.now()) return false
+  if (typeof grant.uses === 'number' && Number.isFinite(grant.maxUses) && grant.uses >= grant.maxUses) return false
   return true
 }
 
@@ -53,15 +63,93 @@ function card(descriptor) {
 /**
  * Build a gateway over one registry.
  * @param {any} registry
- * @param {{ctx?: any, version?: string}} [options]
+ * @param {{ctx?: any, stateFile?: string, gatewayOnly?: boolean}} [options]
  */
 export function createGateway(registry, options = {}) {
   if (!registry || typeof registry.resolve !== 'function') throw new TypeError('createGateway needs a registry')
   const ctx = options.ctx ?? null
+  const stateFile = options.stateFile
   const requests = new Map()
   const jobs = new Map()
   const handles = new Map()
   const idempotency = new Map()
+  const autoGrants = new Map()
+  let idempotencyStore = null
+  try {
+    idempotencyStore = createStateStore(stateFile)
+  } catch (error) {
+    throw new TypeError(error?.message ?? String(error))
+  }
+
+  /** Resolve the Allow service once per call; a throwing getter fails closed. */
+  function allowService() {
+    if (ctx?.allow) return ctx.allow
+    if (typeof ctx?.get !== 'function') return null
+    try { return ctx.get('allow') ?? null } catch { return null }
+  }
+
+  /** Pull the newest request snapshot from the host Allow service. */
+  async function latestRequest(requestId, subject) {
+    const allow = allowService()
+    if (!allow) return null
+    if (typeof allow.requests === 'function') {
+      for (const filter of subject ? [{ subject }] : [{}]) {
+        try {
+          const list = await allow.requests(filter)
+          const items = Array.isArray(list) ? list : Array.isArray(list?.requests) ? list.requests : []
+          const found = items.find(item => item?.id === requestId || item?.requestId === requestId)
+          if (found) return found
+        } catch { /* try the next seam */ }
+      }
+    }
+    if (typeof allow.wait === 'function') {
+      try { return await allow.wait(requestId, { timeoutMs: 0, ...(subject ? { subject } : {}) }) } catch { /* not visible */ }
+    }
+    for (const method of ['get', 'status', 'observe']) {
+      if (typeof allow[method] !== 'function') continue
+      try { const found = await allow[method](requestId); if (found) return found } catch { /* keep local */ }
+    }
+    return null
+  }
+
+  /**
+   * Consume one approved Grant exactly once and remember it for the matching
+   * `os_do` call. The Allow check is the atomic use(), and it deliberately
+   * omits scope so an approval narrowed by the human still authorizes.
+   */
+  async function cacheAutoGrant(requestId, local) {
+    const existing = autoGrants.get(requestId)
+    if (existing) return { grant: existing.grant, reason: null }
+    const allow = allowService()
+    if (!allow || typeof allow.check !== 'function') return { grant: null, reason: 'check_unavailable' }
+    try {
+      const decision = await allow.check({ subject: local.subject, capability: local.capability })
+      if (decision?.allowed !== true) return { grant: null, reason: decision?.reason ?? 'no-grant' }
+      const grant = decision.grant ?? { id: `grant_auto_${requestId}`, status: 'active' }
+      autoGrants.set(requestId, {
+        requestId, id: local.capabilityId, argsHash: local.argsHash, subject: local.subject,
+        capability: local.capability, grant, at: Date.now(),
+      })
+      return { grant, reason: null }
+    } catch (error) {
+      return { grant: null, reason: error?.code ?? 'check_failed' }
+    }
+  }
+
+  /** Peek at a cached approval bound to this subject/id/args without consuming it. */
+  function findAutoGrant(subject, id, argsHash) {
+    if (!subject || !argsHash) return null
+    for (const item of autoGrants.values()) {
+      if (item.id === id && item.subject === subject && item.argsHash === argsHash) return item
+    }
+    return null
+  }
+
+  /** Take (and thus consume) the cached approval found by `findAutoGrant`. */
+  function takeAutoGrant(item) {
+    if (!item) return null
+    return autoGrants.get(item.requestId) === item ? (autoGrants.delete(item.requestId), item) : null
+  }
 
   function remember(value) {
     if (!isObject(value)) return
@@ -81,7 +169,10 @@ export function createGateway(registry, options = {}) {
     if (legacyReady || !refreshLegacy) return
     const tools = ctx?.tools
     if (!tools || typeof tools.schemas !== 'function' || typeof tools.get !== 'function') return
-    try { await refreshLegacy({ scope: exec?.agent }) } catch { return }
+    // gatewayOnly restricts the agent's *tool* view; the kernel still needs the
+    // global view so those tools remain reachable as os_find/os_do capabilities.
+    const scope = options.gatewayOnly === true ? undefined : exec?.agent
+    try { await refreshLegacy({ scope }) } catch { return }
     legacyReady = true
   }
 
@@ -101,9 +192,11 @@ export function createGateway(registry, options = {}) {
   }
 
   async function allowedByHost(exec, descriptor) {
-    if (!ctx?.allow || typeof ctx.allow.check !== 'function') return false
+    const subject = textOf(exec?.subject)
+    const allow = allowService()
+    if (!subject || !allow || typeof allow.check !== 'function') return false
     try {
-      const decision = await ctx.allow.check({ subject: exec?.subject ?? 'agent', capability: `cap:${descriptor.id}`, scope: '*' })
+      const decision = await allow.check({ subject, capability: capabilityName(descriptor.id) })
       return decision?.allowed === true
     } catch {
       return false
@@ -113,13 +206,13 @@ export function createGateway(registry, options = {}) {
   const denied = (descriptor, args, exec) => failure('E_DENIED',
     `Capability "${descriptor.id}" needs a grant for ${descriptor.risk.join('/')} access.`, {
       subcode: 'grant_required',
-      remediation: 'Call os_request with the same id and args, then retry os_do after a human approves it.',
+      remediation: 'Call os_request with the same id and args, then call os_observe to refresh and consume the approved grant.',
       nextTools: [
         { tool: 'os_request', args: { id: descriptor.id, args, reason: `Grant ${descriptor.risk.join('/')} access to ${descriptor.id}.` }, why: 'create the pending approval' },
         { tool: 'os_find', args: { intent: descriptor.id }, why: 'read the capability card and its risk' },
       ],
       requestId: exec?.requestId,
-      details: { capability: descriptor.id, risk: descriptor.risk, permissions: descriptor.permissions },
+      details: { capability: descriptor.id, permission: capabilityName(descriptor.id), risk: descriptor.risk, permissions: descriptor.permissions },
     })
 
   async function execute(input = {}, exec = {}) {
@@ -130,8 +223,8 @@ export function createGateway(registry, options = {}) {
       requestId: exec?.requestId,
     })
     let args = input.args === undefined ? {} : input.args
-    const grant = input.grant ?? exec?.grant ?? (isObject(args) ? args.grant : undefined)
-    if (grant && isObject(args) && Object.prototype.hasOwnProperty.call(args, 'grant')) {
+    const providedGrant = input.grant ?? exec?.grant ?? (isObject(args) ? args.grant : undefined)
+    if (providedGrant && isObject(args) && Object.prototype.hasOwnProperty.call(args, 'grant')) {
       const { grant: _ignored, ...rest } = args
       args = rest
     }
@@ -143,8 +236,14 @@ export function createGateway(registry, options = {}) {
     const descriptor = await registry.resolve(id)
     if (!descriptor) return notFound(id, exec?.requestId)
     const gated = isRisky(descriptor)
-    if (gated && !isGrant(grant) && !(await allowedByHost(exec, descriptor))) return denied(descriptor, args, exec)
+    const argsHash = fingerprint(args)
+    const subject = textOf(exec?.subject)
+    // A grant cached by os_observe is bound to the exact subject/id/args triple.
+    const auto = gated && !isGrant(providedGrant) ? findAutoGrant(subject, descriptor.id, argsHash) : null
+    const grant = providedGrant ?? auto?.grant ?? undefined
+    const authorized = !gated || Boolean(auto) || isGrant(grant)
     if (input.preview === true) {
+      if (!authorized && !(await allowedByHost(exec, descriptor))) return denied(descriptor, args, exec)
       return makeResult(descriptor.id, { preview: true, id: descriptor.id, args, risk: descriptor.risk, gated }, {
         summary: `Preview only: ${descriptor.id} was not executed.`,
         requestId: exec?.requestId,
@@ -152,29 +251,36 @@ export function createGateway(registry, options = {}) {
       })
     }
     const key = textOf(input.idempotencyKey)
-    const slot = key ? `${descriptor.id}\0${key}` : null
-    if (slot && idempotency.has(slot)) {
-      const previous = idempotency.get(slot)
-      if (previous.argsHash !== fingerprint(args)) {
-        return failure('E_CONFLICT', 'This idempotencyKey was used with different args.', {
-          subcode: 'idempotency_reuse',
-          remediation: 'Retry with a fresh idempotencyKey, or replay the original args.',
-          requestId: exec?.requestId,
-          details: { capability: descriptor.id },
-        })
+    const slot = key ? `${subject ?? ''}\0${descriptor.id}\0${key}` : null
+    if (slot) {
+      const previous = idempotency.get(slot) ?? idempotencyStore?.get(slot)
+      if (previous) {
+        if (previous.argsHash !== argsHash) {
+          return failure('E_CONFLICT', 'This idempotencyKey was used with different args.', {
+            subcode: 'idempotency_reuse',
+            remediation: 'Retry with a fresh idempotencyKey, or replay the original args.',
+            requestId: exec?.requestId,
+            details: { capability: descriptor.id },
+          })
+        }
+        return previous.result
       }
-      return previous.result
     }
+    if (!authorized && !(await allowedByHost(exec, descriptor))) return denied(descriptor, args, exec)
+    // Consume only after every check and after the idempotency replay path, so
+    // a replayed call never burns a fresh approval and an approval is used once.
+    if (auto) takeAutoGrant(auto)
+    const callRequestId = auto?.requestId ?? exec?.requestId
     const started = Date.now()
     let outcome
     try {
       outcome = await registry.invoke(descriptor.id, args, {
-        ctx, subject: exec?.subject, agent: exec?.agent, signal: exec?.signal, grant, requestId: exec?.requestId,
+        ctx, subject: exec?.subject, agent: exec?.agent, signal: exec?.signal, grant, requestId: callRequestId,
       })
     } catch (error) {
       return failure('E_INTERNAL', error?.message ?? String(error), {
         remediation: 'Report requestId to the maintainer; do not retry blindly.',
-        requestId: exec?.requestId,
+        requestId: callRequestId,
         details: { capability: descriptor.id },
       })
     }
@@ -182,12 +288,12 @@ export function createGateway(registry, options = {}) {
       return failure(outcome.legacyCode ?? outcome.code, outcome.message ?? `Capability ${descriptor.id} failed.`, {
         subcode: outcome.code === 'E_DENIED' ? 'grant_required' : null,
         remediation: outcome.code === 'E_DENIED'
-          ? 'Call os_request with the same id and args, then retry os_do after approval.'
+          ? 'Call os_request with the same id and args, then call os_observe to refresh the approval.'
           : 'Call os_find to inspect the capability card, fix the args if needed, then retry.',
         nextTools: outcome.code === 'E_DENIED'
           ? [{ tool: 'os_request', args: { id: descriptor.id, args }, why: 'request a grant' }]
           : [{ tool: 'os_find', args: { intent: descriptor.id }, why: 'inspect the capability card' }],
-        requestId: exec?.requestId,
+        requestId: callRequestId,
         details: { capability: descriptor.id },
       })
     }
@@ -203,19 +309,29 @@ export function createGateway(registry, options = {}) {
         retryable: legacy.retryable,
         retryAfterMs: legacy.retryAfterMs,
         remediation: legacy.remediation ?? (denied
-          ? 'Call os_request with the same id and args, then retry os_do after approval.'
+          ? 'Call os_request with the same id and args, then call os_observe to refresh the approval.'
           : undefined),
         nextTools: Array.isArray(legacy.nextTools) ? legacy.nextTools : denied
           ? [{ tool: 'os_request', args: { id: descriptor.id, args }, why: 'request a grant' }]
           : undefined,
-        requestId: exec?.requestId,
+        requestId: callRequestId,
         details: { capability: descriptor.id, ...(isObject(legacy.details) ? legacy.details : {}) },
       })
     }
     const value = normalized?.ok === true ? normalized.value : outcome.value
-    const result = makeResult(descriptor.id, value, { requestId: exec?.requestId, latencyMs: Date.now() - started })
+    const result = makeResult(descriptor.id, value, { requestId: callRequestId, latencyMs: Date.now() - started })
     remember(value)
-    if (slot) idempotency.set(slot, { argsHash: fingerprint(args), result })
+    if (slot) {
+      const entry = { argsHash, result }
+      idempotency.set(slot, entry)
+      if (idempotencyStore) {
+        try {
+          idempotencyStore.set(slot, entry)
+        } catch (error) {
+          result.warnings.push(`idempotency result was not persisted: ${error?.message ?? String(error)}`)
+        }
+      }
+    }
     return result
   }
 
@@ -235,7 +351,7 @@ export function createGateway(registry, options = {}) {
     if (!isObject(args)) return failure('E_INVALID_ARGUMENT', 'args must be an object.', { requestId: exec?.requestId })
     const descriptor = await registry.resolve(id)
     if (!descriptor) return notFound(id, exec?.requestId)
-    const allow = ctx?.allow ?? (typeof ctx?.get === 'function' ? ctx.get('allow') : null)
+    const allow = allowService()
     if (!allow || typeof allow.request !== 'function') {
       return failure('E_UNAVAILABLE', 'No Allow request service is available, so nothing can be approved.', {
         subcode: 'dependency_missing',
@@ -245,17 +361,22 @@ export function createGateway(registry, options = {}) {
         details: { service: 'allow.request' },
       })
     }
+    const capability = capabilityName(descriptor.id)
+    // os_do treats an `args.grant` shortcut as a grant, not capability input,
+    // so the approval fingerprint must use the same normalized args.
+    const requestArgs = isObject(args) && Object.prototype.hasOwnProperty.call(args, 'grant')
+      ? Object.fromEntries(Object.entries(args).filter(([key]) => key !== 'grant')) : args
+    const subject = textOf(exec?.subject)
+    if (!subject) {
+      return failure('E_INVALID_ARGUMENT', 'os_request needs an executing subject.', {
+        remediation: 'Call os_request from an agent turn; the host supplies exec.subject.',
+        requestId: exec?.requestId,
+      })
+    }
     let response
     try {
-      const subject = textOf(exec?.subject)
-      if (!subject) {
-        return failure('E_INVALID_ARGUMENT', 'os_request needs an executing subject.', {
-          remediation: 'Call os_request from an agent turn; the host supplies exec.subject.',
-          requestId: exec?.requestId,
-        })
-      }
       response = await allow.request({
-        subject, capability: id, scope: '*', maxUses: 1, reason,
+        subject, capability, scope: '*', maxUses: 1, reason,
       })
     } catch (error) {
       return failure(error?.code, error?.message ?? String(error), {
@@ -271,9 +392,13 @@ export function createGateway(registry, options = {}) {
       })
     }
     const status = response?.status ?? response?.state ?? 'pending'
-    const hint = response?.hint ?? response?.approvalHint ?? 'A human must decide; then retry os_do with the same id and args.'
-    requests.set(requestId, { requestId, capability: id, args, reason, status, createdAt: Date.now(), response })
-    return { ok: true, requestId, status, hint, capability: id }
+    const hint = response?.hint ?? response?.approvalHint
+      ?? 'A human must decide; then call os_observe with this requestId and retry os_do with the same id and args.'
+    requests.set(requestId, {
+      requestId, capabilityId: descriptor.id, capability, argsHash: fingerprint(requestArgs), subject,
+      reason, status, scope: '*', createdAt: Date.now(), response,
+    })
+    return { ok: true, requestId, status, hint, id: descriptor.id, capability }
   }
 
   async function observe(input = {}, exec = {}) {
@@ -288,23 +413,35 @@ export function createGateway(registry, options = {}) {
     }
     if (requestId) {
       const local = requests.get(requestId)
-      let remote = null
-      if (ctx?.allow) {
-        for (const method of ['get', 'status', 'observe']) {
-          if (typeof ctx.allow[method] !== 'function') continue
-          try { remote = await ctx.allow[method](requestId); if (remote) break } catch { /* keep local state */ }
-        }
+      if (local && textOf(exec?.subject) && local.subject !== textOf(exec?.subject)) {
+        return failure('E_NOT_FOUND', `No request named "${requestId}".`, {
+          subcode: 'request_not_found', requestId: exec?.requestId,
+        })
       }
+      const remote = await latestRequest(requestId, local?.subject ?? textOf(exec?.subject))
       if (!local && !remote) return failure('E_NOT_FOUND', `No request named "${requestId}".`, {
         subcode: 'request_not_found',
         remediation: 'Call os_request to create a pending request, then observe its requestId.',
         requestId: exec?.requestId,
       })
       const state = remote?.state ?? remote?.status ?? local?.status ?? 'pending'
+      let grant = null
+      let grantReason = null
+      if (state === 'approved') {
+        if (local) ({ grant, reason: grantReason } = await cacheAutoGrant(requestId, local))
+        else grantReason = 'request_not_created_by_kernel'
+      } else {
+        autoGrants.delete(requestId)
+      }
+      if (local) local.status = state
       return {
         ok: true, kind: 'request', requestId, state, status: state,
+        id: local?.capabilityId ?? null,
+        capability: local?.capability ?? remote?.capability ?? null,
         request: { ...(local ?? {}), ...(isObject(remote) ? remote : {}) },
-        result: remote?.grant ?? remote?.result ?? null,
+        result: grant ?? remote?.grant ?? remote?.result ?? null,
+        grantAvailable: Boolean(grant),
+        ...(grantReason ? { grantReason } : {}),
       }
     }
     if (jobId) {
@@ -345,7 +482,7 @@ export function createGateway(registry, options = {}) {
       `Call os_find with intent "${task}" to see the top matching capability cards.`,
       'Call os_do with the chosen id and args. Read ok before using any other field.',
       'If os_do returns E_DENIED, call os_request with the same id and args, then wait for a human decision.',
-      'Retry os_do after approval; use os_observe for a jobId or dsh:// handle returned by the result.',
+      'Call os_observe with the requestId; once approved it consumes the Grant and os_do can run without an injected grant.',
     ]
     return {
       ok: true,
@@ -390,19 +527,19 @@ export function createGateway(registry, options = {}) {
       riskMax: { type: 'string', enum: [...RISKS], description: 'Only return capabilities at or below this risk.' },
       limit: { type: 'integer', minimum: 1, maximum: 10, description: 'Maximum cards (default 5).' },
     }, ['intent'], find),
-    defineTool('os_do', 'Execute a resolved capability. Returns an OsResult; write/execute capabilities need a grant.', {
+    defineTool('os_do', 'Execute a resolved capability. Returns an OsResult; write/execute capabilities need a grant. After os_observe reports the request approved, retry with the same id and args and the cached grant is consumed automatically.', {
       id: { type: 'string', description: 'Capability id from os_find, for example "snip.search".' },
       args: { type: 'object', additionalProperties: true, description: 'Capability input matching its inputSchema.' },
       preview: { type: 'boolean', description: 'Validate and preview without running the handler.' },
-      idempotencyKey: { type: 'string', description: 'Reuse on retries so a write happens at most once.' },
-      grant: { description: 'Grant object or id returned by the approval flow; required for write/execute.' },
+      idempotencyKey: { type: 'string', description: 'Reuse on retries so a write happens at most once; with config.stateFile it survives a restart.' },
+      grant: { description: 'Optional grant object or id; normally omitted because os_observe caches the approved one.' },
     }, ['id'], execute),
-    defineTool('os_request', 'Create a pending approval request for a capability; never approves it. Needs ctx.allow.request.', {
+    defineTool('os_request', 'Create a pending approval request for capability "cap:<id>"; never approves it. Needs ctx.allow.request.', {
       id: { type: 'string', description: 'Capability id that needs approval.' },
       args: { type: 'object', additionalProperties: true, description: 'Exact args that will be executed later.' },
       reason: { type: 'string', description: 'One-sentence reason shown to the human approver.' },
     }, ['id', 'args', 'reason'], request),
-    defineTool('os_observe', 'Observe a pending request, a job or a dsh:// handle; returns state and any result.', {
+    defineTool('os_observe', 'Observe a request, job or dsh:// handle. For a request it refreshes state from Allow, consumes grantAvailable and lets the next matching os_do run.', {
       requestId: { type: 'string', description: 'requestId returned by os_request.' },
       jobId: { type: 'string', description: 'jobId returned in an OsResult job field.' },
       handle: { type: 'string', description: 'dsh:// handle from an OsResult.' },
@@ -413,7 +550,7 @@ export function createGateway(registry, options = {}) {
     defineTool('os_status', 'Report installed kernel modules, capability count, gateway version and health. Read-only.', {}, [], status),
   ]
 
-  return { tools, find, do: execute, request, observe, help, status, state: { requests, jobs, handles, idempotency } }
+  return { tools, find, do: execute, request, observe, help, status, state: { requests, jobs, handles, idempotency, autoGrants } }
 }
 
 /** Six plain ToolDefinitions bound to `registry`. */

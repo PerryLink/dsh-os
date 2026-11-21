@@ -1,11 +1,14 @@
 /**
  * dsh-act — typed action registry and agent-facing action bus for DeepSeek Harness.
+ * 0.4.0 adds an `os.result/v1` envelope to `act_list` (`schema`/`ok`/`items`/
+ * `summary`/`page`/`truncated`/`next`/`error`) while keeping `actions` intact.
  * 0.3.0 adds real filesystem actions (`fs.read` / `fs.write` / `fs.list` /
  * `fs.undo`) with a workdir allowlist, read caps, atomic writes, previews and
  * undo tokens. Plain ESM, no runtime dependencies.
  * @module dsh-act
  */
 import { filesystem, fsActions } from './fs-actions.js'
+import { failEnvelope, okEnvelope, pageOf, step } from './lib/result.js'
 
 export const name = 'dsh-act'
 export const inject = ['tools']
@@ -219,7 +222,37 @@ function listTool(service) {
     parameters: schema({ query: { type: 'string', description: 'Optional id/title/description filter.' } }),
     output,
     async execute(args) {
-      return { actions: service.list(args?.query).map(summarize) }
+      try {
+        const actions = service.list(args?.query).map(summarize)
+        const next = []
+        if (actions.length > 0) {
+          next.push(step('act_invoke', { id: actions[0].id }, 'Invoke one of the listed actions by id.'))
+        }
+        const gated = actions.find(action => action.risk !== 'read')
+        if (gated !== undefined) {
+          next.push(step(
+            'allow_request',
+            { capability: `act:invoke:${gated.id}` },
+            `Request a Grant before invoking the ${gated.risk} action "${gated.id}".`,
+          ))
+        }
+        if (actions.length === 0) {
+          next.push(step('act_list', {}, 'No actions matched; call act_list without a query.'))
+        }
+        return okEnvelope('act_list', {
+          items: actions,
+          summary: `${actions.length} actions`,
+          page: pageOf({ limit: actions.length, returned: actions.length, total: actions.length }),
+          next,
+          legacy: { actions },
+        })
+      } catch (error) {
+        return failEnvelope('act_list', error, {
+          remediation: 'Retry act_list with no query or with a plain text filter.',
+          nextTools: [step('act_list', {}, 'Retry without a filter.')],
+          legacy: { actions: [] },
+        })
+      }
     },
   }
 }

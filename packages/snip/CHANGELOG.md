@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.0
+
+- Add an `os.result/v1` envelope to `snip_search`:
+  `{ schema, ok, tool, summary, items, page, truncated, next, error }`.
+  `summary` names the full match count (≤200 chars); `page` reports
+  `{ limit, offset, returned, total, hasMore }`; `next` suggests the next
+  `snip_search` page or `snip_get` for the newest match.
+- Default page size is 20 and is capped at 100; add the optional `offset`
+  argument. Keep the legacy `query` and `entries` fields unchanged (`items` and
+  `entries` are the same page).
+- Add `SnipService.searchPage()` (full match count + offset window);
+  `SnipService.search()` keeps its array return value.
+- Search failures return `{ ok: false, code, error }`; the original `SNIP_*`
+  code is preserved and `error` adds
+  `{ code, message, retryable, remediation, nextTools }`.
+- Ship the zero-dependency helper `lib/result.js`; add envelope tests for the
+  default limit, the 100 cap, offset paging, truncation, legacy fields and the
+  `SNIP_BAD_QUERY` failure.
+
 ## 0.2.0
 
 - Add opt-in OS clipboard capture in `lib/capture.js`: `ClipboardAdapter` with
