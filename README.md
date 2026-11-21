@@ -36,7 +36,7 @@ needs only Node 22+; nothing is installed or published.
 
 | Product | Package | Status | Design |
 |---|---|---|---|
-| **Act** | `dsh-act` | 0.5.0 (fs + taint gate) | [design](docs/design/01-act.md) |
+| **Act** | `dsh-act` | 0.6.0 (kernel capability names) | [design](docs/design/01-act.md) |
 | **Allow** | `dsh-allow` | 0.4.0 (one-time grants) | [design](docs/design/02-allow.md) |
 | **Snip** | `dsh-snip` | 0.4.0 (capture + taint) | [design](docs/design/03-snip.md) |
 | **Check** | `dsh-canary` | 0.4.0 (runner + envelope) | [design](docs/design/04-check.md) |
@@ -55,8 +55,8 @@ needs only Node 22+; nothing is installed or published.
 | **Shell** | `dsh-os-shell` | 0.4.0 optional | injection-safe approvals/activity |
 | **CLI** | `dsh-os-cli` | 0.2.0 tool | `dsh-os list/doctor/install/approvals` |
 | **Contract** | `dsh-os-contract` | 0.2.0 library | result/error/handle protocols |
-| **Kit** | `dsh-os-kit` | 0.8.0 meta bundle | installs 6 latest modules |
-| **Kernel** | `dsh-os-kernel` | 0.4.0 core | taint gate + approval bridge |
+| **Kit** | `dsh-os-kit` | 0.9.0 meta bundle | installs 6 latest modules |
+| **Kernel** | `dsh-os-kernel` | 0.5.0 core | Act projection + taint |
 | **MCP** | `dsh-os-mcp` | 0.2.0 tool | read-only default + write approval path |
 | **A2A** | `dsh-os-a2a` | 0.1.0 tool | agent card + task protocol prototype |
 

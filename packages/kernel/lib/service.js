@@ -73,6 +73,59 @@ export class KernelService extends CapabilityRegistry {
     this.lastLegacyRefresh = Date.now()
     return { ...report, ...this.stats() }
   }
+
+  /** Project Act's registered actions as `act.<id>` capabilities. */
+  async refreshAct() {
+    const act = typeof this.ctx?.get === 'function' ? this.ctx.get('act') : null
+    if (!act || typeof act.list !== 'function' || typeof act.invoke !== 'function') {
+      return { ok: true, available: false, added: 0, ...this.stats() }
+    }
+    let actions
+    try { actions = act.list() } catch { return { ok: true, available: false, added: 0, ...this.stats() } }
+    if (!Array.isArray(actions)) return { ok: true, available: false, added: 0, ...this.stats() }
+    let added = 0
+    for (const action of actions) {
+      if (!action || typeof action.id !== 'string') continue
+      const id = `act.${action.id}`
+      if (this.entries.has(id) || this.aliases.has(id)) continue
+      const risk = action.risk === 'danger' ? ['execute'] : action.risk === 'write' ? ['write'] : ['read']
+      try {
+        this.register({
+          id,
+          title: (action.title ?? action.id).slice(0, 40),
+          summary: (action.description ?? `Act action ${action.id}`).slice(0, 120),
+          whenToUse: [`Use when the task needs the ${action.id} action.`],
+          whenNotToUse: [],
+          inputSchema: { type: 'object', additionalProperties: true },
+          outputSchema: { type: 'object', additionalProperties: true },
+          risk,
+          permissions: [`act:invoke:${action.id}`],
+          cost: { tokens: 0, latencyMs: 0, moneyUsd: 0 },
+          idempotency: risk[0] === 'read' ? 'pure' : 'non-idempotent',
+          examples: [],
+          errors: [],
+          version: '0.1.0',
+          tags: ['act'],
+          handler: async (args, _ctx, exec) => {
+            const subject = exec?.subject ?? exec?.agent?.session?.id ?? exec?.agent?.id
+            const result = await act.invoke(action.id, args, {
+              subject,
+              agent: exec?.agent,
+              signal: exec?.signal,
+            })
+            if (!result || result.ok !== true) {
+              const error = new Error(result?.message ?? `act.${action.id} failed`)
+              error.code = result?.code ?? 'E_UNAVAILABLE'
+              throw error
+            }
+            return result.result ?? result
+          },
+        })
+        added += 1
+      } catch { /* occupied or invalid; keep going */ }
+    }
+    return { ok: true, available: true, added, ...this.stats() }
+  }
 }
 
 export const createKernelService = options => new KernelService(options)

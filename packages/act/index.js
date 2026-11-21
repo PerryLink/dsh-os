@@ -183,14 +183,18 @@ export class ActService {
     }
 
     const capability = `act:invoke:${action.id}`
+    // The kernel projects actions as `act.<id>` and asks Allow for
+    // `cap:act.<id>`; accept either name so one human approval is enough.
+    const alternate = `cap:act.${action.id}`
     const gated = action.risk !== 'read' && action.authorize !== false
-    if (gated && !(await this.#authorized(capability, meta))) {
+    if (gated && !(await this.#authorized(capability, meta, alternate))) {
       return this.#grantRequired(action, capability)
     }
     // Minimal taint gate: a caller/host claim raises the bar for writes and
     // danger actions. It never lowers it; Act does not verify the token.
     const taintedCapability = `${capability}${TAINT_SUFFIX}`
-    if (gated && isTainted(meta) && !(await this.#authorized(taintedCapability, meta))) {
+    const taintedAlternate = `${alternate}${TAINT_SUFFIX}`
+    if (gated && isTainted(meta) && !(await this.#authorized(taintedCapability, meta, taintedAlternate))) {
       return this.#grantRequired(action, taintedCapability, true)
     }
 
@@ -222,18 +226,19 @@ export class ActService {
     return ctx.allow
   }
 
-  async #authorized(capability, meta) {
+  async #authorized(capability, meta, alternate) {
     const allow = this.#allow()
     if (allow === null || typeof allow?.check !== 'function') return false
     // A missing subject must fail closed: a shared 'anonymous' identity would
     // let one grant authorize every background/plugin call.
     const subject = meta?.subject ?? meta?.sessionId
     if (typeof subject !== 'string' || subject === '') return false
-    try {
-      return granted(await allow.check({ subject, capability }))
-    } catch {
-      return false
+    for (const name of [capability, alternate].filter(Boolean)) {
+      try {
+        if (granted(await allow.check({ subject, capability: name }))) return true
+      } catch { /* try the other name */ }
     }
+    return false
   }
 }
 

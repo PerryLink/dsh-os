@@ -127,7 +127,7 @@ test('denied and throwing checks fail closed; sessionId is the subject fallback'
   assert.equal((await service.invoke('write.one', {}, { sessionId: 'session-1' })).code, 'grant_required')
   // Missing subject fails closed: no shared 'anonymous' identity is created.
   assert.equal((await service.invoke('write.one')).code, 'grant_required')
-  assert.deepEqual(seen, ['session-1'])
+  assert.deepEqual(seen, ['session-1', 'session-1'])
   assert.equal((await service.invoke('echo', { text: 'read still runs' })).ok, true)
 
   const broken = setup({ check: async () => { throw new Error('ledger unavailable') } })

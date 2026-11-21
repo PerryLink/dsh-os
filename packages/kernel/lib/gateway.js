@@ -212,8 +212,14 @@ export function createGateway(registry, options = {}) {
   // Lazy legacy bridge: the first os_find/os_status adapts the host tools that
   // are visible to the calling agent. Hosts without schemas/get are skipped.
   let legacyReady = false
+  let actReady = false
   const refreshLegacy = typeof registry.refreshLegacy === 'function' ? registry.refreshLegacy.bind(registry) : null
+  const refreshAct = typeof registry.refreshAct === 'function' ? registry.refreshAct.bind(registry) : null
   async function ensureLegacy(exec) {
+    if (!actReady && refreshAct) {
+      try { await refreshAct() } catch { /* Act is optional */ }
+      actReady = true
+    }
     if (legacyReady || !refreshLegacy) return
     const tools = ctx?.tools
     if (!tools || typeof tools.schemas !== 'function' || typeof tools.get !== 'function') return

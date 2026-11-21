@@ -1,10 +1,10 @@
 {
   "schema": "dsh-os.eval/v1",
   "layer": "P-scripted (fixed policy; no model, no network)",
-  "generatedAt": "2026-11-21T15:20:09.799Z",
+  "generatedAt": "2026-11-21T15:49:09.646Z",
   "env": {
     "node": "v24.22.1",
-    "commit": "d008153",
+    "commit": "3f1dd3e",
     "dirty": true
   },
   "scenarios": [
@@ -118,7 +118,7 @@
           "args": {
             "id": "fs.write",
             "args": {
-              "path": "/tmp/dsh-eval-fix-ulKTrL/src/math.mjs",
+              "path": "/tmp/dsh-eval-fix-EdD6el/src/math.mjs",
               "text": "export const add = (a, b) => a + b\n"
             }
           },
@@ -128,7 +128,7 @@
           "tokens": 119,
           "ms": 0,
           "changeSeq": 0,
-          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-fix-ulKTrL/src/math.mjs\",\"text\":\"export const add = (a, b) => a + b\\n\"}}"
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-fix-EdD6el/src/math.mjs\",\"text\":\"export const add = (a, b) => a + b\\n\"}}"
         },
         {
           "n": 4,
@@ -143,7 +143,7 @@
           "code": null,
           "invalid": null,
           "tokens": 132,
-          "ms": 1,
+          "ms": 0,
           "changeSeq": 0,
           "key": "allow_request:{\"subject\":\"sess:fix-failing-test\",\"capability\":\"act:invoke:fs.write\",\"scope\":\"*\",\"reason\":\"修复 add 的差一错误\"}"
         },
@@ -151,7 +151,7 @@
           "n": 5,
           "tool": "allow_wait",
           "args": {
-            "requestId": "req_194958c1-0676-4109-bc96-f2767f2d9651",
+            "requestId": "req_3011a1e2-f8e3-4882-b741-3f21151f70fe",
             "timeoutMs": 0,
             "subject": "sess:fix-failing-test"
           },
@@ -161,13 +161,13 @@
           "tokens": 150,
           "ms": 0,
           "changeSeq": 0,
-          "key": "allow_wait:{\"requestId\":\"req_194958c1-0676-4109-bc96-f2767f2d9651\",\"timeoutMs\":0,\"subject\":\"sess:fix-failing-test\"}"
+          "key": "allow_wait:{\"requestId\":\"req_3011a1e2-f8e3-4882-b741-3f21151f70fe\",\"timeoutMs\":0,\"subject\":\"sess:fix-failing-test\"}"
         },
         {
           "n": 6,
           "tool": "allow_wait",
           "args": {
-            "requestId": "req_194958c1-0676-4109-bc96-f2767f2d9651",
+            "requestId": "req_3011a1e2-f8e3-4882-b741-3f21151f70fe",
             "timeoutMs": 0,
             "subject": "sess:fix-failing-test"
           },
@@ -177,7 +177,7 @@
           "tokens": 175,
           "ms": 0,
           "changeSeq": 1,
-          "key": "allow_wait:{\"requestId\":\"req_194958c1-0676-4109-bc96-f2767f2d9651\",\"timeoutMs\":0,\"subject\":\"sess:fix-failing-test\"}"
+          "key": "allow_wait:{\"requestId\":\"req_3011a1e2-f8e3-4882-b741-3f21151f70fe\",\"timeoutMs\":0,\"subject\":\"sess:fix-failing-test\"}"
         },
         {
           "n": 7,
@@ -185,7 +185,7 @@
           "args": {
             "id": "fs.write",
             "args": {
-              "path": "/tmp/dsh-eval-fix-ulKTrL/src/math.mjs",
+              "path": "/tmp/dsh-eval-fix-EdD6el/src/math.mjs",
               "text": "export const add = (a, b) => a + b\n"
             }
           },
@@ -195,7 +195,7 @@
           "tokens": 108,
           "ms": 1,
           "changeSeq": 1,
-          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-fix-ulKTrL/src/math.mjs\",\"text\":\"export const add = (a, b) => a + b\\n\"}}"
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-fix-EdD6el/src/math.mjs\",\"text\":\"export const add = (a, b) => a + b\\n\"}}"
         },
         {
           "n": 8,
@@ -208,7 +208,7 @@
           "code": null,
           "invalid": null,
           "tokens": 168,
-          "ms": 72,
+          "ms": 82,
           "changeSeq": 1,
           "key": "check_run:{\"prompt\":\"rerun math.add\",\"id\":\"math.add\"}"
         }
@@ -298,7 +298,7 @@
           "code": null,
           "invalid": null,
           "tokens": 114,
-          "ms": 1,
+          "ms": 2,
           "changeSeq": 0,
           "key": "snip_capture:{\"sourceApp\":\"Chrome\"}"
         },
@@ -321,7 +321,7 @@
           "n": 3,
           "tool": "snip_get",
           "args": {
-            "id": "clipboard://5ae9c3a9-9c04-46d5-8bda-9eb3cacc67e8"
+            "id": "clipboard://5ca26599-dd22-47e6-a8d6-2389b3845753"
           },
           "ok": true,
           "code": null,
@@ -329,7 +329,7 @@
           "tokens": 200,
           "ms": 0,
           "changeSeq": 0,
-          "key": "snip_get:{\"id\":\"clipboard://5ae9c3a9-9c04-46d5-8bda-9eb3cacc67e8\"}"
+          "key": "snip_get:{\"id\":\"clipboard://5ca26599-dd22-47e6-a8d6-2389b3845753\"}"
         },
         {
           "n": 4,
@@ -337,7 +337,7 @@
           "args": {
             "id": "fs.write",
             "args": {
-              "path": "/tmp/dsh-eval-clip-g7SVh7/clip.md",
+              "path": "/tmp/dsh-eval-clip-VIirt5/clip.md",
               "text": "Meeting notes: ship dsh-os 0.2.0 on Friday. Owner: Lin. Link: https://example.test/roadmap"
             }
           },
@@ -345,9 +345,9 @@
           "code": "grant_required",
           "invalid": null,
           "tokens": 131,
-          "ms": 0,
+          "ms": 1,
           "changeSeq": 0,
-          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-clip-g7SVh7/clip.md\",\"text\":\"Meeting notes: ship dsh-os 0.2.0 on Friday. Owner: Lin. Link: https://example.test/roadmap\"}}"
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-clip-VIirt5/clip.md\",\"text\":\"Meeting notes: ship dsh-os 0.2.0 on Friday. Owner: Lin. Link: https://example.test/roadmap\"}}"
         },
         {
           "n": 5,
@@ -370,7 +370,7 @@
           "n": 6,
           "tool": "allow_wait",
           "args": {
-            "requestId": "req_e73a06c2-f877-46b5-b17f-6bcbee682265",
+            "requestId": "req_ed9522e5-5433-440a-9ede-45bfa67a3945",
             "timeoutMs": 0,
             "subject": "sess:tidy-clipboard"
           },
@@ -380,13 +380,13 @@
           "tokens": 150,
           "ms": 0,
           "changeSeq": 0,
-          "key": "allow_wait:{\"requestId\":\"req_e73a06c2-f877-46b5-b17f-6bcbee682265\",\"timeoutMs\":0,\"subject\":\"sess:tidy-clipboard\"}"
+          "key": "allow_wait:{\"requestId\":\"req_ed9522e5-5433-440a-9ede-45bfa67a3945\",\"timeoutMs\":0,\"subject\":\"sess:tidy-clipboard\"}"
         },
         {
           "n": 7,
           "tool": "allow_wait",
           "args": {
-            "requestId": "req_e73a06c2-f877-46b5-b17f-6bcbee682265",
+            "requestId": "req_ed9522e5-5433-440a-9ede-45bfa67a3945",
             "timeoutMs": 0,
             "subject": "sess:tidy-clipboard"
           },
@@ -396,7 +396,7 @@
           "tokens": 175,
           "ms": 0,
           "changeSeq": 1,
-          "key": "allow_wait:{\"requestId\":\"req_e73a06c2-f877-46b5-b17f-6bcbee682265\",\"timeoutMs\":0,\"subject\":\"sess:tidy-clipboard\"}"
+          "key": "allow_wait:{\"requestId\":\"req_ed9522e5-5433-440a-9ede-45bfa67a3945\",\"timeoutMs\":0,\"subject\":\"sess:tidy-clipboard\"}"
         },
         {
           "n": 8,
@@ -404,7 +404,7 @@
           "args": {
             "id": "fs.write",
             "args": {
-              "path": "/tmp/dsh-eval-clip-g7SVh7/clip.md",
+              "path": "/tmp/dsh-eval-clip-VIirt5/clip.md",
               "text": "Meeting notes: ship dsh-os 0.2.0 on Friday. Owner: Lin. Link: https://example.test/roadmap"
             }
           },
@@ -414,7 +414,7 @@
           "tokens": 120,
           "ms": 0,
           "changeSeq": 1,
-          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-clip-g7SVh7/clip.md\",\"text\":\"Meeting notes: ship dsh-os 0.2.0 on Friday. Owner: Lin. Link: https://example.test/roadmap\"}}"
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-clip-VIirt5/clip.md\",\"text\":\"Meeting notes: ship dsh-os 0.2.0 on Friday. Owner: Lin. Link: https://example.test/roadmap\"}}"
         }
       ],
       "toolCalls": 8,
@@ -511,7 +511,7 @@
           "tool": "trigger_source_start",
           "args": {
             "type": "fs",
-            "path": "/tmp/dsh-eval-upgrade-4DN2RU/app.txt",
+            "path": "/tmp/dsh-eval-upgrade-AKW6SI/app.txt",
             "id": "src.fs"
           },
           "ok": true,
@@ -520,7 +520,7 @@
           "tokens": 116,
           "ms": 1,
           "changeSeq": 0,
-          "key": "trigger_source_start:{\"type\":\"fs\",\"path\":\"/tmp/dsh-eval-upgrade-4DN2RU/app.txt\",\"id\":\"src.fs\"}"
+          "key": "trigger_source_start:{\"type\":\"fs\",\"path\":\"/tmp/dsh-eval-upgrade-AKW6SI/app.txt\",\"id\":\"src.fs\"}"
         },
         {
           "n": 3,
@@ -626,7 +626,7 @@
           "n": 7,
           "tool": "ring_escalate",
           "args": {
-            "id": "36e659e1-0237-4ce2-9fa3-abdb4da068f7"
+            "id": "8c6cf7f0-c1d7-4769-85ff-2012b70f6542"
           },
           "ok": true,
           "code": null,
@@ -634,7 +634,7 @@
           "tokens": 162,
           "ms": 0,
           "changeSeq": 1,
-          "key": "ring_escalate:{\"id\":\"36e659e1-0237-4ce2-9fa3-abdb4da068f7\"}"
+          "key": "ring_escalate:{\"id\":\"8c6cf7f0-c1d7-4769-85ff-2012b70f6542\"}"
         },
         {
           "n": 8,
@@ -657,7 +657,7 @@
           "n": 9,
           "tool": "allow_wait",
           "args": {
-            "requestId": "req_4b91dc77-2bfc-4c1f-aab5-c6fd728cb2e4",
+            "requestId": "req_4ff68c56-2722-4207-a73f-a714703b1d9f",
             "timeoutMs": 0,
             "subject": "sess:upgrade-regression"
           },
@@ -667,13 +667,13 @@
           "tokens": 153,
           "ms": 0,
           "changeSeq": 1,
-          "key": "allow_wait:{\"requestId\":\"req_4b91dc77-2bfc-4c1f-aab5-c6fd728cb2e4\",\"timeoutMs\":0,\"subject\":\"sess:upgrade-regression\"}"
+          "key": "allow_wait:{\"requestId\":\"req_4ff68c56-2722-4207-a73f-a714703b1d9f\",\"timeoutMs\":0,\"subject\":\"sess:upgrade-regression\"}"
         },
         {
           "n": 10,
           "tool": "allow_wait",
           "args": {
-            "requestId": "req_4b91dc77-2bfc-4c1f-aab5-c6fd728cb2e4",
+            "requestId": "req_4ff68c56-2722-4207-a73f-a714703b1d9f",
             "timeoutMs": 0,
             "subject": "sess:upgrade-regression"
           },
@@ -683,13 +683,13 @@
           "tokens": 178,
           "ms": 0,
           "changeSeq": 2,
-          "key": "allow_wait:{\"requestId\":\"req_4b91dc77-2bfc-4c1f-aab5-c6fd728cb2e4\",\"timeoutMs\":0,\"subject\":\"sess:upgrade-regression\"}"
+          "key": "allow_wait:{\"requestId\":\"req_4ff68c56-2722-4207-a73f-a714703b1d9f\",\"timeoutMs\":0,\"subject\":\"sess:upgrade-regression\"}"
         },
         {
           "n": 11,
           "tool": "ring_notify",
           "args": {
-            "id": "36e659e1-0237-4ce2-9fa3-abdb4da068f7"
+            "id": "8c6cf7f0-c1d7-4769-85ff-2012b70f6542"
           },
           "ok": false,
           "code": "E_UNAVAILABLE",
@@ -697,7 +697,7 @@
           "tokens": 78,
           "ms": 1,
           "changeSeq": 2,
-          "key": "ring_notify:{\"id\":\"36e659e1-0237-4ce2-9fa3-abdb4da068f7\"}"
+          "key": "ring_notify:{\"id\":\"8c6cf7f0-c1d7-4769-85ff-2012b70f6542\"}"
         },
         {
           "n": 12,
@@ -732,7 +732,7 @@
           "n": 14,
           "tool": "allow_wait",
           "args": {
-            "requestId": "req_df18f4c6-91d6-4e70-8964-4fd173aa66c2",
+            "requestId": "req_dd19b8fc-3a97-4e64-8a89-93c13e5a0db4",
             "timeoutMs": 0,
             "subject": "sess:upgrade-regression"
           },
@@ -742,13 +742,13 @@
           "tokens": 155,
           "ms": 0,
           "changeSeq": 3,
-          "key": "allow_wait:{\"requestId\":\"req_df18f4c6-91d6-4e70-8964-4fd173aa66c2\",\"timeoutMs\":0,\"subject\":\"sess:upgrade-regression\"}"
+          "key": "allow_wait:{\"requestId\":\"req_dd19b8fc-3a97-4e64-8a89-93c13e5a0db4\",\"timeoutMs\":0,\"subject\":\"sess:upgrade-regression\"}"
         },
         {
           "n": 15,
           "tool": "allow_wait",
           "args": {
-            "requestId": "req_df18f4c6-91d6-4e70-8964-4fd173aa66c2",
+            "requestId": "req_dd19b8fc-3a97-4e64-8a89-93c13e5a0db4",
             "timeoutMs": 0,
             "subject": "sess:upgrade-regression"
           },
@@ -758,13 +758,13 @@
           "tokens": 181,
           "ms": 0,
           "changeSeq": 4,
-          "key": "allow_wait:{\"requestId\":\"req_df18f4c6-91d6-4e70-8964-4fd173aa66c2\",\"timeoutMs\":0,\"subject\":\"sess:upgrade-regression\"}"
+          "key": "allow_wait:{\"requestId\":\"req_dd19b8fc-3a97-4e64-8a89-93c13e5a0db4\",\"timeoutMs\":0,\"subject\":\"sess:upgrade-regression\"}"
         },
         {
           "n": 16,
           "tool": "ring_notify",
           "args": {
-            "id": "36e659e1-0237-4ce2-9fa3-abdb4da068f7"
+            "id": "8c6cf7f0-c1d7-4769-85ff-2012b70f6542"
           },
           "ok": true,
           "code": null,
@@ -772,13 +772,13 @@
           "tokens": 98,
           "ms": 0,
           "changeSeq": 4,
-          "key": "ring_notify:{\"id\":\"36e659e1-0237-4ce2-9fa3-abdb4da068f7\"}"
+          "key": "ring_notify:{\"id\":\"8c6cf7f0-c1d7-4769-85ff-2012b70f6542\"}"
         },
         {
           "n": 17,
           "tool": "ring_receipts",
           "args": {
-            "id": "36e659e1-0237-4ce2-9fa3-abdb4da068f7"
+            "id": "8c6cf7f0-c1d7-4769-85ff-2012b70f6542"
           },
           "ok": true,
           "code": null,
@@ -786,7 +786,7 @@
           "tokens": 225,
           "ms": 0,
           "changeSeq": 4,
-          "key": "ring_receipts:{\"id\":\"36e659e1-0237-4ce2-9fa3-abdb4da068f7\"}"
+          "key": "ring_receipts:{\"id\":\"8c6cf7f0-c1d7-4769-85ff-2012b70f6542\"}"
         },
         {
           "n": 18,
@@ -845,7 +845,7 @@
         {
           "id": "notify-delivery-ok",
           "ok": true,
-          "detail": "ring_notify delivery={\"caseId\":\"36e659e1-0237-4ce2-9fa3-abdb4da068f7\",\"channel\":\"console\",\"ok\":true,\"error\":null,\"at\":1795274409661,\"dedupeKey\":\"36e659e1-0237-4ce2-9fa3-abdb4da068f7:t1:console\"}",
+          "detail": "ring_notify delivery={\"caseId\":\"8c6cf7f0-c1d7-4769-85ff-2012b70f6542\",\"channel\":\"console\",\"ok\":true,\"error\":null,\"at\":1795276149491,\"dedupeKey\":\"8c6cf7f0-c1d7-4769-85ff-2012b70f6542:t1:console\"}",
           "deferred": false
         },
         {
@@ -926,7 +926,7 @@
           "code": null,
           "invalid": null,
           "tokens": 652,
-          "ms": 1,
+          "ms": 2,
           "changeSeq": 0,
           "key": "seek_search:{\"query\":\"user-trust\",\"limit\":5}"
         },
@@ -940,7 +940,7 @@
           "code": null,
           "invalid": null,
           "tokens": 85,
-          "ms": 0,
+          "ms": 1,
           "changeSeq": 0,
           "key": "seek_resolve:{\"ref\":\"dsh://locator/docs/missing.md\"}"
         },
@@ -954,7 +954,7 @@
           "code": null,
           "invalid": null,
           "tokens": 90,
-          "ms": 1,
+          "ms": 0,
           "changeSeq": 0,
           "key": "seek_resolve:{\"ref\":\"dsh://memento/mem-42\"}"
         },
@@ -1002,7 +1002,7 @@
           "code": null,
           "invalid": null,
           "tokens": 190,
-          "ms": 0,
+          "ms": 1,
           "changeSeq": 0,
           "key": "trace_remember:{\"key\":\"repo:dsh-os/user-trust\",\"text\":\"user-trust profiles are hidden from agent-layer resolution.\",\"source\":\"dsh://memento/mem-42\",\"confidence\":0.8}"
         },
@@ -1033,7 +1033,7 @@
           "code": null,
           "invalid": null,
           "tokens": 134,
-          "ms": 1,
+          "ms": 0,
           "changeSeq": 0,
           "key": "trace_search:{\"query\":\"user-trust\"}"
         }
@@ -1125,7 +1125,7 @@
           "args": {
             "id": "fs.write",
             "args": {
-              "path": "/tmp/dsh-eval-approve-73iFpw/config.json",
+              "path": "/tmp/dsh-eval-approve-Nz42go/config.json",
               "text": "{\"timeout\":30}\n"
             }
           },
@@ -1135,7 +1135,7 @@
           "tokens": 115,
           "ms": 0,
           "changeSeq": 0,
-          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-approve-73iFpw/config.json\",\"text\":\"{\\\"timeout\\\":30}\\n\"}}"
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-approve-Nz42go/config.json\",\"text\":\"{\\\"timeout\\\":30}\\n\"}}"
         },
         {
           "n": 2,
@@ -1150,7 +1150,7 @@
           "code": null,
           "invalid": null,
           "tokens": 134,
-          "ms": 1,
+          "ms": 0,
           "changeSeq": 0,
           "key": "allow_request:{\"subject\":\"sess:approval-recovery\",\"capability\":\"act:invoke:fs.write\",\"scope\":\"*\",\"reason\":\"更新 config timeout\"}"
         },
@@ -1158,7 +1158,7 @@
           "n": 3,
           "tool": "allow_wait",
           "args": {
-            "requestId": "req_6b95dc9e-23ef-42da-a1b1-190843cc88f4",
+            "requestId": "req_53f14080-44e0-4964-b92f-bbd07da05e2e",
             "timeoutMs": 0,
             "subject": "sess:approval-recovery"
           },
@@ -1168,13 +1168,13 @@
           "tokens": 151,
           "ms": 0,
           "changeSeq": 0,
-          "key": "allow_wait:{\"requestId\":\"req_6b95dc9e-23ef-42da-a1b1-190843cc88f4\",\"timeoutMs\":0,\"subject\":\"sess:approval-recovery\"}"
+          "key": "allow_wait:{\"requestId\":\"req_53f14080-44e0-4964-b92f-bbd07da05e2e\",\"timeoutMs\":0,\"subject\":\"sess:approval-recovery\"}"
         },
         {
           "n": 4,
           "tool": "allow_wait",
           "args": {
-            "requestId": "req_6b95dc9e-23ef-42da-a1b1-190843cc88f4",
+            "requestId": "req_53f14080-44e0-4964-b92f-bbd07da05e2e",
             "timeoutMs": 0,
             "subject": "sess:approval-recovery"
           },
@@ -1184,7 +1184,7 @@
           "tokens": 177,
           "ms": 0,
           "changeSeq": 1,
-          "key": "allow_wait:{\"requestId\":\"req_6b95dc9e-23ef-42da-a1b1-190843cc88f4\",\"timeoutMs\":0,\"subject\":\"sess:approval-recovery\"}"
+          "key": "allow_wait:{\"requestId\":\"req_53f14080-44e0-4964-b92f-bbd07da05e2e\",\"timeoutMs\":0,\"subject\":\"sess:approval-recovery\"}"
         },
         {
           "n": 5,
@@ -1192,7 +1192,7 @@
           "args": {
             "id": "fs.write",
             "args": {
-              "path": "/tmp/dsh-eval-approve-73iFpw/config.json",
+              "path": "/tmp/dsh-eval-approve-Nz42go/config.json",
               "text": "{\"timeout\":30}\n"
             }
           },
@@ -1202,7 +1202,7 @@
           "tokens": 105,
           "ms": 0,
           "changeSeq": 1,
-          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-approve-73iFpw/config.json\",\"text\":\"{\\\"timeout\\\":30}\\n\"}}"
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-approve-Nz42go/config.json\",\"text\":\"{\\\"timeout\\\":30}\\n\"}}"
         },
         {
           "n": 6,
@@ -1210,7 +1210,7 @@
           "args": {
             "id": "fs.write",
             "args": {
-              "path": "/tmp/dsh-eval-approve-73iFpw/config.json",
+              "path": "/tmp/dsh-eval-approve-Nz42go/config.json",
               "text": "{\"timeout\":30}\n"
             }
           },
@@ -1220,7 +1220,7 @@
           "tokens": 115,
           "ms": 0,
           "changeSeq": 1,
-          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-approve-73iFpw/config.json\",\"text\":\"{\\\"timeout\\\":30}\\n\"}}"
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-approve-Nz42go/config.json\",\"text\":\"{\\\"timeout\\\":30}\\n\"}}"
         }
       ],
       "toolCalls": 6,
@@ -1319,8 +1319,8 @@
           "ok": true,
           "code": null,
           "invalid": null,
-          "tokens": 120,
-          "ms": 1,
+          "tokens": 403,
+          "ms": 6,
           "changeSeq": 0,
           "key": "os_find:{\"intent\":\"write a file fs.write\"}"
         },
@@ -1338,7 +1338,7 @@
           "code": "E_DENIED",
           "invalid": null,
           "tokens": 257,
-          "ms": 0,
+          "ms": 1,
           "changeSeq": 0,
           "key": "os_do:{\"id\":\"fs.write\",\"args\":{\"path\":\"note.txt\",\"content\":\"written through the kernel gateway\\n\"}}"
         },
@@ -1357,7 +1357,7 @@
           "code": null,
           "invalid": null,
           "tokens": 131,
-          "ms": 1,
+          "ms": 0,
           "changeSeq": 0,
           "key": "os_request:{\"id\":\"fs.write\",\"args\":{\"path\":\"note.txt\",\"content\":\"written through the kernel gateway\\n\"},\"reason\":\"write note.txt\"}"
         },
@@ -1371,18 +1371,18 @@
               "content": "written through the kernel gateway\n"
             },
             "grant": {
-              "id": "grant_0f5add1b-a3bf-4bba-a7aa-8b699d07e773",
+              "id": "grant_03f1e722-6c7c-4269-a400-4f044ad9bc8c",
               "subject": "sess:kernel-write",
               "capability": "cap:fs.write",
               "scope": "*",
               "status": "active",
-              "createdAt": 1795274409798,
-              "expiresAt": 1795360809798,
+              "createdAt": 1795276149645,
+              "expiresAt": 1795362549645,
               "maxUses": 1,
               "uses": 0,
               "lastUsedAt": null,
               "approver": "user",
-              "requestId": "req_6018799e-00ec-4add-a3c7-a507e5cdc16e",
+              "requestId": "req_c0cfd8da-27cf-4bd9-96ec-c7a7f9883d8d",
               "requestHash": "f6ed8e061fcb447d689a261947505cc596b6b82968bde6ee8e788cabf506cdd2"
             }
           },
@@ -1390,9 +1390,9 @@
           "code": null,
           "invalid": null,
           "tokens": 311,
-          "ms": 0,
+          "ms": 1,
           "changeSeq": 1,
-          "key": "os_do:{\"id\":\"fs.write\",\"args\":{\"path\":\"note.txt\",\"content\":\"written through the kernel gateway\\n\"},\"grant\":{\"id\":\"grant_0f5add1b-a3bf-4bba-a7aa-8b699d07e773\",\"subject\":\"sess:kernel-write\",\"capability\":\"cap:fs.write\",\"scope\":\"*\",\"status\":\"active\",\"createdAt\":1795274409798,\"expiresAt\":1795360809798,\"maxUses\":1,\"uses\":0,\"lastUsedAt\":null,\"approver\":\"user\",\"requestId\":\"req_6018799e-00ec-4add-a3c7-a507e5cdc16e\",\"requestHash\":\"f6ed8e061fcb447d689a261947505cc596b6b82968bde6ee8e788cabf506cdd2\"}}"
+          "key": "os_do:{\"id\":\"fs.write\",\"args\":{\"path\":\"note.txt\",\"content\":\"written through the kernel gateway\\n\"},\"grant\":{\"id\":\"grant_03f1e722-6c7c-4269-a400-4f044ad9bc8c\",\"subject\":\"sess:kernel-write\",\"capability\":\"cap:fs.write\",\"scope\":\"*\",\"status\":\"active\",\"createdAt\":1795276149645,\"expiresAt\":1795362549645,\"maxUses\":1,\"uses\":0,\"lastUsedAt\":null,\"approver\":\"user\",\"requestId\":\"req_c0cfd8da-27cf-4bd9-96ec-c7a7f9883d8d\",\"requestHash\":\"f6ed8e061fcb447d689a261947505cc596b6b82968bde6ee8e788cabf506cdd2\"}}"
         },
         {
           "n": 5,
@@ -1401,7 +1401,7 @@
           "ok": true,
           "code": null,
           "invalid": null,
-          "tokens": 104,
+          "tokens": 106,
           "ms": 0,
           "changeSeq": 1,
           "key": "os_status:{}"
@@ -1409,7 +1409,7 @@
       ],
       "toolCalls": 5,
       "invalidCalls": 0,
-      "tokensEstimate": 923,
+      "tokensEstimate": 1208,
       "interventions": [
         {
           "kind": "human.approve",
@@ -1433,7 +1433,7 @@
         {
           "id": "os-request-opens-request",
           "ok": true,
-          "detail": "requestId=req_6018799e-00ec-4add-a3c7-a507e5cdc16e status=approved",
+          "detail": "requestId=req_c0cfd8da-27cf-4bd9-96ec-c7a7f9883d8d status=approved",
           "deferred": false
         },
         {
@@ -1445,7 +1445,7 @@
         {
           "id": "gateway-healthy",
           "ok": true,
-          "detail": "ok=true capabilities=1 tools=6",
+          "detail": "ok=true capabilities=8 tools=6",
           "deferred": false
         }
       ],
@@ -1477,8 +1477,8 @@
     "invalidCalls": 0,
     "invalidCallRate": 0,
     "avgSteps": 9,
-    "tokensEstimate": 9272,
-    "avgTokens": 1545.3333333333333,
+    "tokensEstimate": 9557,
+    "avgTokens": 1592.8333333333333,
     "interventions": 7,
     "assistedSuccesses": 5,
     "autonomousSuccesses": 1

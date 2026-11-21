@@ -69,7 +69,7 @@ test('meta.tainted requires a second :tainted Grant and never writes without it'
     tainted: true,
     hint: 'Call allow_request for capability "act:invoke:fs.write:tainted" with the target scope, then retry.',
   })
-  assert.deepEqual(allow.calls, ['act:invoke:fs.write', 'act:invoke:fs.write:tainted'])
+  assert.deepEqual(allow.calls, ['act:invoke:fs.write', 'act:invoke:fs.write:tainted', 'cap:act.fs.write:tainted'])
   assert.equal(existsSync(file), false)
 })
 
@@ -101,7 +101,7 @@ test('a taintToken raises the gate; a forged token cannot authorize or downgrade
   const empty = await service.invoke('fs.write', { path: file, text: 'plain' }, { subject: 'tester', taintToken: '' })
   assert.equal(empty.ok, true)
   assert.deepEqual(allow.calls, [
-    'act:invoke:fs.write', 'act:invoke:fs.write:tainted', 'act:invoke:fs.write',
+    'act:invoke:fs.write', 'act:invoke:fs.write:tainted', 'cap:act.fs.write:tainted', 'act:invoke:fs.write',
   ])
 })
 
