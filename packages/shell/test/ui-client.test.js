@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 const CLIENT = new URL('../ui/client.js', import.meta.url)
@@ -11,6 +12,18 @@ test('ui/client.js is a syntactically valid classic-script bundle', () => {
     cwd: PACKAGE_DIR,
     stdio: 'pipe',
   }))
+})
+
+test('the client keeps the five tabs and talks only to the owner-only routes', () => {
+  const source = readFileSync(CLIENT, 'utf8')
+  for (const label of ['Approvals', 'Activity', 'Act', 'Snip', 'Check']) {
+    assert.match(source, new RegExp("'" + label + "'"), label)
+  }
+  for (const route of ['api/os-approvals', 'api/os-activity', 'api/os-shell/snapshot']) {
+    assert.ok(source.includes(route), route)
+  }
+  assert.match(source, /Approver \(required\)/)
+  assert.match(source, /agent identities are rejected/)
 })
 
 test('the bundle hands off its package id and registers main + sidebar.panellist', async () => {

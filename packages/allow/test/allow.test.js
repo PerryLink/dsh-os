@@ -161,19 +161,24 @@ test('evidence is cloned, not aliased', () => {
   assert.equal(service.list()[0].evidence.sessionId, 'session-1')
 })
 
-test('default apply exposes only the read-only check tool (no self-grant)', async () => {
+test('default apply exposes only request/wait/list/check tools (no self-grant)', async () => {
   const { ctx, service } = fakeContext()
   assert.equal(ctx.get('allow'), service)
-  assert.deepEqual([...ctx._tools.keys()], ['allow_check'])
+  assert.deepEqual([...ctx._tools.keys()], ['allow_check', 'allow_request', 'allow_wait', 'allow_requests'])
   assert.equal(ctx._tools.get('allow_issue'), undefined)
   assert.equal(ctx._tools.get('allow_revoke'), undefined)
   assert.equal(ctx._tools.get('allow_list'), undefined)
+  assert.equal(ctx._tools.get('allow_approve'), undefined)
+  assert.equal(ctx._tools.get('allow_deny'), undefined)
 })
 
 test('human-facing clients can opt into the admin tools', async () => {
   const { ctx, service } = fakeContext({ exposeAdminTools: true })
   assert.equal(ctx.get('allow'), service)
-  assert.deepEqual([...ctx._tools.keys()].sort(), ['allow_check', 'allow_issue', 'allow_list', 'allow_revoke'])
+  assert.deepEqual([...ctx._tools.keys()].sort(), [
+    'allow_approve', 'allow_check', 'allow_deny', 'allow_issue', 'allow_list',
+    'allow_request', 'allow_requests', 'allow_revoke', 'allow_wait',
+  ])
 
   const issueTool = ctx._tools.get('allow_issue')
   assert.equal(issueTool.parameters.type, 'object')

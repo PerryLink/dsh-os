@@ -1,6 +1,6 @@
 {
   "name": "@perrylink/dsh-os-cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Offline catalog, doctor and install-command helper for the dsh-os module family.",
   "type": "module",
   "bin": {

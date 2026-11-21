@@ -3,16 +3,16 @@
     "name": "dsh-act",
     "product": "Act",
     "service": "act",
-    "version": "0.1.1",
+    "version": "0.3.0",
     "stability": "experimental",
-    "description": "Typed action registry and natural-language action panel for DeepSeek Harness.",
+    "description": "Typed action registry with filesystem actions, previews and undo for DeepSeek Harness.",
     "install": "dsh plugin --profile web add dsh-act"
   },
   {
     "name": "dsh-allow",
     "product": "Allow",
     "service": "allow",
-    "version": "0.1.2",
+    "version": "0.3.0",
     "stability": "experimental",
     "description": "Revocable capability grants and an audit-ready permission center for DeepSeek Harness.",
     "install": "dsh plugin --profile web add dsh-allow"
@@ -99,6 +99,15 @@
     "install": "dsh plugin --profile web add @perrylink/dsh-root"
   },
   {
+    "name": "@perrylink/dsh-os-kernel",
+    "product": "Kernel",
+    "service": "kernel",
+    "version": "0.1.0",
+    "stability": "experimental",
+    "description": "Thin capability kernel for dsh-os: descriptor protocol, registry and six os_* agent verbs.",
+    "install": "dsh plugin --profile web add @perrylink/dsh-os-kernel"
+  },
+  {
     "name": "dsh-help",
     "product": "Help",
     "service": "help",
@@ -152,9 +161,9 @@
     "name": "@perrylink/dsh-os-shell",
     "product": "Shell",
     "service": null,
-    "version": "0.2.0",
+    "version": "0.3.0",
     "stability": "experimental",
-    "description": "Optional UI shell for dsh-os: a view contribution registry, an owner-only JSON bridge and a minimal React client for Act, Snip and Check.",
+    "description": "Optional UI shell for dsh-os: a view contribution registry, an owner-only JSON bridge and a minimal React client for approvals, activity, Act, Snip and Check.",
     "install": "dsh plugin --profile web add @perrylink/dsh-os-shell",
     "optional": true
   },
@@ -162,7 +171,7 @@
     "name": "dsh-os-kit",
     "product": "Kit",
     "service": null,
-    "version": "0.2.0",
+    "version": "0.3.0",
     "stability": "experimental",
     "description": "Thin meta bundle that installs and mounts the four core dsh-os modules: Act, Allow, Snip and Check.",
     "install": "dsh plugin --profile web add dsh-os-kit",

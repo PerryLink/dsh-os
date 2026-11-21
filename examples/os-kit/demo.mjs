@@ -140,7 +140,8 @@ async function main() {
   const snip = ctx.get('snip')
   check(allow && act && snip, 'the three services must be provided on ctx')
   const toolNames = ctx.tools.list().map(tool => tool.name).sort()
-  check(toolNames.length === 12, `expected 12 agent tools, got ${toolNames.length}`)
+  const requiredTools = ['allow_check', 'allow_request', 'allow_wait', 'allow_requests', 'act_invoke', 'act_list', 'snip_add', 'snip_search']
+  check(requiredTools.every(name => toolNames.includes(name)), `missing tools: ${requiredTools.filter(name => !toolNames.includes(name)).join(', ')}`)
   console.log(`  node ${process.version} · services: allow, act, snip · ${toolNames.length} agent tools`)
   console.log(`  tools: ${toolNames.join(', ')}`)
 

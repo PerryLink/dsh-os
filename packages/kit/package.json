@@ -1,6 +1,6 @@
 {
   "name": "dsh-os-kit",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Thin meta bundle that installs and mounts the four core dsh-os modules: Act, Allow, Snip and Check.",
   "type": "module",
   "main": "index.js",
@@ -38,8 +38,8 @@
     "dsh": ">=0.2.1-rc.2 <0.3.0-0"
   },
   "dependencies": {
-    "dsh-act": "^0.1.1",
-    "dsh-allow": "^0.1.2",
+    "dsh-act": "^0.3.0",
+    "dsh-allow": "^0.3.0",
     "dsh-snip": "^0.2.0",
     "@perrylink/dsh-check": "^0.2.0"
   },
@@ -54,7 +54,7 @@
       "capabilities": [],
       "tools": [],
       "stability": "experimental",
-      "since": "0.2.0"
+      "since": "0.3.0"
     },
     "kit": true
   },

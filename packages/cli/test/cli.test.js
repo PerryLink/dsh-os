@@ -246,7 +246,7 @@ test('update prints @latest commands for every product module', t => {
   const result = runCli(['update'], { cwd: root, env: envWithPath(emptyBin) })
   assert.equal(result.status, 0, result.stderr)
   const lines = result.stdout.trim().split('\n')
-  assert.equal(lines.length, 11)
+  assert.equal(lines.length, 12)
   assert.ok(lines.every(line => line.startsWith('dsh plugin --profile web add ')))
   assert.ok(lines.every(line => line.endsWith('@latest')))
   assert.ok(lines.includes('dsh plugin --profile web add @perrylink/dsh-root@latest'))
@@ -278,9 +278,9 @@ test('doctor exits 1 for an unsupported Node range and an unbounded engines.dsh'
   assert.match(result.stdout, /[1-9]\d* error\(s\)/)
 })
 
-test('catalog.json describes 11 modules plus 5 optional modules', () => {
+test('catalog.json describes 12 modules plus 7 optional modules', () => {
   const catalog = JSON.parse(readFileSync(CATALOG_PATH, 'utf8'))
-  assert.equal(catalog.length, 18)
+  assert.equal(catalog.length, 19)
   assert.deepEqual(
     catalog.filter(entry => !entry.optional).map(entry => entry.name),
     [
@@ -295,6 +295,7 @@ test('catalog.json describes 11 modules plus 5 optional modules', () => {
       'dsh-stage',
       'dsh-ring',
       '@perrylink/dsh-root',
+      '@perrylink/dsh-os-kernel',
     ],
   )
   assert.equal(catalog.filter(entry => entry.optional).length, 7)
@@ -323,7 +324,7 @@ test('help and version are available without a workspace', t => {
   const { root, emptyBin } = makeFixture(t)
   const version = runCli(['--version'], { cwd: root, env: envWithPath(emptyBin) })
   assert.equal(version.status, 0)
-  assert.equal(version.stdout.trim(), '0.1.0')
+  assert.equal(version.stdout.trim(), '0.2.0')
 
   const help = runCli([], { cwd: root, env: envWithPath(emptyBin) })
   assert.equal(help.status, 0)
@@ -354,7 +355,7 @@ test('a plugin monorepo that only declares dsh.os stays in catalog mode', t => {
 
   const list = runCli(['list', '--json'], { cwd: root, env: envWithPath(emptyBin) })
   assert.equal(list.status, 0, list.stderr)
-  assert.equal(JSON.parse(list.stdout).length, 11)
+  assert.equal(JSON.parse(list.stdout).length, 12)
 
   const doctor = runCli(['doctor'], { cwd: root, env: envWithPath(emptyBin) })
   assert.equal(doctor.status, 0, doctor.stdout + doctor.stderr)
@@ -370,7 +371,7 @@ test('catalog mode is used outside a dsh-os checkout', t => {
   const result = runCli(['list', '--json'], { cwd: outside, env: envWithPath(emptyBin) })
   assert.equal(result.status, 0, result.stderr)
   const modules = JSON.parse(result.stdout)
-  assert.equal(modules.length, 11)
+  assert.equal(modules.length, 12)
   assert.equal(modules[0].name, 'dsh-act')
 
   const doctor = runCli(['doctor'], { cwd: outside, env: envWithPath(emptyBin) })

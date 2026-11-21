@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.3.0
+
+- Add four real filesystem actions:
+  - `fs.read` (read) — `{ path, maxBytes? }` → `{ path, size, text }`; read cap
+    defaults to 256 KiB and a per-call value can only lower it.
+  - `fs.write` (write) — `{ path, text, create? }` → `{ path, bytes, undoToken }`;
+    writes a sibling temp file and renames it into place.
+  - `fs.list` (read) — `{ path, recursive?, limit? }` →
+    `{ entries: [{ path, type, size }] }`; symlinks are reported, not followed.
+  - `fs.undo` (write) — `{ undoToken }` restores the previous content (or removes
+    a created file) after re-validating path and content hash.
+- Confine every path to the workdir allowlist (`config.workdir`, default
+  `process.cwd()`): absolute only, no NUL, no `..` segment, `realpath`
+  canonicalization, no symlink escape.
+- Gate `fs.write` through `allow.check({ subject, capability:
+  'act:invoke:fs.write' })`; denials include an `allow_request` hint when the
+  Allow service exposes `request`.
+- Add write previews via `meta.preview` / the `preview` tool flag: return
+  `{ ok: true, preview: { path, bytes, diff } }` without touching disk.
+- Add bounded in-memory undo (16 entries, 1 MiB per entry, 5 minutes, single
+  use); over-limit or otherwise irreversible writes return `undoToken: null`
+  with `undoable: false`.
+- Keep `echo` / `now` / `list` ids and result shapes compatible; `act_list`
+  keeps exposing each action's `risk`.
+- Bump `dsh.os.capabilities` to `fs.read` and `fs.write`; ship
+  `fs-actions.js`.
+- Add `node --test` coverage for read/write/list, caps, traversal and symlink
+  rejection, missing grants and hints, side-effect-free previews, undo
+  restoration, stale undo and read/write limits.
+
 ## 0.1.1
 
 - Missing subject fails closed instead of falling back to a shared `anonymous`

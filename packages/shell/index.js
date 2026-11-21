@@ -10,6 +10,7 @@
  */
 
 import { registerBridge } from './bridge.js'
+import { Oversight } from './oversight.js'
 
 export const name = 'dsh-os-shell'
 
@@ -114,12 +115,14 @@ export class OsShellService {
   #history = []
   #now
   #getService
+  #oversight
 
   constructor({ now = Date.now, getService = () => undefined } = {}) {
     if (typeof now !== 'function') fail('E_INVALID_ARGUMENT', 'now must be a function')
     if (typeof getService !== 'function') fail('E_INVALID_ARGUMENT', 'getService must be a function')
     this.#now = now
     this.#getService = getService
+    this.#oversight = new Oversight(getService)
   }
 
   /** Read an optional peer service; a missing or throwing lookup is absent. */
@@ -275,6 +278,26 @@ export class OsShellService {
     })
     return { available: true, entries }
   }
+
+  /** Pending (or filtered) approval requests, projected for the inbox. */
+  approvalList(status) {
+    return this.#oversight.approvalList(status)
+  }
+
+  /** Approve once as a human; Allow validates the request hash and scope narrowing. */
+  approve(id, input) {
+    return this.#oversight.approve(id, input)
+  }
+
+  /** Deny once as a human; the requester cannot decide its own request. */
+  deny(id, input) {
+    return this.#oversight.deny(id, input)
+  }
+
+  /** Recent approval and action entries, newest first. */
+  activity(limit) {
+    return this.#oversight.activity(limit)
+  }
 }
 
 const OUTPUT = {
@@ -323,7 +346,7 @@ export function createTools(service) {
 
 /**
  * Mount dsh-os-shell: provide `ctx.osShell`, register the three agent tools
- * when a tool registry exists, and expose the four JSON routes when the
+ * when a tool registry exists, and expose the owner-only JSON routes when the
  * profile has a web server. The shell is optional; no other dsh-os module
  * depends on it, and no `ui/index.js` code is imported here.
  */

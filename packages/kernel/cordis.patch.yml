@@ -1,0 +1,4 @@
+# dsh-os-kernel bundle patch: mount the plugin.
+- insert:
+    - id: dsh-os-kernel
+      name: "@perrylink/dsh-os-kernel"

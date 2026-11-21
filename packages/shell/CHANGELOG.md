@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.3.0
+
+- Add the human oversight surface: an approval inbox and an activity feed
+  alongside Act, Snip and Check (five tabs on the existing `os` page).
+- Add `ctx.osShell.approvalList(status?)`, `approve(id, { by, scope? })`,
+  `deny(id, { by, reason })` and `activity(limit?)`; projections live in
+  `oversight.js` so the runtime entry stays inside the 450-line contract.
+- Add owner-only routes when `ctx.webServer` exists:
+  `GET /api/os-approvals`, `POST /api/os-approvals/:id/approve`,
+  `POST /api/os-approvals/:id/deny` and `GET /api/os-activity`. List/decide
+  return 503 `service_unavailable` without Allow; activity returns an empty
+  feed because Allow and Act are both optional.
+- Require a human `by` on every decision, reject `agent:`, `session:`, `tool:`,
+  `plugin:` and `ui:` identities, reject self-approval when Allow can answer,
+  require a deny reason, and forward optional scopes to Allow without widening
+  them in the shell. No model-facing tool can approve or deny.
+- Map approval cards to exactly `{ id, subject, capability, scope, reason,
+  createdAt, expiresAt, risk }`; activity merges `allow.audit` with
+  `act.audit` (or `act.list`) newest first.
+- Add the approval/activity UI: requester, capability, scope, reason, expiry
+  and risk on each card, explicit Approve/Deny buttons, empty/error states and
+  no automatic approval.
+- Tests: fake-webServer and fake-Allow coverage for list/approve/deny, missing
+  Allow, invalid ids, missing `by`, machine identities and self-approval;
+  activity merging; `node --check` plus tab/API markers for the client bundle.
+
 ## 0.2.0
 
 - Add `ctx.osShell.snapshot()`: aggregate Act actions, Snip entries and the

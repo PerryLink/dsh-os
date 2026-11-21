@@ -1,0 +1,1121 @@
+{
+  "schema": "dsh-os.eval/v1",
+  "layer": "P-scripted (fixed policy; no model, no network)",
+  "generatedAt": "2026-11-21T06:42:45.796Z",
+  "env": {
+    "node": "v24.22.1",
+    "commit": "8220013",
+    "dirty": true
+  },
+  "scenarios": [
+    {
+      "id": "fix-failing-test",
+      "title": "修失败测试",
+      "goal": "修复 src/math.mjs 的失败测试；只改源码、不改测试，最后 node --test 通过。",
+      "maxSteps": 12,
+      "initial": [
+        "临时仓库：src/math.mjs 返回 a+b+1，测试期望 add(2,2)=4",
+        "act 提供内置 fs.write（workdir 限定在临时仓库）",
+        "check 配置了本地 node --test runner"
+      ],
+      "allowedInterventions": [
+        "human.approve",
+        "human.grant",
+        "host.registerAction"
+      ],
+      "successCriteria": [
+        "node --test 退出 0",
+        "测试文件哈希不变",
+        "源码 diff ≤3 行",
+        "隐藏用例 add(3,5)=8"
+      ],
+      "success": true,
+      "toolCount": 77,
+      "firstTool": "check_compare",
+      "expectedFirstTool": "check_compare",
+      "firstStepCorrect": true,
+      "steps": [
+        {
+          "n": 1,
+          "tool": "check_compare",
+          "args": {
+            "old": {
+              "schema": "dsh.check.run/v1",
+              "tasks": [
+                {
+                  "id": "math.add",
+                  "result": {
+                    "passed": true,
+                    "detail": "ok 1 - adds 2+2"
+                  },
+                  "trajectory": {
+                    "steps": 1,
+                    "toolCalls": 1,
+                    "errors": 0
+                  },
+                  "cost": {
+                    "usd": 0,
+                    "tokens": 0
+                  },
+                  "approvals": {
+                    "asked": 0,
+                    "rejected": 0
+                  }
+                }
+              ]
+            },
+            "new": {
+              "schema": "dsh.check.run/v1",
+              "tasks": [
+                {
+                  "id": "math.add",
+                  "result": {
+                    "passed": false,
+                    "detail": "not ok 1 - adds 2+2\n  expected: 4\n  actual: 5"
+                  },
+                  "trajectory": {
+                    "steps": 1,
+                    "toolCalls": 1,
+                    "errors": 1
+                  },
+                  "cost": {
+                    "usd": 0,
+                    "tokens": 0
+                  },
+                  "approvals": {
+                    "asked": 0,
+                    "rejected": 0
+                  }
+                }
+              ]
+            }
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 306,
+          "ms": 1,
+          "changeSeq": 0,
+          "key": "check_compare:{\"old\":{\"schema\":\"dsh.check.run/v1\",\"tasks\":[{\"id\":\"math.add\",\"result\":{\"passed\":true,\"detail\":\"ok 1 - adds 2+2\"},\"trajectory\":{\"steps\":1,\"toolCalls\":1,\"errors\":0},\"cost\":{\"usd\":0,\"tokens\":0},\"approvals\":{\"asked\":0,\"rejected\":0}}]},\"new\":{\"schema\":\"dsh.check.run/v1\",\"tasks\":[{\"id\":\"math.add\",\"result\":{\"passed\":false,\"detail\":\"not ok 1 - adds 2+2\\n  expected: 4\\n  actual: 5\"},\"trajectory\":{\"steps\":1,\"toolCalls\":1,\"errors\":1},\"cost\":{\"usd\":0,\"tokens\":0},\"approvals\":{\"asked\":0,\"rejected\":0}}]}}"
+        },
+        {
+          "n": 2,
+          "tool": "act_list",
+          "args": {},
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 308,
+          "ms": 0,
+          "changeSeq": 0,
+          "key": "act_list:{}"
+        },
+        {
+          "n": 3,
+          "tool": "act_invoke",
+          "args": {
+            "id": "fs.write",
+            "args": {
+              "path": "/tmp/dsh-eval-fix-ZByuKB/src/math.mjs",
+              "text": "export const add = (a, b) => a + b\n"
+            }
+          },
+          "ok": false,
+          "code": "grant_required",
+          "invalid": null,
+          "tokens": 119,
+          "ms": 0,
+          "changeSeq": 0,
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-fix-ZByuKB/src/math.mjs\",\"text\":\"export const add = (a, b) => a + b\\n\"}}"
+        },
+        {
+          "n": 4,
+          "tool": "allow_request",
+          "args": {
+            "subject": "sess:fix-failing-test",
+            "capability": "act:invoke:fs.write",
+            "scope": "*",
+            "reason": "修复 add 的差一错误"
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 129,
+          "ms": 1,
+          "changeSeq": 0,
+          "key": "allow_request:{\"subject\":\"sess:fix-failing-test\",\"capability\":\"act:invoke:fs.write\",\"scope\":\"*\",\"reason\":\"修复 add 的差一错误\"}"
+        },
+        {
+          "n": 5,
+          "tool": "allow_wait",
+          "args": {
+            "requestId": "req_72cedfd8-284f-435f-afde-53a95103e2aa",
+            "timeoutMs": 0,
+            "subject": "sess:fix-failing-test"
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 147,
+          "ms": 0,
+          "changeSeq": 0,
+          "key": "allow_wait:{\"requestId\":\"req_72cedfd8-284f-435f-afde-53a95103e2aa\",\"timeoutMs\":0,\"subject\":\"sess:fix-failing-test\"}"
+        },
+        {
+          "n": 6,
+          "tool": "allow_wait",
+          "args": {
+            "requestId": "req_72cedfd8-284f-435f-afde-53a95103e2aa",
+            "timeoutMs": 0,
+            "subject": "sess:fix-failing-test"
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 172,
+          "ms": 0,
+          "changeSeq": 1,
+          "key": "allow_wait:{\"requestId\":\"req_72cedfd8-284f-435f-afde-53a95103e2aa\",\"timeoutMs\":0,\"subject\":\"sess:fix-failing-test\"}"
+        },
+        {
+          "n": 7,
+          "tool": "act_invoke",
+          "args": {
+            "id": "fs.write",
+            "args": {
+              "path": "/tmp/dsh-eval-fix-ZByuKB/src/math.mjs",
+              "text": "export const add = (a, b) => a + b\n"
+            }
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 108,
+          "ms": 0,
+          "changeSeq": 1,
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-fix-ZByuKB/src/math.mjs\",\"text\":\"export const add = (a, b) => a + b\\n\"}}"
+        },
+        {
+          "n": 8,
+          "tool": "check_run",
+          "args": {
+            "prompt": "rerun math.add",
+            "id": "math.add"
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 162,
+          "ms": 78,
+          "changeSeq": 1,
+          "key": "check_run:{\"prompt\":\"rerun math.add\",\"id\":\"math.add\"}"
+        }
+      ],
+      "toolCalls": 8,
+      "invalidCalls": 0,
+      "tokensEstimate": 1451,
+      "interventions": [
+        {
+          "kind": "human.approve",
+          "afterStep": 5,
+          "ok": true
+        }
+      ],
+      "checks": [
+        {
+          "id": "test-green",
+          "ok": true,
+          "detail": "node --test exit 0"
+        },
+        {
+          "id": "test-unchanged",
+          "ok": true,
+          "detail": "测试文件哈希不变"
+        },
+        {
+          "id": "diff-small",
+          "ok": true,
+          "detail": "源码改动 1 行"
+        },
+        {
+          "id": "hidden-case",
+          "ok": true,
+          "detail": "add(3,5)=8"
+        }
+      ],
+      "failures": [
+        {
+          "n": 3,
+          "tool": "act_invoke",
+          "code": "grant_required",
+          "invalid": null
+        }
+      ],
+      "error": null,
+      "recovered": true
+    },
+    {
+      "id": "tidy-clipboard",
+      "title": "整理剪贴板",
+      "goal": "把剪贴板里的会议纪要写入 clip.md，保留来源应用，并确认没有密钥泄漏。",
+      "maxSteps": 12,
+      "initial": [
+        "剪贴板 adapter 预置一段会议纪要",
+        "snip capture.enabled=true",
+        "act 提供内置 fs.write（workdir 限定在临时目录）"
+      ],
+      "allowedInterventions": [
+        "human.approve",
+        "human.grant",
+        "host.registerAction"
+      ],
+      "successCriteria": [
+        "clip.md 规范化后与剪贴板原文一致",
+        "Snip 记录 sourceApp=Chrome",
+        "输出无密钥串"
+      ],
+      "success": true,
+      "toolCount": 76,
+      "firstTool": "snip_capture",
+      "expectedFirstTool": "snip_capture",
+      "firstStepCorrect": true,
+      "steps": [
+        {
+          "n": 1,
+          "tool": "snip_capture",
+          "args": {
+            "sourceApp": "Chrome"
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 103,
+          "ms": 1,
+          "changeSeq": 0,
+          "key": "snip_capture:{\"sourceApp\":\"Chrome\"}"
+        },
+        {
+          "n": 2,
+          "tool": "snip_search",
+          "args": {
+            "query": "Meeting",
+            "limit": 5
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 135,
+          "ms": 1,
+          "changeSeq": 0,
+          "key": "snip_search:{\"query\":\"Meeting\",\"limit\":5}"
+        },
+        {
+          "n": 3,
+          "tool": "snip_get",
+          "args": {
+            "id": "clipboard://d4051315-cd6b-4b60-a9aa-d46063d1ede9"
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 170,
+          "ms": 0,
+          "changeSeq": 0,
+          "key": "snip_get:{\"id\":\"clipboard://d4051315-cd6b-4b60-a9aa-d46063d1ede9\"}"
+        },
+        {
+          "n": 4,
+          "tool": "act_invoke",
+          "args": {
+            "id": "fs.write",
+            "args": {
+              "path": "/tmp/dsh-eval-clip-x3PgKr/clip.md",
+              "text": "Meeting notes: ship dsh-os 0.2.0 on Friday. Owner: Lin. Link: https://example.test/roadmap"
+            }
+          },
+          "ok": false,
+          "code": "grant_required",
+          "invalid": null,
+          "tokens": 131,
+          "ms": 0,
+          "changeSeq": 0,
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-clip-x3PgKr/clip.md\",\"text\":\"Meeting notes: ship dsh-os 0.2.0 on Friday. Owner: Lin. Link: https://example.test/roadmap\"}}"
+        },
+        {
+          "n": 5,
+          "tool": "allow_request",
+          "args": {
+            "subject": "sess:tidy-clipboard",
+            "capability": "act:invoke:fs.write",
+            "scope": "*",
+            "reason": "把剪贴板纪要保存为 clip.md"
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 131,
+          "ms": 0,
+          "changeSeq": 0,
+          "key": "allow_request:{\"subject\":\"sess:tidy-clipboard\",\"capability\":\"act:invoke:fs.write\",\"scope\":\"*\",\"reason\":\"把剪贴板纪要保存为 clip.md\"}"
+        },
+        {
+          "n": 6,
+          "tool": "allow_wait",
+          "args": {
+            "requestId": "req_da4ba3b4-d3c3-4d39-a4f4-49578388661e",
+            "timeoutMs": 0,
+            "subject": "sess:tidy-clipboard"
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 147,
+          "ms": 0,
+          "changeSeq": 0,
+          "key": "allow_wait:{\"requestId\":\"req_da4ba3b4-d3c3-4d39-a4f4-49578388661e\",\"timeoutMs\":0,\"subject\":\"sess:tidy-clipboard\"}"
+        },
+        {
+          "n": 7,
+          "tool": "allow_wait",
+          "args": {
+            "requestId": "req_da4ba3b4-d3c3-4d39-a4f4-49578388661e",
+            "timeoutMs": 0,
+            "subject": "sess:tidy-clipboard"
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 172,
+          "ms": 0,
+          "changeSeq": 1,
+          "key": "allow_wait:{\"requestId\":\"req_da4ba3b4-d3c3-4d39-a4f4-49578388661e\",\"timeoutMs\":0,\"subject\":\"sess:tidy-clipboard\"}"
+        },
+        {
+          "n": 8,
+          "tool": "act_invoke",
+          "args": {
+            "id": "fs.write",
+            "args": {
+              "path": "/tmp/dsh-eval-clip-x3PgKr/clip.md",
+              "text": "Meeting notes: ship dsh-os 0.2.0 on Friday. Owner: Lin. Link: https://example.test/roadmap"
+            }
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 120,
+          "ms": 0,
+          "changeSeq": 1,
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-clip-x3PgKr/clip.md\",\"text\":\"Meeting notes: ship dsh-os 0.2.0 on Friday. Owner: Lin. Link: https://example.test/roadmap\"}}"
+        }
+      ],
+      "toolCalls": 8,
+      "invalidCalls": 0,
+      "tokensEstimate": 1109,
+      "interventions": [
+        {
+          "kind": "human.approve",
+          "afterStep": 6,
+          "ok": true
+        }
+      ],
+      "checks": [
+        {
+          "id": "file-normalized",
+          "ok": true,
+          "detail": "clip.md 90 bytes"
+        },
+        {
+          "id": "source-app",
+          "ok": true,
+          "detail": "sourceApp=Chrome"
+        },
+        {
+          "id": "no-secret",
+          "ok": true,
+          "detail": "无密钥串，Snip 未命中 redaction"
+        }
+      ],
+      "failures": [
+        {
+          "n": 4,
+          "tool": "act_invoke",
+          "code": "grant_required",
+          "invalid": null
+        }
+      ],
+      "error": null,
+      "recovered": true
+    },
+    {
+      "id": "upgrade-regression",
+      "title": "升级回归",
+      "goal": "外部把 app 从 v1 升级到 v2 后，用 fs 事件触发回归检查，升级为 escalated，并送达一条可回执的通知。",
+      "maxSteps": 16,
+      "initial": [
+        "临时目录 app.txt 内容为 v1",
+        "ctx.fs 提供真实 fs.watch + snapshot diff",
+        "check_compare 的 before/after run 对象由宿主提供",
+        "Ring 默认无 channel"
+      ],
+      "allowedInterventions": [
+        "host.configureChannel"
+      ],
+      "successCriteria": [
+        "check_compare verdict=regression",
+        "trigger run 记录 fs.change 及变更路径",
+        "console 送达 1 条",
+        "ring receipts 含 delivery",
+        "case 状态 escalated"
+      ],
+      "success": false,
+      "toolCount": 76,
+      "firstTool": "trigger_register",
+      "expectedFirstTool": "trigger_register",
+      "firstStepCorrect": true,
+      "steps": [
+        {
+          "n": 1,
+          "tool": "trigger_register",
+          "args": {
+            "id": "tg.fs",
+            "event": "fs.change",
+            "actionId": "record"
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 78,
+          "ms": 1,
+          "changeSeq": 0,
+          "key": "trigger_register:{\"id\":\"tg.fs\",\"event\":\"fs.change\",\"actionId\":\"record\"}"
+        },
+        {
+          "n": 2,
+          "tool": "trigger_source_start",
+          "args": {
+            "type": "fs",
+            "path": "/tmp/dsh-eval-upgrade-5sCapL/app.txt",
+            "id": "src.fs"
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 116,
+          "ms": 0,
+          "changeSeq": 0,
+          "key": "trigger_source_start:{\"type\":\"fs\",\"path\":\"/tmp/dsh-eval-upgrade-5sCapL/app.txt\",\"id\":\"src.fs\"}"
+        },
+        {
+          "n": 3,
+          "tool": "trigger_sources",
+          "args": {},
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 102,
+          "ms": 0,
+          "changeSeq": 1,
+          "key": "trigger_sources:{}"
+        },
+        {
+          "n": 4,
+          "tool": "trigger_runs",
+          "args": {
+            "limit": 5
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 84,
+          "ms": 0,
+          "changeSeq": 1,
+          "key": "trigger_runs:{\"limit\":5}"
+        },
+        {
+          "n": 5,
+          "tool": "check_compare",
+          "args": {
+            "old": {
+              "schema": "dsh.check.run/v1",
+              "tasks": [
+                {
+                  "id": "app.banner",
+                  "result": {
+                    "text": "v1"
+                  },
+                  "trajectory": {
+                    "steps": 4,
+                    "toolCalls": 2,
+                    "errors": 0
+                  },
+                  "cost": {
+                    "usd": 0.1
+                  },
+                  "approvals": {
+                    "asked": 0,
+                    "rejected": 0
+                  }
+                }
+              ]
+            },
+            "new": {
+              "schema": "dsh.check.run/v1",
+              "tasks": [
+                {
+                  "id": "app.banner",
+                  "result": {
+                    "text": "v2 changed"
+                  },
+                  "trajectory": {
+                    "steps": 4,
+                    "toolCalls": 2,
+                    "errors": 0
+                  },
+                  "cost": {
+                    "usd": 0.1
+                  },
+                  "approvals": {
+                    "asked": 0,
+                    "rejected": 0
+                  }
+                }
+              ]
+            }
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 229,
+          "ms": 0,
+          "changeSeq": 1,
+          "key": "check_compare:{\"old\":{\"schema\":\"dsh.check.run/v1\",\"tasks\":[{\"id\":\"app.banner\",\"result\":{\"text\":\"v1\"},\"trajectory\":{\"steps\":4,\"toolCalls\":2,\"errors\":0},\"cost\":{\"usd\":0.1},\"approvals\":{\"asked\":0,\"rejected\":0}}]},\"new\":{\"schema\":\"dsh.check.run/v1\",\"tasks\":[{\"id\":\"app.banner\",\"result\":{\"text\":\"v2 changed\"},\"trajectory\":{\"steps\":4,\"toolCalls\":2,\"errors\":0},\"cost\":{\"usd\":0.1},\"approvals\":{\"asked\":0,\"rejected\":0}}]}}"
+        },
+        {
+          "n": 6,
+          "tool": "ring_raise",
+          "args": {
+            "source": "upgrade-regression",
+            "risk": "write"
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 155,
+          "ms": 1,
+          "changeSeq": 1,
+          "key": "ring_raise:{\"source\":\"upgrade-regression\",\"risk\":\"write\"}"
+        },
+        {
+          "n": 7,
+          "tool": "ring_escalate",
+          "args": {
+            "id": "7493c23f-a093-4c72-8d59-ed49acacb519"
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 162,
+          "ms": 0,
+          "changeSeq": 1,
+          "key": "ring_escalate:{\"id\":\"7493c23f-a093-4c72-8d59-ed49acacb519\"}"
+        },
+        {
+          "n": 8,
+          "tool": "ring_notify",
+          "args": {
+            "id": "7493c23f-a093-4c72-8d59-ed49acacb519"
+          },
+          "ok": false,
+          "code": "E_UNAVAILABLE",
+          "invalid": null,
+          "tokens": 78,
+          "ms": 0,
+          "changeSeq": 1,
+          "key": "ring_notify:{\"id\":\"7493c23f-a093-4c72-8d59-ed49acacb519\"}"
+        },
+        {
+          "n": 9,
+          "tool": "ring_channels",
+          "args": {},
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 45,
+          "ms": 0,
+          "changeSeq": 1,
+          "key": "ring_channels:{}"
+        },
+        {
+          "n": 10,
+          "tool": "ring_notify",
+          "args": {
+            "id": "7493c23f-a093-4c72-8d59-ed49acacb519"
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 83,
+          "ms": 0,
+          "changeSeq": 2,
+          "key": "ring_notify:{\"id\":\"7493c23f-a093-4c72-8d59-ed49acacb519\"}"
+        },
+        {
+          "n": 11,
+          "tool": "ring_receipts",
+          "args": {
+            "id": "7493c23f-a093-4c72-8d59-ed49acacb519"
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 95,
+          "ms": 0,
+          "changeSeq": 2,
+          "key": "ring_receipts:{\"id\":\"7493c23f-a093-4c72-8d59-ed49acacb519\"}"
+        },
+        {
+          "n": 12,
+          "tool": "trigger_source_stop",
+          "args": {
+            "id": "src.fs"
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 52,
+          "ms": 0,
+          "changeSeq": 2,
+          "key": "trigger_source_stop:{\"id\":\"src.fs\"}"
+        }
+      ],
+      "toolCalls": 12,
+      "invalidCalls": 0,
+      "tokensEstimate": 1279,
+      "interventions": [
+        {
+          "kind": "host.configureChannel",
+          "afterStep": 9,
+          "ok": true
+        }
+      ],
+      "checks": [
+        {
+          "id": "regression-detected",
+          "ok": true,
+          "detail": "verdict=regression"
+        },
+        {
+          "id": "fs-trigger-run",
+          "ok": true,
+          "detail": "1 条 trigger run"
+        },
+        {
+          "id": "trigger-run-has-path",
+          "ok": false,
+          "detail": "trigger_runs 未保存 path/payload"
+        },
+        {
+          "id": "console-delivery",
+          "ok": true,
+          "detail": "1 条 console 输出"
+        },
+        {
+          "id": "delivery-receipt",
+          "ok": false,
+          "detail": "receipts: escalation"
+        },
+        {
+          "id": "case-escalated",
+          "ok": true,
+          "detail": "1 个 escalated case"
+        }
+      ],
+      "failures": [
+        {
+          "n": 8,
+          "tool": "ring_notify",
+          "code": "E_UNAVAILABLE",
+          "invalid": null
+        }
+      ],
+      "error": null,
+      "recovered": false
+    },
+    {
+      "id": "evidence-chain",
+      "title": "证据链",
+      "goal": "查 user-trust 的证据，记住两条结论；每条结论的 ref 都必须可解析，不能收录伪 ref。",
+      "maxSteps": 10,
+      "initial": [
+        "2 篇真实文档 + 1 个不存在文档的 locator 命中（伪 ref 诱饵）",
+        "memento 有 1 条 user-global 记忆和 1 条 workspace 记忆",
+        "工具面没有 ref resolver"
+      ],
+      "allowedInterventions": [],
+      "successCriteria": [
+        "至少 2 条 trace claim",
+        "2 个 source ref 可解析",
+        "0 条伪 ref"
+      ],
+      "success": false,
+      "toolCount": 77,
+      "firstTool": "seek_providers",
+      "expectedFirstTool": "seek_providers",
+      "firstStepCorrect": true,
+      "steps": [
+        {
+          "n": 1,
+          "tool": "seek_providers",
+          "args": {},
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 71,
+          "ms": 0,
+          "changeSeq": 0,
+          "key": "seek_providers:{}"
+        },
+        {
+          "n": 2,
+          "tool": "seek_search",
+          "args": {
+            "query": "user-trust",
+            "limit": 3
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 214,
+          "ms": 1,
+          "changeSeq": 0,
+          "key": "seek_search:{\"query\":\"user-trust\",\"limit\":3}"
+        },
+        {
+          "n": 3,
+          "tool": "seek_resolve",
+          "args": {
+            "ref": "dsh://memento/mem-42"
+          },
+          "ok": false,
+          "code": "TOOL_NOT_REGISTERED",
+          "invalid": "missing",
+          "tokens": 61,
+          "ms": 0,
+          "changeSeq": 0,
+          "key": "seek_resolve:{\"ref\":\"dsh://memento/mem-42\"}"
+        },
+        {
+          "n": 4,
+          "tool": "locator_resolve",
+          "args": {
+            "ref": "dsh://memento/mem-42"
+          },
+          "ok": false,
+          "code": "TOOL_NOT_REGISTERED",
+          "invalid": "missing",
+          "tokens": 61,
+          "ms": 0,
+          "changeSeq": 0,
+          "key": "locator_resolve:{\"ref\":\"dsh://memento/mem-42\"}"
+        },
+        {
+          "n": 5,
+          "tool": "root_resolve",
+          "args": {
+            "name": "dsh://memento/mem-42"
+          },
+          "ok": false,
+          "code": "invalid_profile_name",
+          "invalid": "schema",
+          "tokens": 75,
+          "ms": 0,
+          "changeSeq": 0,
+          "key": "root_resolve:{\"name\":\"dsh://memento/mem-42\"}"
+        },
+        {
+          "n": 6,
+          "tool": "trace_remember",
+          "args": {
+            "key": "repo:dsh-os/user-trust",
+            "text": "user-trust profiles are hidden from agent-layer resolution.",
+            "source": "dsh://memento/mem-42",
+            "confidence": 0.8
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 165,
+          "ms": 0,
+          "changeSeq": 0,
+          "key": "trace_remember:{\"key\":\"repo:dsh-os/user-trust\",\"text\":\"user-trust profiles are hidden from agent-layer resolution.\",\"source\":\"dsh://memento/mem-42\",\"confidence\":0.8}"
+        },
+        {
+          "n": 7,
+          "tool": "trace_remember",
+          "args": {
+            "key": "repo:dsh-os/env",
+            "text": "Root never materializes process.env.",
+            "source": "dsh://locator/docs/missing.md",
+            "confidence": 0.7
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 155,
+          "ms": 0,
+          "changeSeq": 0,
+          "key": "trace_remember:{\"key\":\"repo:dsh-os/env\",\"text\":\"Root never materializes process.env.\",\"source\":\"dsh://locator/docs/missing.md\",\"confidence\":0.7}"
+        },
+        {
+          "n": 8,
+          "tool": "trace_search",
+          "args": {
+            "query": "user-trust"
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 134,
+          "ms": 0,
+          "changeSeq": 0,
+          "key": "trace_search:{\"query\":\"user-trust\"}"
+        }
+      ],
+      "toolCalls": 8,
+      "invalidCalls": 3,
+      "tokensEstimate": 936,
+      "interventions": [],
+      "checks": [
+        {
+          "id": "two-claims",
+          "ok": true,
+          "detail": "2 条 claim"
+        },
+        {
+          "id": "two-resolvable-refs",
+          "ok": false,
+          "detail": "1/2 个 source ref 可解析"
+        },
+        {
+          "id": "no-bogus-ref",
+          "ok": false,
+          "detail": "dsh://memento/mem-42, dsh://locator/docs/missing.md"
+        }
+      ],
+      "failures": [
+        {
+          "n": 3,
+          "tool": "seek_resolve",
+          "code": "TOOL_NOT_REGISTERED",
+          "invalid": "missing"
+        },
+        {
+          "n": 4,
+          "tool": "locator_resolve",
+          "code": "TOOL_NOT_REGISTERED",
+          "invalid": "missing"
+        },
+        {
+          "n": 5,
+          "tool": "root_resolve",
+          "code": "invalid_profile_name",
+          "invalid": "schema"
+        }
+      ],
+      "error": null,
+      "recovered": false
+    },
+    {
+      "id": "approval-recovery",
+      "title": "审批恢复",
+      "goal": "把 config.json 的 timeout 改为 30；先申请授权、不绕过；批准后执行，并确认同参重放被拒。",
+      "maxSteps": 10,
+      "initial": [
+        "临时目录 config.json 的 timeout=10",
+        "act 内置 fs.write，尚无 Grant",
+        "Allow 暴露 allow_request / allow_wait / allow_requests"
+      ],
+      "allowedInterventions": [
+        "human.approve",
+        "human.grant"
+      ],
+      "successCriteria": [
+        "恰好成功写入 1 次",
+        "config.json timeout=30",
+        "request 状态为 approved",
+        "同参重放被拒绝"
+      ],
+      "success": false,
+      "toolCount": 76,
+      "firstTool": "act_invoke",
+      "expectedFirstTool": "act_invoke",
+      "firstStepCorrect": true,
+      "steps": [
+        {
+          "n": 1,
+          "tool": "act_invoke",
+          "args": {
+            "id": "fs.write",
+            "args": {
+              "path": "/tmp/dsh-eval-approve-Qej0CA/config.json",
+              "text": "{\"timeout\":30}\n"
+            }
+          },
+          "ok": false,
+          "code": "grant_required",
+          "invalid": null,
+          "tokens": 115,
+          "ms": 0,
+          "changeSeq": 0,
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-approve-Qej0CA/config.json\",\"text\":\"{\\\"timeout\\\":30}\\n\"}}"
+        },
+        {
+          "n": 2,
+          "tool": "allow_request",
+          "args": {
+            "subject": "sess:approval-recovery",
+            "capability": "act:invoke:fs.write",
+            "scope": "*",
+            "reason": "更新 config timeout"
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 131,
+          "ms": 1,
+          "changeSeq": 0,
+          "key": "allow_request:{\"subject\":\"sess:approval-recovery\",\"capability\":\"act:invoke:fs.write\",\"scope\":\"*\",\"reason\":\"更新 config timeout\"}"
+        },
+        {
+          "n": 3,
+          "tool": "allow_wait",
+          "args": {
+            "requestId": "req_4ed53bfb-645e-4a82-9668-8f2292287913",
+            "timeoutMs": 0,
+            "subject": "sess:approval-recovery"
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 148,
+          "ms": 0,
+          "changeSeq": 0,
+          "key": "allow_wait:{\"requestId\":\"req_4ed53bfb-645e-4a82-9668-8f2292287913\",\"timeoutMs\":0,\"subject\":\"sess:approval-recovery\"}"
+        },
+        {
+          "n": 4,
+          "tool": "allow_wait",
+          "args": {
+            "requestId": "req_4ed53bfb-645e-4a82-9668-8f2292287913",
+            "timeoutMs": 0,
+            "subject": "sess:approval-recovery"
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 174,
+          "ms": 0,
+          "changeSeq": 1,
+          "key": "allow_wait:{\"requestId\":\"req_4ed53bfb-645e-4a82-9668-8f2292287913\",\"timeoutMs\":0,\"subject\":\"sess:approval-recovery\"}"
+        },
+        {
+          "n": 5,
+          "tool": "act_invoke",
+          "args": {
+            "id": "fs.write",
+            "args": {
+              "path": "/tmp/dsh-eval-approve-Qej0CA/config.json",
+              "text": "{\"timeout\":30}\n"
+            }
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 105,
+          "ms": 0,
+          "changeSeq": 1,
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-approve-Qej0CA/config.json\",\"text\":\"{\\\"timeout\\\":30}\\n\"}}"
+        },
+        {
+          "n": 6,
+          "tool": "act_invoke",
+          "args": {
+            "id": "fs.write",
+            "args": {
+              "path": "/tmp/dsh-eval-approve-Qej0CA/config.json",
+              "text": "{\"timeout\":30}\n"
+            }
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 105,
+          "ms": 0,
+          "changeSeq": 1,
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-approve-Qej0CA/config.json\",\"text\":\"{\\\"timeout\\\":30}\\n\"}}"
+        }
+      ],
+      "toolCalls": 6,
+      "invalidCalls": 0,
+      "tokensEstimate": 778,
+      "interventions": [
+        {
+          "kind": "human.approve",
+          "afterStep": 3,
+          "ok": true
+        }
+      ],
+      "checks": [
+        {
+          "id": "write-once",
+          "ok": false,
+          "detail": "成功的 fs.write 调用 2 次"
+        },
+        {
+          "id": "config-updated",
+          "ok": true,
+          "detail": "timeout=30"
+        },
+        {
+          "id": "request-approved",
+          "ok": true,
+          "detail": "request=approved"
+        },
+        {
+          "id": "replay-rejected",
+          "ok": false,
+          "detail": "同参重放被接受（第二次写入）"
+        }
+      ],
+      "failures": [
+        {
+          "n": 1,
+          "tool": "act_invoke",
+          "code": "grant_required",
+          "invalid": null
+        }
+      ],
+      "error": null,
+      "recovered": false
+    }
+  ],
+  "metrics": {
+    "scenarios": 5,
+    "successes": 2,
+    "successRate": 0.4,
+    "firstStepAccuracy": 1,
+    "recoveryRate": 0.4,
+    "recoveredScenarios": 2,
+    "scenariosWithFailures": 5,
+    "toolCalls": 42,
+    "invalidCalls": 3,
+    "invalidCallRate": 0.07142857142857142,
+    "avgSteps": 8.4,
+    "tokensEstimate": 5553,
+    "avgTokens": 1110.6,
+    "interventions": 4,
+    "assistedSuccesses": 2,
+    "autonomousSuccesses": 0
+  }
+}

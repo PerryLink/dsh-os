@@ -1,7 +1,7 @@
 {
   "name": "dsh-act",
-  "version": "0.1.1",
-  "description": "Typed action registry and natural-language action panel for DeepSeek Harness.",
+  "version": "0.3.0",
+  "description": "Typed action registry with filesystem actions, previews and undo for DeepSeek Harness.",
   "type": "module",
   "main": "index.js",
   "exports": {
@@ -10,6 +10,7 @@
   },
   "files": [
     "index.js",
+    "fs-actions.js",
     "cordis.patch.yml",
     "README.md",
     "CHANGELOG.md"
@@ -19,7 +20,8 @@
     "dsh-plugin",
     "deepseek-harness",
     "agent-os",
-    "act"
+    "act",
+    "filesystem"
   ],
   "license": "MIT",
   "author": "PerryLink contributors",
@@ -46,7 +48,10 @@
       "provides": [
         "act"
       ],
-      "capabilities": [],
+      "capabilities": [
+        "fs.read",
+        "fs.write"
+      ],
       "tools": [
         "act_list",
         "act_invoke"

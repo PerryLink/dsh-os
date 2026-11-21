@@ -1,27 +1,29 @@
 /**
  * dsh-act — typed action registry and agent-facing action bus for DeepSeek Harness.
- *
- * 0.1.0 MVP: Host service `ctx.act` with descriptor validation, optional Allow
- * grant checks for write/danger actions, three read-only built-ins and the
- * `act_list` / `act_invoke` agent tools. Plain ESM, no runtime dependencies.
+ * 0.3.0 adds real filesystem actions (`fs.read` / `fs.write` / `fs.list` /
+ * `fs.undo`) with a workdir allowlist, read caps, atomic writes, previews and
+ * undo tokens. Plain ESM, no runtime dependencies.
  * @module dsh-act
  */
+import { filesystem, fsActions } from './fs-actions.js'
 
-/** Cordis plugin name. */
 export const name = 'dsh-act'
-
-/** The service is usable without tools; the agent tools need the tool registry. */
 export const inject = ['tools']
 
 const ID_PATTERN = /^[a-z][a-z0-9_.-]{1,63}$/
 const RISKS = ['read', 'write', 'danger']
 const RISK_RANK = { read: 0, write: 1, danger: 2 }
+const schema = (properties, required) => ({ type: 'object', additionalProperties: false, properties, ...(required === undefined ? {} : { required }) })
+const output = {
+  schema: { type: 'object', additionalProperties: true },
+  render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
+}
 
 function invalid(actionId, message) {
   return Object.assign(new Error(message), { code: 'invalid_action', actionId })
 }
 
-/** Validate the descriptor fields this MVP relies on. */
+/** Validate the descriptor fields this release relies on. */
 function validate(descriptor) {
   if (descriptor === null || typeof descriptor !== 'object' || Array.isArray(descriptor)) {
     throw invalid(undefined, 'action descriptor must be an object')
@@ -32,22 +34,15 @@ function validate(descriptor) {
   if (typeof descriptor.title !== 'string' || descriptor.title.trim() === '') {
     throw invalid(descriptor.id, `action "${descriptor.id}" requires a non-empty title`)
   }
-  if (!RISKS.includes(descriptor.risk)) {
-    throw invalid(descriptor.id, `action "${descriptor.id}" requires risk read, write or danger`)
+  if (!RISKS.includes(descriptor.risk)) throw invalid(descriptor.id, `action "${descriptor.id}" requires risk read, write or danger`)
+  if (typeof descriptor.execute !== 'function') throw invalid(descriptor.id, `action "${descriptor.id}" requires an execute function`)
+  for (const [field, type] of [['description', 'string'], ['preview', 'function'], ['authorize', 'boolean'], ['undo', 'function']]) {
+    if (descriptor[field] !== undefined && typeof descriptor[field] !== type) {
+      throw invalid(descriptor.id, `action "${descriptor.id}" ${field} must be a ${type}`)
+    }
   }
-  if (typeof descriptor.execute !== 'function') {
-    throw invalid(descriptor.id, `action "${descriptor.id}" requires an execute function`)
-  }
-  if (descriptor.description !== undefined && typeof descriptor.description !== 'string') {
-    throw invalid(descriptor.id, `action "${descriptor.id}" description must be a string`)
-  }
-  if (descriptor.parameters !== undefined
-    && (descriptor.parameters === null || typeof descriptor.parameters !== 'object'
-      || Array.isArray(descriptor.parameters))) {
+  if (descriptor.parameters !== undefined && (descriptor.parameters === null || typeof descriptor.parameters !== 'object' || Array.isArray(descriptor.parameters))) {
     throw invalid(descriptor.id, `action "${descriptor.id}" parameters must be a JSON Schema object`)
-  }
-  if (descriptor.undo !== undefined && typeof descriptor.undo !== 'function') {
-    throw invalid(descriptor.id, `action "${descriptor.id}" undo must be a function`)
   }
 }
 
@@ -63,48 +58,25 @@ export function summarize(action) {
   return summary
 }
 
-/** The built-in read-only actions. */
-function builtins(service) {
+/** The three 0.1 built-ins plus the 0.3 filesystem actions. */
+function builtins(service, fs) {
   return [
     {
-      id: 'echo',
-      title: 'Echo',
-      description: 'Echo the supplied text.',
-      risk: 'read',
-      parameters: {
-        type: 'object',
-        additionalProperties: false,
-        properties: { text: { type: 'string', description: 'Text to echo.' } },
-        required: ['text'],
-      },
-      execute(args) {
-        return { text: typeof args?.text === 'string' ? args.text : '' }
-      },
+      id: 'echo', title: 'Echo', description: 'Echo the supplied text.', risk: 'read',
+      parameters: schema({ text: { type: 'string', description: 'Text to echo.' } }, ['text']),
+      execute: args => ({ text: typeof args?.text === 'string' ? args.text : '' }),
     },
     {
-      id: 'now',
-      title: 'Current time',
+      id: 'now', title: 'Current time', risk: 'read', parameters: schema({}),
       description: 'Return the current time as an ISO 8601 string.',
-      risk: 'read',
-      parameters: { type: 'object', additionalProperties: false, properties: {} },
-      execute() {
-        return { now: new Date().toISOString() }
-      },
+      execute: () => ({ now: new Date().toISOString() }),
     },
     {
-      id: 'list',
-      title: 'List actions',
-      description: 'List registered actions.',
-      risk: 'read',
-      parameters: {
-        type: 'object',
-        additionalProperties: false,
-        properties: { query: { type: 'string', description: 'Optional text filter.' } },
-      },
-      execute(args) {
-        return { actions: service.list(args?.query).map(summarize) }
-      },
+      id: 'list', title: 'List actions', description: 'List registered actions.', risk: 'read',
+      parameters: schema({ query: { type: 'string', description: 'Optional text filter.' } }),
+      execute: args => ({ actions: service.list(args?.query).map(summarize) }),
     },
+    ...fsActions(fs),
   ]
 }
 
@@ -112,12 +84,15 @@ function builtins(service) {
 function granted(decision) {
   if (decision === true || decision === 'allow') return true
   if (decision === null || typeof decision !== 'object') return false
-  return decision.granted === true
-    || decision.allowed === true
-    || decision.allow === true
-    || decision.permitted === true
-    || decision.decision === 'allow'
-    || decision.status === 'allow'
+  return [decision.granted, decision.allowed, decision.allow, decision.permitted].includes(true)
+    || decision.decision === 'allow' || decision.status === 'allow'
+}
+
+/** Structured action failure; `reason` preserves the machine-readable code. */
+function failure(error) {
+  const result = { code: 'action_failed', ok: false, message: error instanceof Error ? error.message : String(error) }
+  if (typeof error?.code === 'string' && error.code !== 'invalid_action') result.reason = error.code
+  return result
 }
 
 /** Typed action registry exposed to other plugins as `ctx.act`. */
@@ -167,45 +142,63 @@ export class ActService {
       return text === '' ? actions : actions.filter(action => matches(action, text))
     }
     if (query === null || typeof query !== 'object') return actions
-    if (typeof query.text === 'string' && query.text.trim() !== '') {
-      const text = query.text.trim().toLowerCase()
-      actions = actions.filter(action => matches(action, text))
-    }
-    if (query.riskMax !== undefined) {
-      const max = RISK_RANK[query.riskMax]
-      if (max === undefined) throw invalid(undefined, `invalid riskMax: ${String(query.riskMax)}`)
-      actions = actions.filter(action => RISK_RANK[action.risk] <= max)
-    }
-    return actions
+    const text = typeof query.text === 'string' ? query.text.trim().toLowerCase() : ''
+    if (text !== '') actions = actions.filter(action => matches(action, text))
+    if (query.riskMax === undefined) return actions
+    const max = RISK_RANK[query.riskMax]
+    if (max === undefined) throw invalid(undefined, `invalid riskMax: ${String(query.riskMax)}`)
+    return actions.filter(action => RISK_RANK[action.risk] <= max)
   }
 
   /**
-   * Invoke an action. `read` runs directly; `write`/`danger` require an
-   * explicit Allow grant. Never throws for action, grant or execution failure.
+   * Invoke an action. `meta.preview` runs a side-effect-free preview when the
+   * descriptor provides one. `read` runs directly; `write`/`danger` require an
+   * explicit Allow grant (unless the descriptor opts into token authorization).
+   * Never throws for action, grant or execution failure.
    */
   async invoke(id, args, meta) {
     const action = this.#actions.get(id)
     if (action === undefined) return { ok: false, code: 'action_not_found', actionId: id }
 
+    if (meta?.preview === true && typeof action.preview === 'function') {
+      try {
+        return { ok: true, preview: await action.preview(args, meta) }
+      } catch (error) {
+        return failure(error)
+      }
+    }
+
     const capability = `act:invoke:${action.id}`
-    if (action.risk !== 'read' && !(await this.#authorized(capability, meta))) {
-      return { ok: false, code: 'grant_required', actionId: action.id, capability }
+    if (action.risk !== 'read' && action.authorize !== false
+      && !(await this.#authorized(capability, meta))) {
+      const result = { ok: false, code: 'grant_required', actionId: action.id, capability }
+      if (typeof this.#allow()?.request === 'function') {
+        result.hint = `Call allow_request for capability "${capability}" with the target scope, then retry.`
+      }
+      return result
     }
 
     try {
       return { ok: true, actionId: action.id, result: await action.execute(args, meta) }
     } catch (error) {
-      return {
-        ok: false,
-        code: 'action_failed',
-        message: error instanceof Error ? error.message : String(error),
-      }
+      return failure(error)
     }
   }
 
+  /** Resolve the optional Allow service through `ctx.get('allow')` or `ctx.allow`. */
+  #allow() {
+    const ctx = this.#ctx
+    if (ctx === undefined || ctx === null) return undefined
+    if (typeof ctx.get === 'function') {
+      const service = ctx.get('allow')
+      if (service !== undefined && service !== null) return service
+    }
+    return ctx.allow
+  }
+
   async #authorized(capability, meta) {
-    const allow = typeof this.#ctx?.get === 'function' ? this.#ctx.get('allow') : undefined
-    if (allow === undefined || allow === null || typeof allow.check !== 'function') return false
+    const allow = this.#allow()
+    if (allow === null || typeof allow?.check !== 'function') return false
     // A missing subject must fail closed: a shared 'anonymous' identity would
     // let one grant authorize every background/plugin call.
     const subject = meta?.subject ?? meta?.sessionId
@@ -218,20 +211,13 @@ export class ActService {
   }
 }
 
-/** `act_list` tool: read-only action discovery. */
+/** `act_list` tool: read-only action discovery, including each action's risk. */
 function listTool(service) {
   return {
     name: 'act_list',
     description: 'List registered Act actions with their id, title and risk.',
-    parameters: {
-      type: 'object',
-      additionalProperties: false,
-      properties: { query: { type: 'string', description: 'Optional id/title/description filter.' } },
-    },
-    output: {
-      schema: { type: 'object', additionalProperties: true },
-      render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
-    },
+    parameters: schema({ query: { type: 'string', description: 'Optional id/title/description filter.' } }),
+    output,
     async execute(args) {
       return { actions: service.list(args?.query).map(summarize) }
     },
@@ -247,20 +233,14 @@ function invokeTool(service) {
     name: 'act_invoke',
     description: 'Invoke a registered Act action by id. '
       + 'write and danger actions return grant_required until the Allow service grants '
-      + 'capability "act:invoke:<id>" for the caller.',
-    parameters: {
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        id: { type: 'string', description: 'Registered action id, e.g. "echo".' },
-        args: { type: 'object', additionalProperties: true, description: 'Action arguments.' },
-      },
-      required: ['id'],
-    },
-    output: {
-      schema: { type: 'object', additionalProperties: true },
-      render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
-    },
+      + 'capability "act:invoke:<id>" for the caller. Pass preview:true to preview a '
+      + 'write without touching disk.',
+    parameters: schema({
+      id: { type: 'string', description: 'Registered action id, e.g. "fs.read".' },
+      args: { type: 'object', additionalProperties: true, description: 'Action arguments.' },
+      preview: { type: 'boolean', description: 'Preview without executing (write actions).' },
+    }, ['id']),
+    output,
     async execute(args, exec) {
       if (typeof args?.id !== 'string' || args.id === '') {
         throw Object.assign(new Error('act_invoke requires a non-empty string id'), {
@@ -270,6 +250,7 @@ function invokeTool(service) {
       const meta = { origin: 'tool' }
       const subject = exec?.agent?.session?.id ?? exec?.agent?.id
       if (subject !== undefined) meta.subject = subject
+      if (args.preview === true) meta.preview = true
       return service.invoke(args.id, args.args, meta)
     },
   }
@@ -278,11 +259,12 @@ function invokeTool(service) {
 /**
  * Mount dsh-act: provide `ctx.act`, register built-ins and the two agent tools.
  * @param {object} ctx - Cordis context.
- * @param {object} [_config] - Reserved for 0.2.0; unused by the MVP.
+ * @param {object} [config] - `{ workdir?, maxReadBytes?, maxWriteBytes? }`.
  */
-export function apply(ctx, _config = {}) {
+export function apply(ctx, config = {}) {
   const service = new ActService(ctx)
-  for (const descriptor of builtins(service)) service.register(descriptor)
+  const fs = filesystem(config ?? {})
+  for (const descriptor of builtins(service, fs)) service.register(descriptor)
   ctx.provide('act', service)
   ctx.tools.register(listTool(service))
   ctx.tools.register(invokeTool(service))

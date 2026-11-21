@@ -8,7 +8,8 @@ printer for `dsh plugin`.
 - **No network.** Every fact comes from the repository or from the packaged
   `catalog.json`; the CLI never contacts a registry.
 - **No configuration writes.** It never edits a DSH profile, credentials,
-  sessions, settings or any other user file.
+  sessions, settings or any other user file. The one exception is intentional:
+  `dsh-os approvals` writes only the Allow state file named by `--state`.
 
 ## Requirements
 
@@ -36,6 +37,7 @@ node packages/cli/bin/dsh-os.js list
 | `dsh-os doctor` | Check Node, catalog versions, `engines.dsh` upper bounds and `dsh.os` manifests. |
 | `dsh-os install <module...> [--profile <name>] [--run]` | Print `dsh plugin --profile <name> add <pkg>` for each module. `--run` also executes it. |
 | `dsh-os update [--profile <name>]` | Print `dsh plugin --profile <name> add <pkg>@latest` for every product module. |
+| `dsh-os approvals list\|approve\|deny` | Inspect and decide Allow requests in the given Allow state file. |
 
 `--profile` defaults to `web`.
 
@@ -110,6 +112,39 @@ dsh plugin --profile web add dsh-allow@latest
 
 `update` only prints; it never executes anything.
 
+### approvals
+
+`dsh-os approvals` is the human side of the Allow request protocol. It reads and
+writes the same JSON state file as `dsh-allow` (`version: 2`), including the
+`requestHash`, Grants and audit trail. It never starts `dsh`, a shell or a
+network request.
+
+```console
+$ dsh-os approvals list --state ./allow-state.json
+ID                                    STATUS   SUBJECT      CAPABILITY  SCOPE     EXPIRES
+req_01j...                            pending  agent:model  fs.write    repo:src  2026-11-21T04:39:02.122Z
+
+$ dsh-os approvals approve req_01j... --by alice --state ./allow-state.json
+{
+  "request": { "id": "req_01j...", "status": "approved", "grantId": "grant_01j...", ... },
+  "grant": { "id": "grant_01j...", "approver": "alice", "requestHash": "...", ... }
+}
+
+$ dsh-os approvals deny req_01j... --reason "not now" --state ./allow-state.json
+```
+
+- `--state` is required unless `DSH_OS_ALLOW_STATE` is set; the path is resolved
+  against the current directory.
+- `list` filters by `--status pending|approved|denied|expired` and `--subject`,
+  and `--json` prints the raw request objects.
+- `approve` requires `--by`. It creates the Grant in the same atomic write,
+  binds it to the request hash, and is idempotent. Approval cannot widen the
+  requested scope (the CLI uses the requested scope as-is), expired requests are
+  refused, and denial is terminal.
+- `deny` requires `--reason`; `--by` defaults to `cli`.
+- Errors exit `1` and print a single `dsh-os:` line. Values such as `--by` are
+  stored as data and are never interpolated into a shell.
+
 ## Repository mode vs catalog mode
 
 - **Repository mode:** when the current directory is inside a dsh-os checkout
@@ -146,9 +181,11 @@ are maintained in the generator rather than derived from package names.
   recommendation feature. It knows only the curated dsh-os catalog.
 - **Not networked.** The CLI performs no HTTP requests at all.
 - **Read-only for user data.** It does not write profiles, credentials,
-  sessions, DSH configuration or any file outside its own package.
+  sessions, DSH configuration or any file outside its own package — except the
+  explicit `approvals` state file passed via `--state`/`DSH_OS_ALLOW_STATE`.
 - The only external process it can start is `dsh`, and only for
-  `install --run`, with a fixed argument list and `shell: false`.
+  `install --run`, with a fixed argument list and `shell: false`. `approvals`
+  never starts a process or a shell.
 
 ## Exit codes
 
@@ -168,6 +205,9 @@ node --test
 
 The tests build throwaway fixture repositories under the OS temp directory, run
 the CLI as a child process, and never touch a real DSH profile or the network.
+The `approvals` tests create throwaway Allow state files, exercise
+list/approve/deny, expiry, hash mismatch, duplicate decisions and shell-safe
+approver names, then read the state back through `dsh-allow`.
 
 ## License
 

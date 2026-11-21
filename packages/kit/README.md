@@ -2,7 +2,7 @@
 
 > One install for the four core dsh-os modules: Act, Allow, Snip and Check.
 
-**Status: 0.1.0 experimental — dependency-only meta bundle, no business code.**
+**Status: 0.3.0 experimental — dependency-only meta bundle, no business code.**
 
 `dsh-os-kit` is a thin Cordis bundle. It installs four independently versioned
 modules and mounts them through one insert patch:
@@ -61,7 +61,7 @@ as kit dependencies may be pruned with the kit.
 
 The dsh-os module contract forbids runtime dependencies. **The kit is the
 exception**: it contains no runtime logic, and its four `dependencies` are
-exactly the modules it mounts. All ranges are `^0.1.0` (compatible semver
+exactly the modules it mounts. All ranges are `^0.3.0` / `^0.2.0` (compatible semver
 ranges, not pins), so Act, Allow, Snip and Check keep their own release
 cadence.
 

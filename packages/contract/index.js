@@ -10,14 +10,14 @@
 export const SERVICES = Object.freeze({
   act: 'act', allow: 'allow', snip: 'snip', check: 'check', nest: 'nest',
   trigger: 'triggers', seek: 'evidence', trace: 'trace', stage: 'stage',
-  ring: 'ring', root: 'env', help: 'help', context: 'context', cost: 'cost', backup: 'backup', notify: 'notify',
+  ring: 'ring', root: 'env', help: 'help', context: 'context', cost: 'cost', backup: 'backup', notify: 'notify', kernel: 'kernel',
 })
 
 /** Agent tool prefix per canonical service. */
 const TOOL_PREFIX = Object.freeze({
   act: 'act_', allow: 'allow_', snip: 'snip_', check: 'check_', nest: 'nest_',
   triggers: 'trigger_', evidence: 'seek_', trace: 'trace_', stage: 'stage_',
-  ring: 'ring_', env: 'root_', help: 'help_', context: 'context_', cost: 'cost_', backup: 'backup_', notify: 'notify_',
+  ring: 'ring_', env: 'root_', help: 'help_', context: 'context_', cost: 'cost_', backup: 'backup_', notify: 'notify_', kernel: 'os_',
 })
 
 /** Capabilities a module may declare in `dsh.os.capabilities`. @type {ReadonlyArray<string>} */
@@ -131,3 +131,11 @@ export function defineTool(tool) {
   if (typeof execute !== 'function') throw fail('tool execute must be a function')
   return { ...tool }
 }
+
+// OsResult v1, OsError v1 and the audit event contract.
+export {
+  DEFAULT_PAGE_LIMIT, HANDLE_KINDS, MAX_HANDLES, MAX_ITEMS, MAX_SUMMARY, RESULT_SCHEMA,
+  makeHandle, ok, page, parseHandle, setCursorKey,
+} from './lib/result.js'
+export { ERROR_CLASSES, OsError, err, isRetryable, toToolError } from './lib/error.js'
+export { AUDIT_SCHEMA, auditEvent } from './lib/audit.js'

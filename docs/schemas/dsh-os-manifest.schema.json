@@ -24,7 +24,7 @@
           "properties": {
             "service": {
               "type": ["string", "null"],
-              "enum": ["act", "allow", "snip", "check", "nest", "triggers", "evidence", "trace", "stage", "ring", "env", "help", "context", "cost", "backup", "notify", null]
+              "enum": ["act", "allow", "snip", "check", "nest", "triggers", "evidence", "trace", "stage", "ring", "env", "help", "context", "cost", "backup", "notify", "kernel", null]
             },
             "provides": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
             "requires": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },

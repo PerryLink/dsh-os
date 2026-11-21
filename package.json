@@ -21,7 +21,9 @@
     "verify": "npm test && npm run conformance && npm run pack-smoke && npm run check-versions && npm run examples-smoke",
     "publish:all": "node scripts/publish.mjs",
     "publish:one": "node scripts/publish.mjs",
-    "examples-smoke": "node scripts/examples-smoke.mjs"
+    "examples-smoke": "node scripts/examples-smoke.mjs",
+    "eval": "node scripts/eval.mjs",
+    "eval:baseline": "node scripts/eval.mjs --threshold=0.4"
   },
   "engines": {
     "node": ">=22.19.0"

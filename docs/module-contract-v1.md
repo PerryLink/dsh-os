@@ -74,6 +74,7 @@ removable.
 | Cost (optional) | `ctx.cost` | `cost_` |
 | Backup (optional) | `ctx.backup` | `backup_` |
 | Notify (optional) | `ctx.notify` | `notify_` |
+| Kernel | `ctx.kernel` | `os_` |
 
 The service name is part of the public contract; renaming requires a major
 version and a conformance update.

@@ -1,4 +1,6 @@
 import { CLI_PACKAGE, findRepoRoot, loadCatalog } from './catalog.mjs'
+import { parseOptions } from './args.mjs'
+import { runApprovals } from './approvals.mjs'
 import {
   runDoctorCommand,
   runInfo,
@@ -9,7 +11,7 @@ import {
 import { collectModules } from './modules.mjs'
 import { DEFAULT_PROFILE, isSafeProfile } from './names.mjs'
 
-const COMMANDS = new Set(['list', 'info', 'install', 'update', 'doctor'])
+const COMMANDS = new Set(['list', 'info', 'install', 'update', 'doctor', 'approvals'])
 
 const HELP = `dsh-os ${CLI_PACKAGE.version} - offline catalog and installer helper for dsh-os modules
 
@@ -19,58 +21,22 @@ Usage:
   dsh-os install <module...> [--profile <name>] [--run]
   dsh-os update [--profile <name>]
   dsh-os doctor
+  dsh-os approvals list|approve|deny [options]
 
 Options:
-  --json       machine-readable output (list, info)
+  --json       machine-readable output (list, info, approvals list)
   --all        include optional/planned modules in list
   --profile    DeepSeek Harness profile (default: ${DEFAULT_PROFILE})
   --run        execute "dsh plugin" instead of only printing it (install)
+  --state      Allow stateFile JSON for approvals (default: $DSH_OS_ALLOW_STATE)
   -h, --help   show this help
   -v, --version  show the CLI version
 
 Modules may be referenced by package name (dsh-act), product (Act) or
 service (act, ctx.act). The CLI never contacts a registry and never writes
-a profile or any other user configuration.
+a profile or any other user configuration. "approvals" edits only the Allow
+state file passed with --state; run "dsh-os approvals --help" for details.
 `
-
-function parseOptions(args, { flags = [], values = [] } = {}) {
-  const options = {}
-  const positional = []
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index]
-    if (arg === '--') {
-      positional.push(...args.slice(index + 1))
-      break
-    }
-    if (arg === '-h' || arg === '--help') {
-      options.help = true
-      continue
-    }
-    if (arg.startsWith('--')) {
-      const equals = arg.indexOf('=')
-      const name = equals === -1 ? arg.slice(2) : arg.slice(2, equals)
-      const inline = equals === -1 ? undefined : arg.slice(equals + 1)
-      if (flags.includes(name)) {
-        if (inline !== undefined) throw new Error(`option --${name} does not take a value`)
-        options[name] = true
-        continue
-      }
-      if (values.includes(name)) {
-        const value = inline !== undefined ? inline : args[index + 1]
-        if (value === undefined || value.startsWith('--')) {
-          throw new Error(`option --${name} requires a value`)
-        }
-        options[name] = value
-        if (inline === undefined) index += 1
-        continue
-      }
-      throw new Error(`unknown option --${name}`)
-    }
-    if (arg.startsWith('-') && arg !== '-') throw new Error(`unknown option ${arg}`)
-    positional.push(arg)
-  }
-  return { options, positional }
-}
 
 function profileOf(options) {
   const profile = options.profile ?? DEFAULT_PROFILE
@@ -98,6 +64,7 @@ export function main(argv, io = {}) {
   }
 
   try {
+    if (command === 'approvals') return runApprovals(args, { stdout, stderr })
     const catalog = loadCatalog()
     const repoRoot = findRepoRoot(cwd, new Set(catalog.map(entry => entry.name)))
     const context = collectModules(repoRoot, catalog)

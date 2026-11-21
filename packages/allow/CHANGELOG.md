@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.3.0
+
+- Add the `Request` object (`pending | approved | denied | expired`) and the
+  request → approval → Grant protocol. `requestHash` binds the exact subject,
+  capability, scope, TTL and reason; approval refuses a mismatch with
+  `E_REQUEST_HASH`.
+- Service API: model-callable `request({ subject, capability, scope?, ttlMs?,
+  reason? })`, human `approve({ id, by, scope? })` and `deny({ id, by, reason })`,
+  plus `requests({ status?, subject? })` and polling `wait(id, { timeoutMs?,
+  subject? })` (5s default, 25s cap). Approval creates the Grant in the same
+  atomic save and records `requestId`/`requestHash` on it.
+- Security: approval can only narrow scope (`E_SCOPE_NARROW`), idempotent repeat
+  approval returns the same Grant, expired/denied requests cannot be approved,
+  and `request()` rejects server-owned fields (`approver`, `id`, state, hashes)
+  with `E_PRIVILEGED`.
+- Tools: default surface is now `allow_request`, `allow_wait`, `allow_requests`
+  and `allow_check`. `allow_approve` and `allow_deny` join `allow_issue`,
+  `allow_revoke` and `allow_list` behind `exposeAdminTools: true`; the legacy
+  `allow_issue` path is unchanged.
+- State version 2 persists requests alongside grants, counters and audit; version
+  1 files still load. Invalid/tampered requests and approved requests without a
+  Grant are dropped fail-closed on load.
+- CLI: `dsh-os approvals list|approve|deny --state <file>` edits the same state
+  format (no shell, no network, no profile writes).
+- Tests: 27 cases, including the full request lifecycle, hash mismatch, expiry,
+  duplicate approval/denial, privilege rejection, scope narrowing, wait polling,
+  persistence and cross-subject tool scoping.
+
 ## 0.1.2
 
 - Audit retention is tiered: at most 200 `allowed`/`denied` events are kept,

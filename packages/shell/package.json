@@ -1,7 +1,7 @@
 {
   "name": "@perrylink/dsh-os-shell",
-  "version": "0.2.0",
-  "description": "Optional UI shell for dsh-os: a view contribution registry, an owner-only JSON bridge and a minimal React client for Act, Snip and Check.",
+  "version": "0.3.0",
+  "description": "Optional UI shell for dsh-os: a view contribution registry, an owner-only JSON bridge and a minimal React client for approvals, activity, Act, Snip and Check.",
   "type": "module",
   "main": "index.js",
   "exports": {
@@ -13,6 +13,7 @@
   "files": [
     "index.js",
     "bridge.js",
+    "oversight.js",
     "ui/index.js",
     "ui/client.js",
     "cordis.patch.yml",

@@ -54,6 +54,7 @@ export const SERVICE_PREFIX = Object.freeze({
   cost: 'cost_',
   backup: 'backup_',
   notify: 'notify_',
+  kernel: 'os_',
 })
 
 export const CAPABILITIES = Object.freeze([

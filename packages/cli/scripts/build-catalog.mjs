@@ -25,6 +25,7 @@ const MODULES = [
   { dir: 'stage', product: 'Stage', service: 'stage' },
   { dir: 'ring', product: 'Ring', service: 'ring' },
   { dir: 'root', product: 'Root', service: 'env' },
+  { dir: 'kernel', product: 'Kernel', service: 'kernel' },
 ]
 
 const OPTIONAL_MODULES = [

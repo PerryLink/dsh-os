@@ -1,0 +1,63 @@
+{
+  "name": "@perrylink/dsh-os-mcp",
+  "version": "0.1.0",
+  "description": "Read-only stdio MCP server prototype for the dsh-os capability catalog: zero dependencies, no DSH connection.",
+  "type": "module",
+  "bin": {
+    "dsh-os-mcp": "bin/dsh-os-mcp.js"
+  },
+  "main": "lib/server.mjs",
+  "exports": {
+    ".": "./lib/server.mjs",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "dsh",
+    "dsh-os",
+    "deepseek-harness",
+    "mcp",
+    "model-context-protocol",
+    "stdio",
+    "read-only",
+    "agent-os"
+  ],
+  "license": "MIT",
+  "author": "PerryLink contributors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PerryLink/dsh-os.git",
+    "directory": "packages/mcp"
+  },
+  "homepage": "https://github.com/PerryLink/dsh-os/tree/main/packages/mcp#readme",
+  "bugs": {
+    "url": "https://github.com/PerryLink/dsh-os/issues"
+  },
+  "engines": {
+    "node": ">=22.19.0",
+    "dsh": ">=0.2.1-rc.2 <0.3.0-0"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "os": {
+      "service": null,
+      "provides": [],
+      "capabilities": [],
+      "tools": [],
+      "stability": "experimental",
+      "since": "0.1.0"
+    }
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

@@ -1,7 +1,7 @@
 {
   "name": "@perrylink/dsh-os-contract",
-  "version": "0.1.0",
-  "description": "Canonical service names, capabilities, error codes, refs and thin validators shared by dsh-os modules.",
+  "version": "0.2.0",
+  "description": "Canonical service names, capabilities, error codes, refs, result/error/audit protocol helpers and thin validators shared by dsh-os modules.",
   "type": "module",
   "main": "index.js",
   "exports": {
@@ -10,7 +10,9 @@
   },
   "files": [
     "index.js",
+    "lib",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "sideEffects": false,

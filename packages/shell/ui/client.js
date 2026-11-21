@@ -13,7 +13,10 @@ window.__ModuleLoader__.load({
     const React = require('react')
     const h = React.createElement
     const { useState, useEffect } = React
-    const TABS = [['act', 'Act'], ['snip', 'Snip'], ['check', 'Check']]
+    const TABS = [
+      ['approvals', 'Approvals'], ['activity', 'Activity'],
+      ['act', 'Act'], ['snip', 'Snip'], ['check', 'Check'],
+    ]
     const CSS = `
 .os-shell{padding:20px;overflow:auto;height:100%;box-sizing:border-box;color:var(--dsw-alias-label-primary)}
 .os-shell-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
@@ -33,6 +36,8 @@ window.__ModuleLoader__.load({
 .os-shell-pre-error{color:var(--dsw-alias-label-error)}
 .os-shell-error{padding:10px;border-radius:8px;border:1px solid var(--dsw-alias-label-error);color:var(--dsw-alias-label-error);white-space:pre-wrap}
 .os-shell-notice{color:var(--dsw-alias-state-success-primary);font-size:12px}
+.os-shell-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.os-shell-label{color:var(--dsw-alias-label-tertiary);font-size:12px;white-space:nowrap}
 `
     function errorText(error) {
       if (!error) return 'Unknown error'
@@ -56,6 +61,23 @@ window.__ModuleLoader__.load({
     const verdictBadge = verdict => badge(String(verdict || 'unknown'), verdict === 'regression'
       ? 'var(--dsw-alias-label-error)' : verdict === 'warning' ? 'var(--dsw-alias-state-warn-label)'
         : 'var(--dsw-alias-state-success-primary)')
+    function timeText(value) {
+      const ms = typeof value === 'number' ? value
+        : typeof value === 'string' && value.trim() !== '' ? Date.parse(value) : NaN
+      if (!Number.isFinite(ms)) return typeof value === 'string' && value !== '' ? value : '—'
+      const date = new Date(ms > 0 && ms < 1e12 ? ms * 1000 : ms)
+      try { return date.toLocaleString() } catch { return date.toISOString() }
+    }
+    function scopeText(value) {
+      if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : '—'
+      return typeof value === 'string' && value !== '' ? value : '—'
+    }
+    function riskColor(risk) {
+      return risk === 'danger' ? 'var(--dsw-alias-label-error)'
+        : risk === 'write' ? 'var(--dsw-alias-state-warn-label)'
+          : risk === 'read' ? 'var(--dsw-alias-state-success-primary)'
+            : 'var(--dsw-alias-label-secondary)'
+    }
     function ActTab(props) {
       const [query, setQuery] = useState(''); const [args, setArgs] = useState('{}')
       const [result, setResult] = useState(null)
@@ -111,6 +133,160 @@ window.__ModuleLoader__.load({
         result ? h('pre', {
           className: 'os-shell-pre' + (result.ok === false ? ' os-shell-pre-error' : ''),
         }, pretty(result)) : null)
+    }
+    function ApprovalsTab() {
+      const [items, setItems] = useState(null)
+      const [by, setBy] = useState('')
+      const [reason, setReason] = useState('')
+      const [scope, setScope] = useState('')
+      const [error, setError] = useState('')
+      const [notice, setNotice] = useState('')
+      const [busy, setBusy] = useState('')
+      const [loading, setLoading] = useState(true)
+      async function load() {
+        setLoading(true)
+        setError('')
+        try {
+          const data = await request('api/os-approvals?status=pending')
+          setItems(Array.isArray(data.items) ? data.items : [])
+        } catch (failure) {
+          setError(failure.code === 'service_unavailable'
+            ? 'Allow is not installed in this profile.' : errorText(failure))
+          setItems(null)
+        } finally { setLoading(false) }
+      }
+      async function decide(item, decision) {
+        setError('')
+        setNotice('')
+        const approver = by.trim()
+        if (approver === '') {
+          setError('Approver is required: enter the human deciding this request.')
+          return
+        }
+        if (/^(agent|session|tool|plugin|ui):/i.test(approver)) {
+          setError('Agent, session, tool, plugin and ui identities cannot decide.')
+          return
+        }
+        if (decision === 'deny' && reason.trim() === '') {
+          setError('A deny reason is required.')
+          return
+        }
+        if (decision === 'approve' && item.risk === 'danger'
+          && !window.confirm('Approve danger request "' + item.id + '"? It may be irreversible.')) return
+        if (decision === 'deny' && !window.confirm('Deny request "' + item.id + '"?')) return
+        const body = { by: approver }
+        if (decision === 'approve' && scope.trim() !== '') body.scope = scope.trim()
+        if (decision === 'deny' && reason.trim() !== '') body.reason = reason.trim()
+        setBusy(item.id + ':' + decision)
+        try {
+          await request('api/os-approvals/' + encodeURIComponent(item.id) + '/' + decision, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(body),
+          })
+          setItems(rows => (rows || []).filter(row => row.id !== item.id))
+          setNotice((decision === 'approve' ? 'Approved ' : 'Denied ') + item.id)
+        } catch (failure) {
+          setError(errorText(failure))
+        } finally { setBusy('') }
+      }
+      useEffect(() => { load() }, [])
+      const disabled = busy !== '' || by.trim() === ''
+      return h('div', null,
+        h('div', { className: 'os-shell-row' },
+          h('label', { className: 'os-shell-label' }, 'Approver (required)'),
+          h('input', {
+            placeholder: 'your name or os-user',
+            value: by,
+            onChange: event => setBy(event.target.value),
+          }),
+          h('button', { onClick: load, disabled: loading }, loading ? 'Loading…' : 'Refresh')),
+        h('p', { className: 'os-shell-muted' },
+          'Decisions are human-only. Nothing is approved automatically; agent identities are rejected.'),
+        h('div', { className: 'os-shell-row' },
+          h('label', { className: 'os-shell-label' }, 'Scope override (optional, can only narrow)'),
+          h('input', {
+            placeholder: 'e.g. repo:/work/file',
+            value: scope,
+            onChange: event => setScope(event.target.value),
+          }),
+          h('label', { className: 'os-shell-label' }, 'Deny reason (required)'),
+          h('input', {
+            placeholder: 'optional',
+            value: reason,
+            onChange: event => setReason(event.target.value),
+          })),
+        error ? h('p', { className: 'os-shell-error' }, error) : null,
+        notice ? h('p', { className: 'os-shell-notice' }, notice) : null,
+        !items && loading ? h('p', { className: 'os-shell-muted' }, 'Loading…') : null,
+        items && items.length === 0
+          ? h('p', { className: 'os-shell-muted' }, 'No pending approval requests.') : null,
+        (items || []).map(item => h('div', { key: item.id, className: 'os-shell-card' },
+          h('div', { className: 'os-shell-row' },
+            badge(item.risk || 'unknown', riskColor(item.risk)),
+            h('strong', null, item.capability || 'unknown capability'),
+            h('code', null, item.id || '')),
+          h('p', { className: 'os-shell-muted' }, 'Requester: ' + (item.subject || '—')),
+          h('p', { className: 'os-shell-muted' }, 'Scope: ' + scopeText(item.scope)),
+          item.reason ? h('p', { className: 'os-shell-muted' }, 'Reason: ' + item.reason) : null,
+          h('p', { className: 'os-shell-muted' },
+            'Created: ' + timeText(item.createdAt) + ' · Expires: ' + timeText(item.expiresAt)),
+          h('div', { className: 'os-shell-actions' },
+            h('button', {
+              disabled,
+              onClick: () => decide(item, 'approve'),
+            }, busy === item.id + ':approve' ? 'Approving…' : 'Approve'),
+            h('button', {
+              disabled,
+              onClick: () => decide(item, 'deny'),
+            }, busy === item.id + ':deny' ? 'Denying…' : 'Deny')))))
+    }
+    function ActivityTab() {
+      const [entries, setEntries] = useState(null)
+      const [sources, setSources] = useState(null)
+      const [error, setError] = useState('')
+      const [loading, setLoading] = useState(true)
+      async function load() {
+        setLoading(true)
+        setError('')
+        try {
+          const data = await request('api/os-activity?limit=50')
+          setEntries(Array.isArray(data.entries) ? data.entries : [])
+          setSources(data.sources || null)
+        } catch (failure) {
+          setError(errorText(failure))
+          setEntries(null)
+          setSources(null)
+        } finally { setLoading(false) }
+      }
+      useEffect(() => { load() }, [])
+      return h('div', null,
+        h('div', { className: 'os-shell-row' },
+          h('strong', null, 'Recent approvals and actions'),
+          h('button', { onClick: load, disabled: loading }, loading ? 'Loading…' : 'Refresh')),
+        h('p', { className: 'os-shell-muted' },
+          'Newest first. Rows come from Allow audit and Act audit/list when those services exist.'),
+        error ? h('p', { className: 'os-shell-error' }, error) : null,
+        !entries && loading ? h('p', { className: 'os-shell-muted' }, 'Loading…') : null,
+        entries && entries.length === 0
+          ? h('p', { className: 'os-shell-muted' },
+            sources && !sources.approvals && !sources.actions
+              ? 'Allow and Act are not installed in this profile.' : 'No activity yet.') : null,
+        (entries || []).map((entry, index) => h('div', {
+          key: entry.kind + ':' + (entry.id || index), className: 'os-shell-card',
+        },
+        h('div', { className: 'os-shell-row' },
+          badge(entry.kind, entry.kind === 'approval'
+            ? 'var(--dsw-alias-brand-primary)' : 'var(--dsw-alias-label-secondary)'),
+          h('strong', null, entry.title || entry.event || entry.id || 'entry'),
+          entry.risk ? badge(entry.risk, riskColor(entry.risk)) : null,
+          h('span', { className: 'os-shell-muted' }, timeText(entry.at))),
+        entry.subject ? h('p', { className: 'os-shell-muted' }, 'Subject: ' + entry.subject) : null,
+        entry.capability ? h('p', { className: 'os-shell-muted' },
+          'Capability: ' + entry.capability) : null,
+        entry.scope ? h('p', { className: 'os-shell-muted' }, 'Scope: ' + scopeText(entry.scope)) : null,
+        entry.status || entry.reason ? h('p', { className: 'os-shell-muted' },
+          [entry.status, entry.reason].filter(Boolean).join(' · ')) : null)))
     }
     function SnipTab() {
       const [query, setQuery] = useState('')
@@ -208,7 +384,7 @@ window.__ModuleLoader__.load({
           h('pre', { className: 'os-shell-pre' }, pretty(last))) : null)
     }
     function Page() {
-      const [tab, setTab] = useState('act')
+      const [tab, setTab] = useState('approvals')
       const [snapshot, setSnapshot] = useState(null)
       const [error, setError] = useState('')
       const [loading, setLoading] = useState(true)
@@ -229,7 +405,7 @@ window.__ModuleLoader__.load({
         h('div', { className: 'os-shell-head' },
           h('div', null,
             h('h1', null, 'OS Shell'),
-            h('p', { className: 'os-shell-muted' }, 'Optional control surface for Act, Snip and Check.')),
+            h('p', { className: 'os-shell-muted' }, 'Optional control surface for approvals, activity, Act, Snip and Check.')),
           h('button', { onClick: () => setNonce(value => value + 1), disabled: loading },
             loading ? 'Loading…' : 'Refresh')),
         h('nav', { className: 'os-shell-tabs' }, TABS.map(([id, label]) => h('button', {
@@ -237,14 +413,16 @@ window.__ModuleLoader__.load({
           className: 'os-shell-tab' + (tab === id ? ' os-shell-tab-active' : ''),
           onClick: () => setTab(id),
         }, label))),
-        tab === 'act'
-          ? h(ActTab, {
-            section: snapshot ? snapshot.act : null,
-            loading,
-            error,
-            onRefresh: () => setNonce(value => value + 1),
-          })
-          : tab === 'snip' ? h(SnipTab) : h(CheckTab))
+        tab === 'approvals' ? h(ApprovalsTab)
+          : tab === 'activity' ? h(ActivityTab)
+            : tab === 'act'
+              ? h(ActTab, {
+                section: snapshot ? snapshot.act : null,
+                loading,
+                error,
+                onRefresh: () => setNonce(value => value + 1),
+              })
+              : tab === 'snip' ? h(SnipTab) : h(CheckTab))
     }
     function Icon(props) {
       const size = props && typeof props.size === 'number' ? props.size : 18
