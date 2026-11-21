@@ -51,6 +51,7 @@ test('apply provides ctx.evidence and registers all four tools', () => {
   assert.deepEqual(service.sources(), [
     { name: 'locator', status: 'unavailable', reason: 'locator_find is not registered (install/enable dsh-locator)' },
     { name: 'memento', status: 'unavailable', reason: 'memory service is not available (install/enable dsh-memento)' },
+    { name: 'trace', status: 'unavailable', reason: 'trace service is not available (install/enable dsh-trace)' },
   ])
 })
 
@@ -257,9 +258,19 @@ test('hits are normalized to the documented shape', async () => {
       snippet: 'snip',
       score: 1.5,
       freshness: 'fresh',
+      tainted: true,
+      taintSource: 'alpha',
       resolvable: false,
     },
-    { ref: 'dsh://alpha/bare', source: 'alpha', title: '', snippet: '', resolvable: false },
+    {
+      ref: 'dsh://alpha/bare',
+      source: 'alpha',
+      title: '',
+      snippet: '',
+      tainted: true,
+      taintSource: 'alpha',
+      resolvable: false,
+    },
   ])
 })
 
@@ -375,6 +386,7 @@ test('agent tools call the service', async () => {
     ['alpha', 'ready'],
     ['locator', 'unavailable'],
     ['memento', 'unavailable'],
+    ['trace', 'unavailable'],
   ])
   await assert.rejects(
     ctx._tools.get('seek_search').execute({}),

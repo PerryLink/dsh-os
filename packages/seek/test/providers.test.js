@@ -5,7 +5,7 @@ import { createLocatorProvider } from '../lib/providers/locator.js'
 import { createMementoProvider } from '../lib/providers/memento.js'
 
 /** Fake Cordis context with a tool registry and optional host services. */
-function fakeContext({ tools = [], memory } = {}) {
+function fakeContext({ tools = [], memory, trace } = {}) {
   const registry = new Map(tools.map(tool => [tool.name, tool]))
   const services = new Map()
   const toolService = {
@@ -14,6 +14,7 @@ function fakeContext({ tools = [], memory } = {}) {
   }
   services.set('tools', toolService)
   if (memory !== undefined) services.set('memory', memory)
+  if (trace !== undefined) services.set('trace', trace)
   return {
     tools: toolService,
     provide: (name, value) => services.set(name, value),
@@ -47,12 +48,24 @@ function fakeMemory(entries, calls = []) {
   }
 }
 
-test('apply auto-registers locator and memento when their host services exist', () => {
-  const { ctx, service } = setup({ tools: [fakeLocator([])], memory: fakeMemory([]) })
-  assert.deepEqual(service.providers(), ['locator', 'memento'])
+function fakeTrace(records = []) {
+  return {
+    search: () => records,
+    list: () => records,
+  }
+}
+
+test('apply auto-registers locator, memento and trace when their host services exist', () => {
+  const { ctx, service } = setup({
+    tools: [fakeLocator([])],
+    memory: fakeMemory([]),
+    trace: fakeTrace(),
+  })
+  assert.deepEqual(service.providers(), ['locator', 'memento', 'trace'])
   assert.deepEqual(service.sources(), [
     { name: 'locator', status: 'ready' },
     { name: 'memento', status: 'ready' },
+    { name: 'trace', status: 'ready' },
   ])
   assert.deepEqual(
     [...ctx._registry.keys()].filter(name => name.startsWith('seek_')),
@@ -65,9 +78,10 @@ test('missing optional plugins are reported as unavailable, not thrown', async (
   assert.deepEqual(service.providers(), [])
   const report = await ctx._registry.get('seek_providers').execute()
   assert.deepEqual(report.providers, [])
-  assert.deepEqual(report.sources.map(source => source.status), ['unavailable', 'unavailable'])
+  assert.deepEqual(report.sources.map(source => source.status), ['unavailable', 'unavailable', 'unavailable'])
   assert.match(report.sources[0].reason, /locator_find/)
   assert.match(report.sources[1].reason, /memory/)
+  assert.match(report.sources[2].reason, /trace service/)
 })
 
 test('locator hits map to dsh://locator/<path> with caller cwd and freshness', async () => {
@@ -238,22 +252,24 @@ test('seek_register_defaults retries after optional plugins mount', async () => 
 
   let report = await register.execute()
   assert.deepEqual(report.providers, [])
-  assert.equal(report.sources.filter(source => source.status === 'unavailable').length, 2)
+  assert.equal(report.sources.filter(source => source.status === 'unavailable').length, 3)
 
   ctx._registry.set('locator_find', fakeLocator([{ kind: 'file', path: '/work/a.ts' }]))
   ctx._services.set('memory', fakeMemory([
     { id: 'id-1', scope: 'user-global', agentKey: '', text: 'm' },
   ]))
+  ctx._services.set('trace', fakeTrace())
 
   report = await register.execute()
-  assert.deepEqual(report.providers, ['locator', 'memento'])
+  assert.deepEqual(report.providers, ['locator', 'memento', 'trace'])
   assert.deepEqual(report.sources, [
     { name: 'locator', status: 'ready' },
     { name: 'memento', status: 'ready' },
+    { name: 'trace', status: 'ready' },
   ])
 
   report = await register.execute()
-  assert.deepEqual(report.providers, ['locator', 'memento'])
+  assert.deepEqual(report.providers, ['locator', 'memento', 'trace'])
 })
 
 test('registerDefaultProviders is idempotent and returns statuses', () => {
@@ -261,9 +277,10 @@ test('registerDefaultProviders is idempotent and returns statuses', () => {
   assert.deepEqual(registerDefaultProviders(ctx, service), [
     { name: 'locator', status: 'ready' },
     { name: 'memento', status: 'unavailable', reason: 'memory service is not available (install/enable dsh-memento)' },
+    { name: 'trace', status: 'unavailable', reason: 'trace service is not available (install/enable dsh-trace)' },
   ])
   assert.deepEqual(service.providers(), ['locator'])
-  assert.deepEqual(registerDefaultProviders(ctx, service).map(status => status.status), ['ready', 'unavailable'])
+  assert.deepEqual(registerDefaultProviders(ctx, service).map(status => status.status), ['ready', 'unavailable', 'unavailable'])
 })
 
 test('seek_search without a caller fails first-party providers closed', async () => {

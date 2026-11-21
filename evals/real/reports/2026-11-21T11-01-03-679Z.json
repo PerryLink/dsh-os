@@ -1,0 +1,222 @@
+{
+  "schema": "dsh-os.eval-real/v1",
+  "layer": "A-real (DSH headless; real model calls; external-state grading)",
+  "generatedAt": "2026-11-21T11:01:03.679Z",
+  "env": {
+    "node": "v24.22.1",
+    "platform": "linux",
+    "dshBin": "/home/yy/deepseek-harness/apps/cli/lib/bin.js",
+    "profile": "eval",
+    "keyVar": "DEEPSEEK_API_KEY",
+    "commit": "1958cf3",
+    "dirty": true
+  },
+  "scenarios": [
+    {
+      "id": "seek-evidence",
+      "title": "seek 证据（Trace）",
+      "goal": "先用 Trace 记住两条事实，再通过 seek 搜索并 resolve 两条 dsh://trace ref，写出 evidence.json；不引用不存在的文档。",
+      "initial": [
+        "临时工作区：docs/user-trust.md 与 docs/env.md 是两条事实的来源文档",
+        "profile 需要挂载 dsh-seek + dsh-trace；trace provider 会自动注册，不依赖 locator 索引临时工作区",
+        "seek_search 搜索 Trace 记忆，返回 dsh://trace/<record-id>；seek_resolve 按 id 验证",
+        "notes.md 提到 docs/deprecated-trust.md，但该文件不存在"
+      ],
+      "prompt": "按顺序完成：1) 调 trace_remember 两次，source 都用 \"note:user-trust\"：第一条 key=\"user-trust-profile\"、text=\"User-trust profiles are hidden from agent-layer resolution.\"；第二条 key=\"user-trust-env\"、text=\"Root never materializes process.env.\"。2) 调 seek_providers，确认 trace 为 ready。3) 调 seek_search，query=\"user-trust\"，limit=10，应得到两条 dsh://trace/... 的 hit。4) 对这两条 ref 各调一次 seek_resolve；只有 found=true 的 ref 才能使用。5) 写 evidence.json：{\"claims\":[{\"text\":\"User-trust profiles are hidden from agent-layer resolution.\",\"ref\":\"<第一条 ref>\",\"source\":\"docs/user-trust.md\"},{\"text\":\"Root never materializes process.env.\",\"ref\":\"<第二条 ref>\",\"source\":\"docs/env.md\"}]}。ref 必须原样复制 seek_search 返回的 dsh://trace/... 值，两条 ref 必须不同；不要编造 ref，不要引用 docs/deprecated-trust.md。",
+      "success": true,
+      "strictSuccess": true,
+      "deferredChecks": 0,
+      "toolCalls": 10,
+      "invalidCalls": 0,
+      "tokensEstimate": 189976,
+      "interventions": [],
+      "firstTool": "trace_remember",
+      "expectedFirstTool": [
+        "trace_remember",
+        "seek_providers",
+        "seek_search"
+      ],
+      "firstStepCorrect": true,
+      "steps": [
+        {
+          "n": 1,
+          "tool": "trace_remember",
+          "args": "{\"key\":\"user-trust-profile\",\"text\":\"User-trust profiles are hidden from agent-layer resolution.\",\"source\":\"note:user-trust\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_ET_YaFS0Es5nX8eW98pxsoA1002"
+        },
+        {
+          "n": 2,
+          "tool": "trace_remember",
+          "args": "{\"key\":\"user-trust-env\",\"source\":\"note:user-trust\",\"text\":\"Root never materializes process.env.\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_ET_LBF4micNVZZWfone0Fwt8219"
+        },
+        {
+          "n": 3,
+          "tool": "seek_providers",
+          "args": "{}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_ET_yeUpwa5yKMStemkXTYqE7797"
+        },
+        {
+          "n": 4,
+          "tool": "seek_search",
+          "args": "{\"query\":\"user-trust\",\"limit\":10}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_AJNtouJkQ1PE7PP8U02m2351"
+        },
+        {
+          "n": 5,
+          "tool": "seek_resolve",
+          "args": "{\"ref\":\"dsh://trace/eeb761be-3409-4aea-9e22-5dc6d587ac20\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_C6e5EKPZCe7ePqIXAQYL2857"
+        },
+        {
+          "n": 6,
+          "tool": "seek_resolve",
+          "args": "{\"ref\":\"dsh://trace/04b2168c-5079-4145-8140-299c78aa0ead\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_01_88zJA02smdPDAc0kyiEn0577"
+        },
+        {
+          "n": 7,
+          "tool": "bash",
+          "args": "{\"command\":\"ls -la /tmp/dsh-real-seek-evidence-fsmBqG\",\"description\":\"List workspace contents\"}",
+          "ok": false,
+          "code": "SANDBOX_UNAVAILABLE",
+          "invalid": null,
+          "callId": "call_00_bkthzGLGX8W4DmoX0mhJ2164"
+        },
+        {
+          "n": 8,
+          "tool": "glob",
+          "args": "{\"pattern\":\"*\",\"path\":\"/tmp/dsh-real-seek-evidence-fsmBqG\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_Y3iWA0y5QRAibYSiFlN51857"
+        },
+        {
+          "n": 9,
+          "tool": "write",
+          "args": "{\"file_path\":\"/tmp/dsh-real-seek-evidence-fsmBqG/evidence.json\",\"content\":\"{\\n  \\\"claims\\\": [\\n    {\\n      \\\"text\\\": \\\"User-trust profiles are hidden from agent-layer resolution.\\\",\\n      \\\"ref\\\": \\\"dsh://trace/eeb761be-3409-4aea-9e22-5dc6d587ac20\\\",\\n      \\\"source\\\": \\\"docs/user-trust.md\\\"\\n    },\\n    {\\n      \\\"text\\\": \\\"Root never materializes process.env.\\\",\\n      \\\"ref\\\": \\\"dsh://trace/04b2168c-5079-4145-8140-299c78aa0ead\\\",\\n      \\\"source\\\": \\\"docs/env.md\\\"\\n    }\\n  ]\\n}\\n\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_JHKxTUGq8jvxLqP1lE5M9295"
+        },
+        {
+          "n": 10,
+          "tool": "read",
+          "args": "{\"file_path\":\"/tmp/dsh-real-seek-evidence-fsmBqG/evidence.json\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_ET_re8Jt1Sz6Kx0BTPoE9nx7802"
+        }
+      ],
+      "checks": [
+        {
+          "id": "seek-search-used",
+          "ok": true,
+          "detail": "seek_search 调用 1 次（至少 1）"
+        },
+        {
+          "id": "seek-resolve-used",
+          "ok": true,
+          "detail": "seek_resolve 调用 2 次（至少 2）"
+        },
+        {
+          "id": "trace-remember-used",
+          "ok": true,
+          "detail": "trace_remember 调用 2 次（至少 2）"
+        },
+        {
+          "id": "evidence-chain",
+          "ok": true,
+          "detail": "2 条可解析证据"
+        },
+        {
+          "id": "evidence-trace-refs",
+          "ok": true,
+          "detail": "exit 0，stdout 符合期望"
+        }
+      ],
+      "failures": [
+        {
+          "n": 7,
+          "tool": "bash",
+          "code": "SANDBOX_UNAVAILABLE",
+          "invalid": null
+        }
+      ],
+      "approvals": {
+        "asked": 0,
+        "decided": 0,
+        "rejected": 0,
+        "outcomes": {},
+        "parsed": 80,
+        "files": 4,
+        "source": "log"
+      },
+      "finalReason": {
+        "kind": "completed"
+      },
+      "finalText": "所有五个步骤均按顺序完成，并且每一份 ref 在使用前都已验证。\n\n**1. `trace_remember` × 2**（来源为 `note:user-trust`）\n- `user-trust-profile` → “User-trust profiles are hidden from agent-layer resolution.”（id `eeb761be-3409-4aea-9e22-5dc6d587ac20`）\n- `user-trust-env` → “Root never materializes process.env.”（id `04b2168c-5079-4145-8140-299c78aa0ead`）\n\n**2. `seek_providers`** — `trace` 的 `status: \"ready\"`（`locator` 也是 `ready`；`memento` 不可用）。\n\n**3. `seek_search`**（`query=\"user-trust\"`，`limit=10`）— 恰好返回 2 条命中，均属于 `dsh://trace/...`：\n- `dsh://trace/eeb761be-3409-4aea-9e22-5dc6d587ac20` — 标题 `user-trust-profile`\n- `dsh://trace/04b2168c-5079-4145-8140-299c78aa0ead` — 标题 `user-trust-env`\n\n（搜索结果还记录了 `locator` 提供方的一处非致命错误 `E_UNAUTHORIZED: content-path-denied`；trace 的这两条命中不受影响。）\n\n**4. `seek_resolve` × 2** — 两个 ref 均返回 `found: true`，并且文本与预期匹配：\n- `...eeb761be...` → “User-trust profiles are hidden from agent-layer resolution.”\n- `...04b2168c...` → “Root never materializes process.env.”\n\n**5. `evidence.json` 已写入** `/tmp/dsh-real-seek-evidence-fsmBqG/evidence.json`，包含两个条目：\n- ref `dsh://trace/eeb761be-3409-4aea-9e22-5dc6d587ac20`，来源 `docs/user-trust.md`\n- ref `dsh://trace/04b2168c-5079-4145-8140-299c78aa0ead`，来源 `docs/env.md`\n\n两条 ref 都是原样复制自 `seek_search` 输出的不同值；没有编造 ref，也没有引用 `docs/deprecated-trust.md`。我通过回读文件确认了其内容。\n\n一点说明：`bash` 无法运行，因为主机没有可用的 sandbox 后端（`workspace-write` 被拒绝），因此我改用 `glob`/`read`/`write` 文件工具，而没有使用 shell 列出或检查目录。这对任务本身没有影响。",
+      "sessionId": "session-87a09012-a005-45d6-b069-58555dfa78e6",
+      "exitCode": 0,
+      "timedOut": false,
+      "stepLimitHit": false,
+      "tokenLimitHit": false,
+      "tokensUsed": 189976,
+      "outputLimitHit": false,
+      "protocolOk": true,
+      "parseErrors": 0,
+      "badLines": [],
+      "usageComplete": true,
+      "tokensSource": "usage",
+      "durationMs": 18954,
+      "stdoutBytes": 15898,
+      "stderr": "[llm-deepseek-api-key] model listing from https://api.deepseek.com/models loaded 2 model(s), skipped 0 row(s)\n[dsh-locator] locator: scanned 232159 entries in 699ms\n[dsh-locator] locator: watching 1 root(s)\n",
+      "profile": "eval",
+      "dshBin": "/home/yy/deepseek-harness/apps/cli/lib/bin.js",
+      "error": null
+    }
+  ],
+  "metrics": {
+    "scenarios": 1,
+    "successes": 1,
+    "successRate": 1,
+    "strictSuccesses": 1,
+    "strictSuccessRate": 1,
+    "deferredChecks": 0,
+    "deferredScenarios": 0,
+    "firstStepAccuracy": 1,
+    "recoveryRate": 1,
+    "recoveredScenarios": 1,
+    "scenariosWithFailures": 1,
+    "toolCalls": 10,
+    "invalidCalls": 0,
+    "invalidCallRate": 0,
+    "avgSteps": 10,
+    "tokensEstimate": 189976,
+    "avgTokens": 189976,
+    "interventions": 0,
+    "assistedSuccesses": 0,
+    "autonomousSuccesses": 1
+  }
+}

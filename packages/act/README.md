@@ -2,16 +2,18 @@
 
 > Typed action registry and agent-facing action bus for DeepSeek Harness.
 
-**Status: 0.4.0 — result envelopes on `act_list`**
+**Status: 0.5.0 — tainted writes need two Grants.**
 
-0.4.0 keeps every 0.1/0.3 field and adds a bounded `os.result/v1` envelope to
-`act_list`: `schema`, `ok`, `items`, `summary`, `page`, `truncated`, `next` and
-`error`, with the legacy `actions` array untouched. 0.3.0 turned Act from a
-demo registry into a usable action bus: the 0.1
-`echo` / `now` / `list` actions stay compatible, and four filesystem actions
-(`fs.read` / `fs.write` / `fs.list` / `fs.undo`) execute real work behind one
-grant, preview and undo pipeline. The action panel and `dsh-act` CLI are still
-planned for a later release.
+0.5.0 adds a minimal tainted-write gate: when the caller/host marks an action
+call as tainted (`meta.tainted` or `meta.taintToken`), a `write`/`danger` action
+needs `act:invoke:<id>:tainted` in addition to its normal Grant. 0.4.0 keeps
+every 0.1/0.3 field and adds a bounded `os.result/v1` envelope to `act_list`:
+`schema`, `ok`, `items`, `summary`, `page`, `truncated`, `next` and `error`,
+with the legacy `actions` array untouched. 0.3.0 turned Act from a demo registry
+into a usable action bus: the 0.1 `echo` / `now` / `list` actions stay
+compatible, and four filesystem actions (`fs.read` / `fs.write` / `fs.list` /
+`fs.undo`) execute real work behind one grant, preview and undo pipeline. The
+action panel and `dsh-act` CLI are still planned for a later release.
 
 Act is an **action bus**, not a repository task runner such as `dsh-actions`:
 plugins register typed `ActionDescriptor`s once, and humans, agents and future
@@ -61,7 +63,8 @@ directory. Every filesystem action is restricted to that tree.
 - `fs.write` replaces the whole file (`create: false` requires an existing
   file). It writes a sibling temporary file and renames it into place, so a
   reader never observes a half-written file. Text over `maxWriteBytes` is
-  rejected with `E_TOO_LARGE`.
+  rejected with `E_TOO_LARGE`. A tainted call also needs the `:tainted` Grant
+  (see below).
 - `fs.list` returns absolute paths. `limit` defaults to 200 and is clamped to
   1000. `recursive: true` descends into real subdirectories only; symlinks are
   reported as `symlink` and are never followed.
@@ -122,6 +125,48 @@ method, the denial also carries:
 capability. Affirmative decisions are `true`, `'allow'`, or an object with
 `granted` / `allowed` / `allow` / `permitted === true`, or `decision` /
 `status === 'allow'`.
+
+## Tainted writes (0.5.0)
+
+A call is **tainted** when the caller or host sets `meta.tainted === true` or
+passes a non-empty `meta.taintToken` (for example the token from `snip_get`).
+Then `invoke()` performs both checks, in this order:
+
+```js
+await allow.check({ subject, capability: 'act:invoke:fs.write' })
+await allow.check({ subject, capability: 'act:invoke:fs.write:tainted' })
+```
+
+The second check applies to every non-read action that is not opted out with
+`authorize: false` (so `fs.write` and custom `write`/`danger` actions, but not
+`fs.undo`, whose single-use token is already the capability). If either check is
+missing or non-affirmative, the call returns `grant_required` with the missing
+`capability`, and the tainted denial also carries `tainted: true` plus an
+`allow_request` hint:
+
+```js
+{ ok: false, code: 'grant_required', actionId: 'fs.write',
+  capability: 'act:invoke:fs.write:tainted', tainted: true,
+  hint: 'Call allow_request for capability "act:invoke:fs.write:tainted" …' }
+```
+
+The agent tool accepts both claims and forwards them to `meta`:
+
+```js
+await act_invoke({ id: 'fs.write', args: { path, text }, tainted: true })
+await act_invoke({ id: 'fs.write', args: { path, text }, taintToken: entry.taintToken })
+```
+
+`meta.tainted` is supplied by the caller/host, never inferred from the action's
+arguments; Act does not inspect `args.text`. `preview: true` runs before any
+grant check and never touches disk.
+
+> **This is a minimal gate, not taint tracking.** Act does not verify
+> `taintToken`: a non-empty token is only a claim that raises the bar, and a
+> forged token can neither authorize nor downgrade the call. A caller that omits
+> `tainted`/`taintToken` gets the normal single-Grant path. The durable fix is
+> host-produced result metadata that the host attaches to every tool result and
+> passes to Act, plus a taint-aware planner — not a per-plugin label.
 
 ## Preview
 
@@ -202,7 +247,7 @@ Results never throw for expected failures:
 | Success | `{ ok: true, actionId, result }` |
 | Preview | `{ ok: true, actionId, preview }` |
 | Unknown id | `{ ok: false, code: 'action_not_found', actionId }` |
-| Missing grant | `{ ok: false, code: 'grant_required', actionId, capability, hint? }` |
+| Missing grant | `{ ok: false, code: 'grant_required', actionId, capability, tainted?, hint? }` |
 | Action threw | `{ ok: false, code: 'action_failed', message, reason? }` |
 
 Filesystem `reason` codes: `E_INVALID_ARGUMENT` (wrong type, unknown field,
@@ -222,8 +267,10 @@ original `reason`.
   action, `allow_request`. Failures return `{ ok: false, code, error }` while
   keeping the original `code`.
 - `act_invoke` — `id` required, `args` optional object, `preview` optional
-  boolean. The effective risk is the target descriptor's risk; `write` /
-  `danger` actions still go through the Allow check above.
+  boolean, `tainted` optional boolean, `taintToken` optional string. The
+  effective risk is the target descriptor's risk; `write` / `danger` actions
+  still go through the Allow checks above, and a tainted call also needs the
+  `:tainted` capability.
 
 ## Test
 
@@ -235,7 +282,9 @@ node --test
 The suite covers reads, writes, listing, path traversal and symlink escapes,
 missing grants and hints, previews that do not touch disk, undo (restore,
 created-file removal, stale detection), read/write caps, `act_list` risks and
-the 0.4.0 envelope (summary/page/next, legacy `actions`, failure `error`).
+the 0.4.0 envelope (summary/page/next, legacy `actions`, failure `error`), plus
+the 0.5.0 taint gate: one Grant for a normal write, both Grants for a tainted
+write, forged/empty tokens, tool forwarding and preview/read exemptions.
 
 ## License
 

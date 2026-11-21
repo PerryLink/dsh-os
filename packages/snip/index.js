@@ -1,6 +1,10 @@
 /**
  * dsh-snip — local-first clipboard ledger for DeepSeek Harness.
  *
+ * 0.4.0 marks every ledger entry as clipboard-tainted (`tainted: true`,
+ * `taintSource: "clipboard"`) and mints a process-local `taintToken` from
+ * `snip_get`; the token is a random id mapped to the SHA-256 of the stored
+ * text. This is a minimal gate, not full taint tracking.
  * 0.3.0 adds an `os.result/v1` envelope to `snip_search` (default limit 20,
  * max 100, `page`/`truncated`/`next`/`error`) while keeping `query`/`entries`.
  * 0.2.0 adds explicit OS clipboard capture through `lib/capture.js`. Capture
@@ -165,7 +169,8 @@ export function makeTools(service) {
     ),
     tool(
       'snip_get',
-      'Read one clipping by id or clipboard:// handle. Returned text becomes part of this conversation session log.',
+      'Read one clipping by id or clipboard:// handle. Returned text becomes part of this conversation session log. '
+        + 'The reply is marked tainted (taintSource "clipboard") and includes a process-local taintToken.',
       {
         type: 'object',
         additionalProperties: false,

@@ -130,7 +130,19 @@ export function displayPath(payload) {
   return display === '' ? null : truncateText(redactText(display), MAX_TEXT_BYTES)
 }
 
-/** The ledger projection of one fired event. */
-export function runFields(payload) {
-  return { payload: sanitizePayload(payload), path: displayPath(payload) }
+/**
+ * The ledger projection of one fired event. A source-driven event passes its
+ * source type as `taintSource`; the stored payload and the run row then carry
+ * `tainted: true` / `taintSource` (external content, not a trust proof).
+ */
+export function runFields(payload, taintSource) {
+  const safe = sanitizePayload(payload)
+  const tainted = typeof taintSource === 'string' && taintSource !== ''
+  return {
+    payload: tainted && isPlain(safe)
+      ? Object.freeze({ ...safe, tainted: true, taintSource })
+      : safe,
+    path: displayPath(payload),
+    ...(tainted ? { tainted: true, taintSource } : {}),
+  }
 }

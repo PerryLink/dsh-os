@@ -1,7 +1,7 @@
 {
   "name": "dsh-seek",
-  "version": "0.4.0",
-  "description": "Cross-source evidence search for DeepSeek Harness with verifiable refs, resolvable markers, resolve routing and real locator/memento providers.",
+  "version": "0.5.0",
+  "description": "Cross-source evidence search for DeepSeek Harness with verifiable refs, resolvable/tainted markers, resolve routing and real locator/memento/trace providers.",
   "type": "module",
   "main": "index.js",
   "exports": {

@@ -1,6 +1,12 @@
 /**
  * dsh-seek — cross-source evidence search for DeepSeek Harness.
  *
+ * 0.5.0 adds the `trace` provider (through dsh-trace's `ctx.trace`): memory hits
+ * map to `dsh://trace/<record-id>`, carry `resolvable: true` and `tainted: true`,
+ * and resolve by id with the stored text. Auto-registration now covers
+ * `locator`, `memento` and `trace`; providers mounted after Seek are picked up
+ * by the next `seek_search`/`seek_resolve`/`seek_providers` call.
+ *
  * 0.4.0 adds an `os.result/v1` envelope to `seek_search` (default limit 10,
  * max 50, `page`/`truncated`/`next`/`error`) while keeping the legacy
  * `{ query, hits, total, errors }` fields.
@@ -8,8 +14,7 @@
  * `ctx.evidence` fans one query out to named providers, normalizes and
  * deduplicates their hits, and returns a partial result plus per-provider
  * errors. It also routes one `dsh://` ref to the matching provider's optional
- * `resolve` (0.3.0). 0.2.0 ships two optional first-party providers: `locator`
- * (through dsh-locator's `locator_find`) and `memento` (through `ctx.memory`).
+ * `resolve` (0.3.0).
  * @module dsh-seek
  */
 
@@ -119,6 +124,10 @@ function normalizeHit(value) {
     source: parsed.source,
     title: typeof value.title === 'string' ? value.title : '',
     snippet: typeof value.snippet === 'string' ? value.snippet : '',
+    // Every provider result crosses a trust boundary (files, memory, remote
+    // sources), so a provider cannot opt a hit out of the taint label.
+    tainted: true,
+    taintSource: parsed.source,
   }
   if (typeof value.score === 'number' && Number.isFinite(value.score)) hit.score = value.score
   if (value.freshness !== undefined) hit.freshness = value.freshness
@@ -156,9 +165,13 @@ export class SeekService {
 
   /**
    * Register `{ name, search(query, opts) }`. Returns a disposer.
+   *
+   * An auto-registered first-party provider (`builtin: true`, set only by
+   * `registerDefaultProviders`) may be replaced by a later manual registration
+   * of the same name; every other duplicate throws `provider_exists`.
    * @throws {Error} `invalid_provider` or `provider_exists`.
    */
-  registerProvider(provider) {
+  registerProvider(provider, options = {}) {
     if (!plainObject(provider)) {
       throw fail('invalid_provider', 'seek: provider must be an object')
     }
@@ -171,7 +184,9 @@ export class SeekService {
     if (provider.resolve !== undefined && typeof provider.resolve !== 'function') {
       throw fail('invalid_provider', `seek: provider "${provider.name}" resolve must be a function`)
     }
-    if (this.#providers.has(provider.name)) {
+    const builtin = plainObject(options) && options.builtin === true
+    const existing = this.#providers.get(provider.name)
+    if (existing !== undefined && existing.builtin !== true) {
       throw fail('provider_exists', `seek: provider "${provider.name}" is already registered`)
     }
 
@@ -179,6 +194,7 @@ export class SeekService {
       name: provider.name,
       search: provider.search.bind(provider),
       ...(typeof provider.resolve === 'function' ? { resolve: provider.resolve.bind(provider) } : {}),
+      ...(builtin ? { builtin: true } : {}),
     })
     this.#providers.set(entry.name, entry)
     this.#unavailable.delete(entry.name)
@@ -397,7 +413,7 @@ export class SeekService {
  * the agent tools (`seek_search`, `seek_resolve`, `seek_providers`,
  * `seek_register_defaults`).
  * @param {object} ctx - Cordis context with `provide` and `tools.register`.
- * @param {object} [_config] - Reserved; no Seek config in 0.3.0.
+ * @param {object} [_config] - Reserved; no Seek config in 0.5.0.
  */
 export function apply(ctx, _config = {}) {
   const service = new SeekService()

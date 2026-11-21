@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.0
+
+- Mark every run created by a real source (`agent` / `fs` / `webhook`) with
+  `tainted: true` and `taintSource: "<source type>"`, on both the run row and
+  its stored `payload` projection. The live payload passed to conditions and
+  actions is unchanged.
+- `fire(event, payload, options?)` accepts `{ tainted: true, taintSource }` for
+  host callers; the three source adapters use it automatically. `trigger_fire`
+  stays untainted because its payload is model-authored.
+- Document the limit: this is a minimal label for routing external payloads into
+  Act's `:tainted` write Grant, not taint tracking; a caller can ignore it.
+- Tests: agent-source runs are tainted on the run and payload, host `fire()`
+  options set the fields, and plain `fire()` / `trigger_fire` runs are
+  unchanged (exact run keys).
+
 ## 0.3.0
 
 - Every run recorded by `fire()` now keeps the event payload and a display

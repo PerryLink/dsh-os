@@ -1,5 +1,9 @@
 /**
  * dsh-act — typed action registry and agent-facing action bus for DeepSeek Harness.
+ * 0.5.0 adds a minimal tainted-write gate: when the caller marks meta.tainted
+ * or supplies a taintToken, a write action also needs the
+ * `act:invoke:<id>:tainted` capability in addition to its normal Grant. The
+ * caller/host supplies the taint flag; Act does not track data flow.
  * 0.4.0 adds an `os.result/v1` envelope to `act_list` (`schema`/`ok`/`items`/
  * `summary`/`page`/`truncated`/`next`/`error`) while keeping `actions` intact.
  * 0.3.0 adds real filesystem actions (`fs.read` / `fs.write` / `fs.list` /
@@ -16,6 +20,7 @@ export const inject = ['tools']
 const ID_PATTERN = /^[a-z][a-z0-9_.-]{1,63}$/
 const RISKS = ['read', 'write', 'danger']
 const RISK_RANK = { read: 0, write: 1, danger: 2 }
+const TAINT_SUFFIX = ':tainted'
 const schema = (properties, required) => ({ type: 'object', additionalProperties: false, properties, ...(required === undefined ? {} : { required }) })
 const output = {
   schema: { type: 'object', additionalProperties: true },
@@ -89,6 +94,12 @@ function granted(decision) {
   if (decision === null || typeof decision !== 'object') return false
   return [decision.granted, decision.allowed, decision.allow, decision.permitted].includes(true)
     || decision.decision === 'allow' || decision.status === 'allow'
+}
+
+/** A caller/host-supplied taint claim. Act never infers it from action args. */
+function isTainted(meta) {
+  return meta?.tainted === true
+    || (typeof meta?.taintToken === 'string' && meta.taintToken !== '')
 }
 
 /** Structured action failure; `reason` preserves the machine-readable code. */
@@ -172,13 +183,15 @@ export class ActService {
     }
 
     const capability = `act:invoke:${action.id}`
-    if (action.risk !== 'read' && action.authorize !== false
-      && !(await this.#authorized(capability, meta))) {
-      const result = { ok: false, code: 'grant_required', actionId: action.id, capability }
-      if (typeof this.#allow()?.request === 'function') {
-        result.hint = `Call allow_request for capability "${capability}" with the target scope, then retry.`
-      }
-      return result
+    const gated = action.risk !== 'read' && action.authorize !== false
+    if (gated && !(await this.#authorized(capability, meta))) {
+      return this.#grantRequired(action, capability)
+    }
+    // Minimal taint gate: a caller/host claim raises the bar for writes and
+    // danger actions. It never lowers it; Act does not verify the token.
+    const taintedCapability = `${capability}${TAINT_SUFFIX}`
+    if (gated && isTainted(meta) && !(await this.#authorized(taintedCapability, meta))) {
+      return this.#grantRequired(action, taintedCapability, true)
     }
 
     try {
@@ -186,6 +199,16 @@ export class ActService {
     } catch (error) {
       return failure(error)
     }
+  }
+
+  /** Fail-closed grant result; tainted denials always point at allow_request. */
+  #grantRequired(action, capability, tainted = false) {
+    const result = { ok: false, code: 'grant_required', actionId: action.id, capability }
+    if (tainted) result.tainted = true
+    if (tainted || typeof this.#allow()?.request === 'function') {
+      result.hint = `Call allow_request for capability "${capability}" with the target scope, then retry.`
+    }
+    return result
   }
 
   /** Resolve the optional Allow service through `ctx.get('allow')` or `ctx.allow`. */
@@ -266,12 +289,15 @@ function invokeTool(service) {
     name: 'act_invoke',
     description: 'Invoke a registered Act action by id. '
       + 'write and danger actions return grant_required until the Allow service grants '
-      + 'capability "act:invoke:<id>" for the caller. Pass preview:true to preview a '
-      + 'write without touching disk.',
+      + 'capability "act:invoke:<id>" for the caller. If the arguments are tainted '
+      + '(tainted:true or a taintToken from snip_get/seek/trigger), the write also needs '
+      + '"act:invoke:<id>:tainted". Pass preview:true to preview a write without touching disk.',
     parameters: schema({
       id: { type: 'string', description: 'Registered action id, e.g. "fs.read".' },
       args: { type: 'object', additionalProperties: true, description: 'Action arguments.' },
       preview: { type: 'boolean', description: 'Preview without executing (write actions).' },
+      tainted: { type: 'boolean', description: 'Set when args came from untrusted external content; requires the extra :tainted Grant.' },
+      taintToken: { type: 'string', description: 'Opaque token from snip_get/seek/trigger; treated as taint evidence and requires the extra :tainted Grant.' },
     }, ['id']),
     output,
     async execute(args, exec) {
@@ -284,6 +310,8 @@ function invokeTool(service) {
       const subject = exec?.agent?.session?.id ?? exec?.agent?.id
       if (subject !== undefined) meta.subject = subject
       if (args.preview === true) meta.preview = true
+      if (args.tainted === true) meta.tainted = true
+      if (typeof args.taintToken === 'string' && args.taintToken !== '') meta.taintToken = args.taintToken
       return service.invoke(args.id, args.args, meta)
     },
   }

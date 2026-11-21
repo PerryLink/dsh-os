@@ -12,6 +12,7 @@ import {
   createClipboardAdapter,
   hashText,
 } from './capture.js'
+import { TaintTokens } from './taint.js'
 
 const DAY_MS = 86_400_000
 const PREVIEW_CHARS = 140
@@ -79,6 +80,8 @@ function summaryOf(entry) {
     createdAt: entry.createdAt,
     expiresAt: entry.expiresAt,
     redacted: entry.redacted,
+    tainted: entry.tainted === true,
+    taintSource: entry.taintSource ?? 'clipboard',
   }
 }
 
@@ -142,6 +145,7 @@ export class SnipService {
   #lastWatchError = null
   #lastHash = null
   #lastEntryId = null
+  #taint
 
   constructor(ctxOrConfig = {}, maybeConfig) {
     const config = isContext(ctxOrConfig) ? (maybeConfig ?? {}) : (ctxOrConfig ?? {})
@@ -150,6 +154,7 @@ export class SnipService {
     this.#maxBytes = positiveInt(config.maxBytes, 64 * 1024)
     this.#excludeSecrets = config.excludeSecrets !== false
     this.#now = typeof config.now === 'function' ? config.now : () => Date.now()
+    this.#taint = new TaintTokens({ now: this.#now, ttlMs: config.taintTtlMs, max: config.taintMaxTokens })
     this.#stateFile = typeof config.stateFile === 'string' && config.stateFile.length > 0 ? config.stateFile : null
     const rawCapture = config.capture
     const capture = rawCapture === true
@@ -214,6 +219,8 @@ export class SnipService {
       createdAt: new Date(timestamp).toISOString(),
       expiresAt: new Date(timestamp + this.#ttlMs).toISOString(),
       redacted: reason !== null,
+      tainted: true,
+      taintSource: 'clipboard',
     }
 
     const next = new Map(this.#entries)
@@ -316,6 +323,8 @@ export class SnipService {
         duplicate: true,
         handle: handleOf(this.#lastEntryId),
         redacted: last.redacted,
+        tainted: true,
+        taintSource: 'clipboard',
       }
     }
     const summary = this.add({ text, kind: 'text', sourceApp })
@@ -332,6 +341,8 @@ export class SnipService {
       bytes: Buffer.byteLength(text, 'utf8'),
       ...(snapshot.truncated === true ? { truncated: true } : {}),
       expiresAt: summary.expiresAt,
+      tainted: true,
+      taintSource: 'clipboard',
     }
   }
 
@@ -379,7 +390,31 @@ export class SnipService {
       text: entry.text,
       sourceApp: entry.sourceApp,
       sensitivity: entry.sensitivity,
+      taintToken: this.#taint.issue(entry.id, hashText(entry.text)),
     }
+  }
+
+  /**
+   * Verify a token minted by `get()` in this process. Without `idOrHandle` any
+   * live token verifies; with it, the token must belong to that entry and the
+   * stored text must still hash to the bound digest. Forged, expired, forgotten
+   * and cross-process tokens return false.
+   */
+  verifyTaintToken(token, idOrHandle) {
+    const record = this.#taint.verify(token)
+    if (record === undefined) return false
+    if (idOrHandle === undefined) return true
+    let id
+    try {
+      id = resolveId(idOrHandle)
+    } catch {
+      return false
+    }
+    const entry = this.#entries.get(id)
+    return entry !== undefined
+      && Date.parse(entry.expiresAt) > this.#now()
+      && record.entryId === id
+      && record.hash === hashText(entry.text)
   }
 
   /** Delete one entry by id or handle; true when it existed. */
@@ -388,6 +423,7 @@ export class SnipService {
     const next = new Map(this.#entries)
     const swept = this.#sweep(next)
     const removed = next.delete(id)
+    if (removed) this.#taint.dropEntry(id)
     if (removed || swept > 0) this.#commit(next)
     return removed
   }
@@ -395,7 +431,10 @@ export class SnipService {
   /** Delete every entry; return the number removed. */
   clear() {
     const removed = this.#entries.size
-    if (removed > 0) this.#commit(new Map())
+    if (removed > 0) {
+      for (const id of this.#entries.keys()) this.#taint.dropEntry(id)
+      this.#commit(new Map())
+    }
     return removed
   }
 
@@ -456,6 +495,10 @@ export class SnipService {
         createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : new Date(this.#now()).toISOString(),
         expiresAt: typeof raw.expiresAt === 'string' ? raw.expiresAt : new Date(this.#now() + this.#ttlMs).toISOString(),
         redacted: raw.redacted === true || reason !== null,
+        // A snapshot carries no trust proof; older snapshots are still
+        // clipboard-origin content, so they load as tainted rather than trusted.
+        tainted: true,
+        taintSource: 'clipboard',
       })
     }
   }

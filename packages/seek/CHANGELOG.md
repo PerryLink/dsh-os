@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.5.0
+
+- Add the first-party `trace` provider: when dsh-trace is mounted, `ctx.trace`
+  is auto-detected and records map to `dsh://trace/<record-id>`. Search calls
+  `trace.search(query, { limit })`; resolve finds the record by id through
+  `trace.list`/`trace.search`, returns `{ found, status, source, title, text? }`
+  (a found record is `status: "unknown"`), and the normalized result forwards
+  `text`.
+- Mark every merged `seek_search` hit with `tainted: true` and
+  `taintSource: "<provider>"` (file and memory sources alike); a provider
+  cannot opt out. This is a minimal label, not taint tracking: no token is
+  minted and a caller can still omit it.
+- Auto-register `locator`, `memento` and `trace`; `seek_providers`,
+  `seek_search` and `seek_resolve` retry registration so a provider mounted
+  after Seek becomes ready on the next call. An auto-registered built-in
+  provider may be replaced by a manual registration of the same name.
+- Rewrite the real-eval `seek-evidence` scenario to use Trace memory
+  (`trace_remember` -> `seek_search "user-trust"` -> `seek_resolve` two refs ->
+  `evidence.json`) instead of depending on dsh-locator having indexed the
+  temporary workspace. Add a trace-focused `node --test` suite.
+
 ## 0.4.0
 
 - Add an `os.result/v1` envelope to `seek_search`:

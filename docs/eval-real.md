@@ -38,7 +38,7 @@ node evals/real-run.mjs
 - `DSH_BIN` 缺失、文件不存在或没有检测到模型 key（`DEEPSEEK_API_KEY` / `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `DSH_REAL_API_KEY`）时，运行器打印 **“需要 DSH checkout + profile + 模型 key”** 并 **exit 2**，不写报告。
 - `DSH_REAL_ALLOW_NO_KEY=1` 或 `--allow-no-key` 只用于用假 bin 验证接线；不要用它产出真实成绩。
 - 审批场景要求 profile 的沙箱为 `workspace-write`（运行器显式设置 `DSH_PERMISSION_MODE=workspace-write`）且 `user-approval` 服务存在；headless 没有实时审批人，带 `sandbox_permissions` 的提权会 fail-closed。
-- `seek-evidence` 需要 profile 挂载 `dsh-seek` **和** `dsh-locator`，否则 `seek_*` 工具不存在，该场景会如实失败（不会跳过、不会记为通过）。
+- `seek-evidence` 现在走 **trace provider**：profile 需要 `dsh-seek` + `dsh-trace`；不再依赖 locator 对临时工作区的索引。
 - 运行器会删除自己建的临时目录；`--keep` 保留现场。
 
 常用命令：
@@ -57,7 +57,7 @@ node --test evals/real/test/real-run.test.mjs         # 单元测试，不调模
 |---|---|---|---|
 | `fix-failing-test` 修失败测试 | `src/math.mjs` 返回 `a+b+1`，测试期望 `add(2,2)=4` | 只改源码、不改测试，跑通测试 | `node --test` exit 0；测试文件字节不变；源码不再含差一 bug（`a + b + 1`）；隐藏用例 `add(3,5)=8` |
 | `approval-recovery` 审批恢复 | 工作区内 `config.json` 的 `timeout=10` | 用 write 带 `sandbox_permissions` + `justification` 请求提权；审批不可用则写 `approval-report.json`，不绕过 | 至少 1 条 `approval/asked`；`approval-report.json.blocked=true`；`config.json` 原样 |
-| `seek-evidence` seek 证据 | 两篇真实文档 + `notes.md` 提到一个不存在的文档 | 用 `seek_providers`/`seek_search` 搜索，`seek_resolve` 验证，写 `evidence.json` | `seek_search` ≥1、`seek_resolve` ≥2；≥2 条 claim；每条 ref 可解析；同时引用两篇真实文档；禁止 `deprecated-trust.md` |
+| `seek-evidence` seek 证据 | trace 中两条事实 + 一个伪 ref | `trace_remember` → `seek_search` → `seek_resolve` → 写 `evidence.json` | `seek_search` ≥1、`seek_resolve` ≥2；伪 ref 被拒；`evidence.json` 两条可解析 trace ref |
 | `regression-triage` 回归判定 | `old.json` 全通过，`new.json` 中 `math.add` 新失败 | 对比两份 check-run JSON，写 `verdict.json` | `verdict=regression`；`regressions[0].id=math.add`；两份输入字节不变 |
 | `cost-summary` usage 汇总 | `events.ndjson`：3 个 `step_end`（第 3 个无 `totalTokens`）、1 个 tool error | 求和并写 `cost.json` | `totalTokens=50`、`inputTokens=35`、`outputTokens=15`、`steps=3`、`errors=1` |
 
@@ -96,45 +96,57 @@ evals/real/reports/<ISO 时间戳>.md     # 同内容的人类可读报告
 
 再次声明：**截至 2026-11-21 本运行器未真跑过模型，仓库中没有真实成绩。**
 
-## 7. 首次真机结果（2026-11-21，DeepSeek key，本地 profile）
+## 7. 真机结果（2026-11-21，DeepSeek key，本地 profile）
 
-使用当前 DSH `0.2.2-rc.4`、本机 DeepSeek key、`/tmp/dsh-real-home/profiles/eval`（挂载本地 dsh-os 包）跑了 4 个场景。key 不写入报告，只记录“已提供”。
+使用当前 DSH `0.2.2-rc.4`、本机 DeepSeek key、`/tmp/dsh-real-home/profiles/eval`（挂载本地 dsh-os 包）跑了 5 个场景。key 不写入报告，只记录“已提供”。
 
-| 场景 | 结果 | 步数 | tokens | 耗时 | 审批 | 失败点 |
+| 场景 | 结果 | 步数 | tokens | 耗时 | 审批 | 备注 |
 |---|---|---:|---:|---:|---:|---|
-| `kernel-discovery` | ✅ | 5 | 91,385 | 7.0s | 0 | — |
-| `regression-triage` | ✅ | 6 | 107,733 | 9.3s | 0 | — |
-| `fix-failing-test` | ✅ | 17 | 272,707 | 77.3s | 1（unavailable） | — |
-| `seek-evidence` | ❌ | 52–59 | 0.77–1.28M | 105s | 1（unavailable） | `evidence.json` 不存在；已加 300k token 预算 |
+| `kernel-discovery` | ✅ | 5 | 91,385 | 7.0s | 0 | `os_status → os_find → os_do` |
+| `regression-triage` | ✅ | 6 | 107,733 | 9.3s | 0 | 读两份 run，写 verdict |
+| `fix-failing-test` | ✅ | 17 | 272,707 | 77.3s | 1（unavailable） | 修源码、跑测试 |
+| `seek-evidence` | ✅ | 10 | 189,976 | 19.0s | 0 | trace provider + `seek_resolve` |
+| `approval-recovery` | ✅ | 5 | 108,416 | 11.1s | 1（unavailable） | 审批不可用时写 blocked 报告 |
 
-**可用的真实结论：**
+**5/5 通过**，但这不等于“AI 已经好用”：
 
-- 真模型能用 `os_status → os_find → os_do` 完成一次只读剪贴板搜索（`kernel-discovery`），说明 gateway 的最小闭环成立。
-- 真模型能完成“读两份 run JSON → 写 verdict”的回归判定（`regression-triage`）。
-- 真模型能修测试（`fix-failing-test`），但花了 **17 步 / 272k tokens / 77s**，且触发 1 次不可用审批。
-- `seek-evidence` 失败：模型在 59 步内反复读文件、没有写 `evidence.json`，吃掉 **1.28M tokens** 后触发 step limit/exit 130。这不是“架构通过”，是真实失败，保留。
+- 其中 3 个场景有 1 次 `approval/asked`，headless 无实时审批人，结果是 `unavailable`；**真正的“人批准后执行”仍没在交互式 surface 实测**。
+- `fix-failing-test` 花了 17 步 / 272k tokens / 77s；成本仍高。
+- 模型行为非确定，重跑可能不同；这些是 2026-11-21 的一次真机样本，不是稳定 benchmark。
 
-**gateway-only preset 真机测试失败（headless 根本不加载 preset）：**
+### 7.1 gateway-only 已在 Web 真机验证（headless 不行）
 
-- 建了 `eval-gw` 副本，加 `docs/presets/os-gateway.cordis.yml` 和 `@deepseek-ai/dsh-agent-preset-registry`。
-- registry 导入失败（缺 `@deepseek-ai/cordis` 等 peer），`preset-os-gateway` 一直 `pending (waiting for service: agentPresets)`。
-- 结果：模型仍然看到并可调用 `read` / `glob`；`os_status` 只报告 kernel 自己的 6 个工具，不代表全局 tool surface。
-- headless bundle 的源码明确写着“不组合 preset registry”，并拒绝 `agentPreset` 会话（`packages/bundle/headless/src/index.ts:203-224`）；所以 headless 永远无法验证 gateway-only。
-- **所以“模型只看到 5 个动词”尚未在真机成立**；需要在 web/tui 或自定义 bundle 中验证，不是修 peer 就能解决。
+`docs/presets/web-verification.md` 记录了完整复现：
 
-**复现：**
+- `dsh web` 硬编码 `--profile web`；要测自定义 profile，必须 `dsh --profile eval-gw --no-open --port 0`。
+- Web 端用 `POST /api/session/create` 的 `args.request.agentPreset: "os-gateway"` 选择 preset。
+- 实测 `request/header.data.header.tools` **恰好是 6 个**：
+  `os_do / os_find / os_help / os_observe / os_request / os_status`。
+- 模型尝试调用 `read` 时没有该工具；实际 tool call 只有 `os_status` / `os_find`。
+- `os_status` 报告 `legacy: 8`：8 个继承工具被 kernel 适配成 `legacy.<tool>`，不暴露给模型。
+
+**headless 不是有效验证面**：它不组合 preset registry，并拒绝 `agentPreset` 会话。之前在 headless 里看到的 `read` 可调用，是 headless 的默认工具面，不是 gateway 失败。
+
+### 7.2 token 预算
+
+`evals/real-run.mjs` 默认每场景 **300k token** 上限（scenario 可覆盖，`seek-evidence` 设 200k）：
+
+- 逐行解析 `status.step_end.usage.totalTokens`；
+- 超限 `SIGINT → SIGKILL`，标记 `tokenLimitHit`，该场景不计成功；
+- mock 测试覆盖“60 tokens 超过 50 上限即终止”。
+
+### 7.3 复现
 
 ```bash
 # 一次性准备 profile（用本地包）
 DSH_HOME=/tmp/dsh-real-home dsh --profile eval --from-default-profile headless
 DSH_HOME=/tmp/dsh-real-home dsh plugin --profile eval add /path/to/dsh-os/packages/{allow,act,snip,check,seek,trace,ring,trigger,kernel}
-DSH_HOME=/tmp/dsh-real-home dsh plugin --profile eval add dsh-locator@0.20.1
 
 # 跑真机（key 只从环境读，不落盘）
 DSH_BIN=/home/yy/deepseek-harness/apps/cli/lib/bin.js \
 DSH_PROFILE=eval DSH_REAL_HOME=/tmp/dsh-real-home \
 DEEPSEEK_API_KEY=... \
-node evals/real-run.mjs --scenario=kernel-discovery
+node evals/real-run.mjs --scenario=seek-evidence
 ```
 
-> 真机数字与 `evals/BASELINE.md` 的 P 层脚本基线**不可横比**；温度、模型版本、profile 都会改变结果。
+> 真机数字与 `evals/BASELINE.md` 的 P 层脚本基线**不可横比**。

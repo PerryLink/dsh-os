@@ -3,15 +3,17 @@
 > A local-first clipboard ledger for DeepSeek Harness with opt-in OS clipboard
 > capture, secret exclusion and `clipboard://` agent handles.
 
-**Status: 0.3.0.** Snip records a clipping only when a caller explicitly calls
+**Status: 0.4.0 — clipboard entries are tainted and `snip_get` mints a token.**
+Snip records a clipping only when a caller explicitly calls
 `snip.add(...)`, `snip.capture(...)`, or one of the agent tools. **Clipboard
 capture is off by default**: mounting the plugin never reads the OS clipboard,
 never starts a watcher and never enables a timer. Set `capture.enabled: true`
 to allow `snip_capture` / `snip_watch_start`; nothing else turns capture on.
 
-In one sentence: **0.3.0 reads the clipboard only when explicitly asked,
-redacts secrets by default, stores clippings locally, and pages search results
-through an `os.result/v1` envelope.**
+In one sentence: **0.4.0 reads the clipboard only when explicitly asked,
+labels every ledger entry as external taint, redacts secrets by default, stores
+clippings locally, and pages search results through an `os.result/v1`
+envelope.**
 
 **Not affiliated with DeepSeek.** DeepSeek and DeepSeek Harness are trademarks
 of their respective owners.
@@ -55,6 +57,8 @@ snip.watch({ intervalMs: 1000 })      // explicit opt-in polling
 snip.stopWatch()
 
 snip.get('clipboard://<id>').text
+const entry = snip.get('clipboard://<id>')
+snip.verifyTaintToken(entry.taintToken, entry.id) // true in this process only
 snip.search('select')
 snip.list({ kind: 'text', limit: 20 })
 snip.forget('clipboard://<id>')
@@ -72,9 +76,11 @@ summary without the clipboard text:
 
 ```js
 // captured text: { ok: true, kind: 'text', captured: true, duplicate: false,
-//   id, handle, redacted, bytes, expiresAt }
+//   id, handle, redacted, bytes, expiresAt, tainted: true,
+//   taintSource: 'clipboard' }
 // unchanged/duplicate text: { ok: true, kind: 'text', captured: false,
-//   duplicate: true, handle, redacted }
+//   duplicate: true, handle, redacted, tainted: true,
+//   taintSource: 'clipboard' }
 // empty/image/file: { ok: true, kind: 'empty' | 'image' | 'file',
 //   captured: false }
 ```
@@ -93,13 +99,13 @@ dependency):
 
 | Tool | Arguments | Result |
 | --- | --- | --- |
-| `snip_add` | `text` (required), `kind`, `sourceApp`, `sensitivity` | `{ id, handle, kind, preview, createdAt, expiresAt, redacted }` |
-| `snip_capture` | `sourceApp` | safe capture summary; **no text or preview** |
+| `snip_add` | `text` (required), `kind`, `sourceApp`, `sensitivity` | `{ id, handle, kind, preview, createdAt, expiresAt, redacted, tainted: true, taintSource: 'clipboard' }` |
+| `snip_capture` | `sourceApp` | safe capture summary including taint labels; **no text or preview** |
 | `snip_watch_start` | `intervalMs` | `{ ok, watching, intervalMs }` |
 | `snip_watch_stop` | none | `{ ok, watching, stopped, lastError }` |
-| `snip_search` | `query` (required), `limit` (default 20, max 100), `offset` | `os.result/v1` envelope `{ schema, ok, summary, items, page, truncated, next, error }` plus the legacy `{ query, entries }`; `items` and `entries` are the same page |
-| `snip_get` | `id` (id or `clipboard://` handle) | full entry including `text` |
-| `snip_list` | `kind`, `limit` | `{ entries }` |
+| `snip_search` | `query` (required), `limit` (default 20, max 100), `offset` | `os.result/v1` envelope `{ schema, ok, summary, items, page, truncated, next, error }` plus the legacy `{ query, entries }`; each entry carries `tainted: true` / `taintSource: 'clipboard'` |
+| `snip_get` | `id` (id or `clipboard://` handle) | full entry including `text` and a process-local `taintToken` |
+| `snip_list` | `kind`, `limit` | `{ entries }` (entries carry taint labels) |
 | `snip_forget` | `id` | `{ ok, removed }` |
 | `snip_clear` | none | `{ removed }` |
 
@@ -114,6 +120,29 @@ you need. `snip_capture` intentionally returns a handle and metadata only.
 `SNIP_*` code is preserved at the top level and inside
 `error: { code, message, retryable, remediation, nextTools }`.
 
+## Taint labels (0.4.0)
+
+Snip's ledger is clipboard and other external text, so **every entry** is
+labelled `tainted: true` with `taintSource: "clipboard"` — including
+`snip_add`, because Snip cannot attest whether caller-supplied text was typed by
+the user or copied from a page. `snip_capture`, `snip_search`, `snip_list` and
+`snip_get` return the labels.
+
+`snip_get` additionally mints a process-local `taintToken`: a random 256-bit id
+mapped to the SHA-256 of the stored text (never the text itself). Tokens live
+only in the Snip process, expire after 15 minutes (`taintTtlMs`), and are never
+written to `stateFile`. A host can call `snip.verifyTaintToken(token, id?)`;
+forged, expired, forgotten, cross-entry and cross-process tokens verify as
+`false`. Pass the token (or `tainted: true`) to `act_invoke` and the write also
+needs the `act:invoke:<id>:tainted` Grant.
+
+> **This is a minimal gate, not taint tracking.** The label is caller-forwarded
+> metadata: Snip cannot follow the text into the model, Act does not verify the
+> token, and a model can omit both claims and fall back to the normal Grant.
+> Treat this as an audit signal and a speed bump. The durable fix is
+> host-produced result metadata that the host attaches to every tool result and
+> passes to Act, plus a taint-aware planner — not a per-plugin label.
+
 ## Configuration
 
 | Option | Default | Meaning |
@@ -123,6 +152,8 @@ you need. `snip_capture` intentionally returns a handle and metadata only.
 | `maxEntries` | `200` | Oldest entries are evicted when the cap is exceeded. |
 | `maxBytes` | `65536` (64 KiB) | Larger `add()`/capture calls fail with `SNIP_TOO_LARGE`. |
 | `stateFile` | unset | Optional JSON snapshot path, written atomically. |
+| `taintTtlMs` | `900000` (15 min) | Lifetime of a `snip_get` taint token. |
+| `taintMaxTokens` | `512` | Bound on live tokens; oldest tokens are evicted first. |
 | `capture.enabled` | `false` | Master switch; `snip_capture`, `watch()` and `snip_watch_start` fail with `SNIP_CAPTURE_DISABLED` when false. |
 | `capture.intervalMs` | `700` | Default polling interval. |
 | `capture.timeoutMs` | `5000` | Hard per-read timeout; a timeout fails with `SNIP_CLIPBOARD_TIMEOUT`. |
@@ -163,7 +194,8 @@ node --test
 Pure ESM JavaScript, Node 22+, no runtime dependencies and no build step.
 Tests inject a fake runner; they never read the real clipboard. Adapter code
 lives in `lib/capture.js`, the ledger and capture orchestration in
-`lib/ledger.js`; `index.js` stays a small tool/registration entry.
+`lib/ledger.js`, taint-token bookkeeping in `lib/taint.js`; `index.js` stays a
+small tool/registration entry.
 
 ## License
 

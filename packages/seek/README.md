@@ -4,8 +4,16 @@
 > verifiable `dsh://` refs, ref resolution, and partial results when a provider
 > fails.
 
-**Status: 0.4.0 adds search result envelopes.** `seek_search` now returns the
-legacy `{ query, hits, total, errors }` plus an `os.result/v1` envelope
+**Status: 0.5.0 adds a `trace` provider.** When dsh-trace is mounted,
+`ctx.trace` is auto-registered as a first-party source: memory records map to
+`dsh://trace/<record-id>`, every hit carries `resolvable: true` and
+`tainted: true` (memory is user/external input), and `seek_resolve` looks the
+record up by id through `trace.list`/`trace.search`, forwarding its stored
+`text` and provenance. This gives the real-eval seek scenario an in-workspace
+evidence source that does not depend on dsh-locator indexing the sandbox.
+
+**0.4.0 added search result envelopes.** `seek_search` returns the legacy
+`{ query, hits, total, errors }` plus an `os.result/v1` envelope
 (`summary`, `items`, `page`, `truncated`, `next`, `error`): default limit 10,
 max 50, optional `offset`. `page.hasMore`/`truncated` say whether more merged
 hits exist; `next` suggests the next page or `seek_resolve` for the top hit.
@@ -13,10 +21,9 @@ hits exist; `next` suggests the next page or `seek_resolve` for the top hit.
 `seek_resolve` tool route one `dsh://<source>/<id>` ref to its provider, bound
 the call with a deadline, and report `found`/`status` without inventing
 freshness. `locator` resolves through dsh-locator's `locator_resolve`;
-`memento` looks the entry up by id through `ctx.memory`. `seek_search` hits now
-carry a `resolvable` marker. Both providers are still optional and auto-detected;
-`seek_providers` reports which sources are ready and why a missing source is
-unavailable.
+`memento` looks the entry up by id through `ctx.memory`. All three providers are
+optional and auto-detected; `seek_providers` reports which sources are ready and
+why a missing source is unavailable.
 
 **Not affiliated with DeepSeek.** DeepSeek and DeepSeek Harness are trademarks
 of their respective owners.
@@ -28,10 +35,12 @@ dsh plugin --profile web add dsh-seek
 ```
 
 The bundle patch mounts the plugin and provides `ctx.evidence`. The built-in
-providers have no package dependencies: install/enable `dsh-locator` and/or
-`dsh-memento` separately and they are picked up at mount. If a plugin is mounted
-after Seek, call the `seek_register_defaults` tool to retry registration; missing
-plugins are reported, never fatal.
+providers have no package dependencies: install/enable `dsh-locator`,
+`dsh-memento` and/or `dsh-trace` separately and they are picked up at mount.
+`seek_search`, `seek_resolve` and `seek_providers` also retry registration, so a
+provider mounted after Seek becomes ready on the next call; the
+`seek_register_defaults` tool does the same explicitly. Missing plugins are
+reported, never fatal.
 
 ## Built-in provider matrix
 
@@ -39,6 +48,7 @@ plugins are reported, never fatal.
 | --- | --- | --- | --- | --- | --- | --- |
 | `locator` | indexed file bodies and session messages | dsh-locator tool `locator_find`, `mode:"content"` | dsh-locator tool `locator_resolve`, `mode:"meta"`, native `ref://file` rebuilt from the caller cwd | `dsh://locator/<workspace-relative-path>` | on when `locator_find` exists | `pathPrefix=<caller cwd>`; no cwd → `E_UNAUTHORIZED` |
 | `memento` | approved memory entries | dsh-memento `ctx.memory.query({ text, limit, scope:"user-global" }, { agentKey })` | `ctx.memory.query({ scope:"user-global", limit:1000 }, { agentKey })` then match by id | `dsh://memento/<entry-id>` | on when `ctx.memory` exists | only `user-global` + caller `agentKey`; workspace scope is never queried |
+| `trace` | dsh-trace active memory records | `ctx.trace.search(query, { limit })` | `ctx.trace.list({ limit:100 })` then match by id; `ctx.trace.search(id, { limit:100 })` fallback | `dsh://trace/<record-id>` | on when `ctx.trace` exists | dsh-trace's active ledger only; hits marked `tainted: true` |
 
 Not built in yet: `library`, `capability`, `web` and `session-query`. Register
 them through the provider protocol below.
@@ -95,6 +105,25 @@ them through the provider protocol below.
   `status: "unknown"` because memory has no verifiable snapshot; it is never
   reported as `fresh`.
 
+### `trace` details
+
+- Active records only: search calls `ctx.trace.search(query, { limit })` and
+  maps each record to `dsh://trace/<record-id>` (the id is percent-encoded).
+  Expired/forgotten keys do not appear; superseded versions are not active.
+- Every hit is marked `tainted: true` by the shared hit normalizer, and
+  `taintSource: "trace"`; memory is user/external input.
+- Hits are `resolvable: true` because the provider implements `resolve`.
+  Resolve finds the record by id with `ctx.trace.list({ limit: 100 })`, falling
+  back to `ctx.trace.search(id, { limit: 100 })` when the service has no
+  `list`. A miss is `status: "missing"`.
+- A found record is `status: "unknown"` (memory has no verifiable snapshot) and
+  keeps `found: true`. The provider answer also carries the record's provenance
+  `source`; the normalized `seek_resolve` result reports the provider name
+  (`trace`) as `source` and forwards the stored `text` (capped at 4000
+  characters).
+- No caller cwd/agentKey is required: Trace's own record visibility is the
+  only filter. Seek does not read `trace.export()` and never mutates the ledger.
+
 ## Provider protocol
 
 A provider is a plain object with a stable lowercase name and an async (or
@@ -129,6 +158,9 @@ evidence.sources()                         // ready + unavailable-with-reason
 `search` receives `{ limit, signal, timeoutMs, cwd, agentKey, agent }`. `agent`
 is the host tool's `exec.agent` (opaque to Seek); `cwd` and `agentKey` are
 derived from it so providers can put ACL parameters into their upstream call.
+An auto-registered first-party provider can be replaced by a later manual
+registration of the same name; any other duplicate name still throws
+`provider_exists`.
 
 ### Refs
 
@@ -177,6 +209,15 @@ Invalid or mismatched hits are omitted from the result and reported as one
 - Uses `Promise.allSettled`, so one rejected, timed-out or malformed provider
   only adds an entry to `errors`; the other providers still return hits.
 
+### Tainted hits (0.5.0)
+
+Every merged hit carries `tainted: true` and `taintSource: <provider>` (`locator`
+= indexed file, `memento`/`trace` = memory); a provider cannot opt out.
+`seek_resolve` results are not labelled. This is a minimal label for routing
+external text into Act's `:tainted` write grant, **not** taint tracking: Seek
+does not mint a `taintToken`, and a caller can still omit the label. The durable
+fix is host-produced result metadata; use this as a signal, not a sandbox.
+
 ### Resolve semantics
 
 `evidence.resolve(ref, { timeoutMs, signal, cwd, agentKey, agent })`:
@@ -193,19 +234,21 @@ Invalid or mismatched hits are omitted from the result and reported as one
   the provider's stable `E_*` code. The query is not rejected unless the caller
   itself aborts (`code: "aborted"`).
 - Successful results are
-  `{ ref, found, status, source, checkedAt, title?, freshness? }`.
+  `{ ref, found, status, source, checkedAt, title?, text?, freshness? }`.
   `status` is one of `fresh|stale|missing|tombstoned|unknown`; `unknown` is
   reported as `found: false` unless the provider explicitly says otherwise
-  (memento does, because the entry exists but cannot be freshness-checked).
+  (memento and trace do, because the entry exists but cannot be
+  freshness-checked). `text` is forwarded when the provider returns it (Trace
+  does).
 
 ## Agent tools
 
 | Tool | Arguments | Result |
 | --- | --- | --- |
-| `seek_search` | `query` (required), `sources?`, `limit?` (default 10, max 50), `offset?` | `os.result/v1` envelope `{ schema, ok, summary, items, page, truncated, next, error }` plus the legacy `{ query, hits, total, errors }`; each hit has `resolvable`; forwards `exec.signal` and the caller's cwd/agentKey |
-| `seek_resolve` | `ref` (required) | `{ ref, found, status, source, title?, freshness?, checkedAt }`, or `status: "unsupported"`/`"timeout"`/`"error"` with an `error` block. Read-only |
+| `seek_search` | `query` (required), `sources?`, `limit?` (default 10, max 50), `offset?` | `os.result/v1` envelope `{ schema, ok, summary, items, page, truncated, next, error }` plus the legacy `{ query, hits, total, errors }`; each hit has `resolvable`, `tainted`, `taintSource`; forwards `exec.signal` and the caller's cwd/agentKey |
+| `seek_resolve` | `ref` (required) | `{ ref, found, status, source, title?, text?, freshness?, checkedAt }`, or `status: "unsupported"`/`"timeout"`/`"error"` with an `error` block. Read-only |
 | `seek_providers` | none | `{ providers: string[], sources: [{ name, status: "ready" or "unavailable", reason? }] }` |
-| `seek_register_defaults` | none | retries locator/memento registration, then returns the same report |
+| `seek_register_defaults` | none | retries locator/memento/trace registration, then returns the same report |
 
 All are plain-object tools (no `@deepseek-ai/dsh-tools` dependency) and return
 lossless JSON through the host tool pipeline. `seek_search` reports the hits
@@ -235,19 +278,23 @@ Per-query provider problems are returned, not thrown:
 }
 ```
 
-## Limits of 0.3.0
+## Limits of 0.5.0
 
-- Two first-party providers only: `locator` (content) and `memento`
-  (user-global). No `library`, `capability`, `web` or `session-query` adapter.
+- Three first-party providers only: `locator` (content), `memento`
+  (user-global) and `trace` (active ledger). No `library`, `capability`, `web`
+  or `session-query` adapter.
 - `resolve` is provider-routed only. There is no cache, persistence or
   permissions model, and no native-ref carrier in Seek refs: locator resolve
   needs the caller cwd to rebuild the locator-native file ref, and a locator
   file ref cannot pin a historical snapshot (its `fresh`/`stale` compare the
   current file with the locator index).
-- `freshness` is either the locator payload or `{ state: "unknown" }` for
-  memento; Seek never synthesizes `fresh`.
-- Resolution does not grant new read access: locator applies `resolveWithinRoots`
-  and memento applies the caller `agentKey` filter before returning metadata.
+- `freshness` is the locator payload or `{ state: "unknown" }` for
+  memento/trace; Seek never synthesizes `fresh`.
+- Resolution does not grant new read access: locator applies `resolveWithinRoots`,
+  memento applies the caller `agentKey` filter, and trace reads only its active
+  ledger before returning metadata.
+- `tainted`/`taintSource` is a routing label, not taint tracking (no token, no
+  enforcement); see the section above.
 - No network I/O and no writes to provider data. Seek only reads. memento's
   recall counter is updated by its own `query`, as documented above.
 - Provider callers should still apply their own ACLs before returning hits;
@@ -262,8 +309,9 @@ node --test
 ```
 
 Pure ESM JavaScript, Node 22+, no runtime dependencies and no build step. Tests
-mock `locator_find`, `locator_resolve` and `ctx.memory`; no real
-locator/memento plugin or network is used.
+mock `locator_find`, `locator_resolve` and `ctx.memory`, and use the real
+in-memory Trace service; no real locator/memento/trace plugin or network is
+used.
 
 ## License
 

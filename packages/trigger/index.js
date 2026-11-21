@@ -1,10 +1,10 @@
 /**
  * dsh-trigger — in-memory event-to-action trigger fabric for DeepSeek Harness.
  *
+ * 0.4.0 marks runs from the real agent/fs/webhook sources as tainted (run row
+ * and stored payload); `fire()` accepts `{ tainted, taintSource }` for hosts.
  * 0.3.0: `ctx.triggers`, a small condition DSL, per-trigger cooldown, an
- * in-memory run ledger with a redacted, 2 KiB-bounded payload + display path,
- * seven agent tools and three real event sources — agent (`session/event` +
- * `agent/*`), fs (`fs.watch` invalidation + snapshot diff) and webhook.
+ * in-memory run ledger with a redacted 2 KiB payload, seven tools and sources.
  * @module dsh-trigger
  */
 import { randomUUID } from 'node:crypto'
@@ -266,7 +266,7 @@ export class TriggerService {
     }
     record.events += 1
     record.lastEventAt = this.#now()
-    this.fire(payload.type, payload).catch(() => {
+    this.fire(payload.type, payload, { tainted: true, taintSource: record.type }).catch(() => {
       record.dropped += 1
     })
   }
@@ -274,16 +274,18 @@ export class TriggerService {
   /**
    * Fire an event: run every matching trigger subject to its condition and
    * cooldown, record one run per execution and never throw for action failure.
+   * Source-driven runs are marked tainted; hosts may pass options.tainted/taintSource.
    * @returns {Promise<{event: string, runs: object[], skipped: object[], results: object[]}>}
    */
-  async fire(event, payload = {}) {
+  async fire(event, payload = {}, options = {}) {
     if (typeof event !== 'string' || event.trim() === '') {
       throw fail('invalid_event', 'event must be a non-empty string')
     }
     const runs = []
     const skipped = []
     const results = []
-    const observed = runFields(payload)
+    const taintSource = options?.tainted === true ? (typeof options.taintSource === 'string' && options.taintSource !== '' ? options.taintSource : 'external') : undefined
+    const observed = runFields(payload, taintSource)
 
     for (const trigger of [...this.#triggers.values()]) {
       if (trigger.event !== event) continue
@@ -315,6 +317,7 @@ export class TriggerService {
         event,
         payload: observed.payload,
         path: observed.path,
+        ...(observed.tainted === true ? { tainted: true, taintSource: observed.taintSource } : {}),
         ok: true,
         error: null,
         startedAt,

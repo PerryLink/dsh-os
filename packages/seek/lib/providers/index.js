@@ -7,12 +7,14 @@
 
 import { createLocatorProvider, probeLocator } from './locator.js'
 import { createMementoProvider, probeMemento } from './memento.js'
+import { createTraceProvider, probeTrace } from './trace.js'
 import { fail, serviceOf } from './util.js'
 
 /** First-party providers, in deterministic registration order. */
 export const DEFAULT_PROVIDERS = Object.freeze([
   { name: 'locator', probe: probeLocator, create: createLocatorProvider },
   { name: 'memento', probe: probeMemento, create: createMementoProvider },
+  { name: 'trace', probe: probeTrace, create: createTraceProvider },
 ])
 
 /**
@@ -39,7 +41,9 @@ export function registerDefaultProviders(ctx, service = serviceOf(ctx, 'evidence
       statuses.push({ name: provider.name, status: 'unavailable', reason: probe.reason })
       continue
     }
-    if (!service.providers().includes(provider.name)) service.registerProvider(provider.create(ctx))
+    if (!service.providers().includes(provider.name)) {
+      service.registerProvider(provider.create(ctx), { builtin: true })
+    }
     service.noteSource(provider.name)
     statuses.push({ name: provider.name, status: 'ready' })
   }

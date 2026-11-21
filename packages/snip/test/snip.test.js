@@ -13,6 +13,7 @@ test('add, list, search and handle lookup', () => {
   const first = snip.add({ text: 'hello world', sourceApp: 'Chrome' })
   assert.deepEqual(Object.keys(first).sort(), [
     'createdAt', 'expiresAt', 'handle', 'id', 'kind', 'preview', 'redacted',
+    'taintSource', 'tainted',
   ])
   assert.equal(first.kind, 'text')
   assert.equal(first.preview, 'hello world')

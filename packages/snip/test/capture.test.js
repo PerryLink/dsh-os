@@ -139,6 +139,8 @@ test('capture redacts secrets and dedupes repeated content by hash', () => {
     duplicate: true,
     handle: first.handle,
     redacted: true,
+    tainted: true,
+    taintSource: 'clipboard',
   })
   assert.equal(service.list().length, 1)
   assert.equal(runner.calls.length, 2)

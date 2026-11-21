@@ -4,15 +4,18 @@
 > holds, run Z and keep a receipt.** This is an event-trigger fabric, not a
 > `dsh-hooks`-style lifecycle hook.
 
-**Status: 0.3.0 — the event chain is auditable.** Runs now keep a redacted,
-2 KiB-bounded `payload` and a display `path`, so `trigger_runs` answers "which
-file changed, and with what event data" without trusting an action's own
-output. 0.2.0 shipped the three real event sources — agent (`session/event`),
-fs (`ctx.fs.watch` invalidation + snapshot diff) and webhook (loopback HTTP when
-`ctx.webServer` exists); 0.3.0 keeps the same seam (`ctx.triggers`), condition
-DSL, per-trigger cooldown and in-memory ledger. Everything is in memory: a
-restart loses triggers, runs and dedupe state. Delivery is at-least-once with a
-bounded dedupe window, **not** exactly-once.
+**Status: 0.4.0 — source-driven runs are tainted.** Runs produced by the
+`agent`, `fs` and `webhook` sources carry `tainted: true` and
+`taintSource: "<type>"` on both the run row and its stored payload. 0.3.0
+closed the event-chain gap: runs keep a redacted, 2 KiB-bounded `payload` and a
+display `path`, so `trigger_runs` answers "which file changed, and with what
+event data" without trusting an action's own output. 0.2.0 shipped the three
+real event sources — agent (`session/event`), fs (`ctx.fs.watch` invalidation +
+snapshot diff) and webhook (loopback HTTP when `ctx.webServer` exists); 0.4.0
+keeps the same seam (`ctx.triggers`), condition DSL, per-trigger cooldown and
+in-memory ledger. Everything is in memory: a restart loses triggers, runs and
+dedupe state. Delivery is at-least-once with a bounded dedupe window, **not**
+exactly-once.
 
 **Not affiliated with DeepSeek.** DeepSeek and DeepSeek Harness are trademarks
 of their respective owners.
@@ -133,6 +136,32 @@ token, the body cap and delivery dedupe, but any local process that knows the
 token can post. Use a secret for anything that matters, and remember that behind
 a reverse proxy `remoteAddress` is the proxy — the HMAC is the real boundary.
 
+## Taint on source runs (0.4.0)
+
+Every run created by a real source (`agent`, `fs` or `webhook`) is marked as
+external taint:
+
+```js
+const [run] = service.runs(1)
+// { …, tainted: true, taintSource: 'fs', payload: { …, tainted: true,
+//   taintSource: 'fs' } }
+```
+
+The flag is on both the run row and the stored `payload` projection, so
+`trigger_runs` shows it. The live payload that conditions and actions receive is
+unchanged (no `tainted` key is injected). `trigger_fire` is model-authored and
+therefore **not** tainted; a host that calls `fire()` directly can opt in:
+
+```js
+await service.fire('webhook/received', payload, { tainted: true, taintSource: 'webhook' })
+```
+
+> **This is a minimal gate, not taint tracking.** Trigger only labels its
+> results; it does not follow the payload through an action into a write, and a
+> caller can ignore the label. Forward `tainted: true` / a taint token to
+> `act_invoke` to require the extra `act:invoke:<id>:tainted` Grant. The durable
+> fix is host-produced result metadata, not per-plugin labels.
+
 ## Service API
 
 ```js
@@ -146,8 +175,9 @@ await service.dispose()                          // stop every source
 - `startSource` validates the type (`agent` / `fs` / `webhook`) and options,
   throws `invalid_source`, `E_UNAVAILABLE` or `source_exists`, and rolls back a
   partially started adapter on failure.
-- Emitted events call `fire(type, payload)` without ever blocking the host
-  listener, watcher or HTTP handler; action failures stay in the run ledger.
+- Emitted events call `fire(type, payload, { tainted: true, taintSource: type })`
+  without ever blocking the host listener, watcher or HTTP handler; action
+  failures stay in the run ledger.
 - A source event only runs triggers registered for its exact event name — it is
   not a global `fire()` of every trigger.
 
@@ -170,7 +200,7 @@ code. Tool-started sources live until stopped or the host process exits.
 
 ```js
 service.register({ id, event, condition?, action, cooldownMs? })  // frozen record
-await service.fire(event, { … })                                  // { event, runs, skipped, results }
+await service.fire(event, { … }, { tainted?, taintSource? })       // { event, runs, skipped, results }
 service.list(); service.unregister(id); service.runs(limit)
 ```
 
@@ -185,7 +215,9 @@ service.list(); service.unregister(id); service.runs(limit)
   `startsWith`. Fields are dotted payload paths; no expression evaluation.
 - `runs(limit?)` returns the newest entries (default cap 1,000 in memory).
   Every run is `{ id, triggerId, event, payload, path, ok, error, startedAt,
-  durationMs }`. `payload` is a **projection**, not the live object: known
+  durationMs }`; source-driven runs add `tainted: true` and
+  `taintSource: "<type>"`, and their `payload` projection carries the same two
+  fields. `payload` is a **projection**, not the live object: known
   credentials (`sk-…`, `ghp_…`, `AKIA…`, `Bearer …`, PEM private keys) and
   credential-named fields are redacted, strings and collections are shortened,
   and the JSON form is capped at 2 KiB. Oversized payloads become
@@ -195,8 +227,13 @@ service.list(); service.unregister(id); service.runs(limit)
   The projection is deep-frozen, so a reader cannot rewrite the ledger, and
   actions still receive the untouched payload.
 
-## Limits and 0.3.0
+## Limits (0.4.0)
 
+- 0.4.0 marks source runs as tainted (run row + stored payload) and lets hosts
+  opt in via `fire(event, payload, { tainted, taintSource })`. This is a label,
+  not taint tracking: Trigger does not follow the payload into a downstream
+  write, and `trigger_fire` payloads stay untainted. Forward the label to
+  `act_invoke` to require the extra Grant.
 - 0.3.0 closes the WF3 "trigger loses the payload" gap: runs carry a redacted,
   2 KiB-capped payload and a display path, and `trigger_runs` exposes both.
   Nothing is logged, and the raw payload is never persisted.

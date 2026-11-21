@@ -68,6 +68,7 @@ export function normalizeResolution(ref, source, value) {
     checkedAt: Number.isInteger(value.checkedAt) ? value.checkedAt : Date.now(),
   }
   if (typeof value.title === 'string' && value.title !== '') result.title = value.title
+  if (typeof value.text === 'string' && value.text !== '') result.text = value.text
   if (value.freshness !== undefined) result.freshness = value.freshness
   return result
 }

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.5.0
+
+- Add a minimal tainted-write gate. When `meta.tainted === true` or
+  `meta.taintToken` is a non-empty string, every non-read action that is not
+  `authorize: false` needs `act:invoke:<id>:tainted` **after** the normal
+  `act:invoke:<id>` Grant. A missing tainted Grant returns `grant_required` with
+  that capability, `tainted: true` and an `allow_request` hint; nothing is
+  executed.
+- `act_invoke` accepts optional `tainted` and `taintToken` arguments and
+  forwards them to `meta`. `meta.tainted` is supplied by the caller/host, never
+  inferred from action arguments; `preview` and `read` calls are unchanged.
+- Act does not verify tokens: a token is a taint claim that raises the gate, so
+  a forged token can neither authorize nor downgrade a call. An omitted claim
+  falls back to the normal single-Grant path.
+- Document the limit: this is a minimal gate, not taint tracking; the durable
+  fix is host-produced result metadata.
+- Tests: normal write needs only the base capability; tainted write needs both
+  Grants in order; forged and empty tokens; tool forwarding; preview/read
+  exemptions.
+
 ## 0.4.0
 
 - Add a bounded `os.result/v1` envelope to `act_list`:

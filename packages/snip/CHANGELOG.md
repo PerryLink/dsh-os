@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.4.0
+
+- Mark every ledger entry `tainted: true` with `taintSource: "clipboard"`, and
+  return those labels from `snip_add`, `snip_capture` (captured and duplicate
+  text results), `snip_search`, `snip_list` and `snip_get`. The ledger is
+  clipboard/external content, so `snip_add` is labelled too: Snip cannot attest
+  whether caller-supplied text was user-typed or copied.
+- `snip_get` now returns a process-local `taintToken`: a random 256-bit id
+  mapped to the SHA-256 of the stored text. Tokens expire after 15 minutes
+  (`taintTtlMs`, bounded by `taintMaxTokens`) and are never persisted. Add
+  `SnipService.verifyTaintToken(token, id?)`; forged, expired, forgotten,
+  cross-entry and other-process tokens verify as `false`, and `forget`/`clear`
+  invalidate the entry's tokens.
+- Document the limit: this is a minimal label/gate for Act's `:tainted` write
+  Grant, not taint tracking. A caller can omit the label; the durable fix is
+  host-produced result metadata.
+- Tests: flags and token mint/verify, forged/cross-entry/cross-process/expired/
+  forgotten token rejection, capture and duplicate labeling, token absence from
+  the state snapshot.
+
 ## 0.3.0
 
 - Add an `os.result/v1` envelope to `snip_search`:

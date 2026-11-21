@@ -45,6 +45,14 @@ function tool(name, description, parameters, execute) {
   }
 }
 
+/**
+ * Retry first-party registration before a call so providers mounted after Seek
+ * (Cordis plugin order is not guaranteed) become ready without an extra tool.
+ */
+function refreshDefaults(ctx, service) {
+  if (ctx !== undefined && typeof ctx.get === 'function') registerDefaultProviders(ctx, service)
+}
+
 /** Read the caller's session-derived context (cwd and agentKey) from `exec`. */
 function callerOf(exec) {
   const session = exec?.agent?.session
@@ -57,7 +65,7 @@ function callerOf(exec) {
 }
 
 /** `seek_search` tool: one query across all or selected providers. */
-function searchTool(service) {
+function searchTool(ctx, service) {
   return tool(
     'seek_search',
     'Search registered evidence providers and return deduplicated hits with dsh:// refs, '
@@ -93,6 +101,7 @@ function searchTool(service) {
       const limit = limitOf(args?.limit)
       const offset = offsetOf(args?.offset)
       try {
+        refreshDefaults(ctx, service)
         const found = await service.searchPage(args?.query, {
           sources: args?.sources,
           limit,
@@ -150,10 +159,10 @@ function searchTool(service) {
  * Read-only: it never mutates provider data and returns a partial result for an
  * unavailable or failing provider instead of throwing.
  */
-function resolveTool(service) {
+function resolveTool(ctx, service) {
   return tool(
     'seek_resolve',
-    'Resolve one dsh://<source>/<id> evidence ref through its provider and report found/status, source, title, freshness and checkedAt. Read-only.',
+    'Resolve one dsh://<source>/<id> evidence ref through its provider and report found/status, source, title, text, provenance, freshness and checkedAt. Read-only.',
     {
       type: 'object',
       additionalProperties: false,
@@ -162,7 +171,10 @@ function resolveTool(service) {
         ref: { type: 'string', description: 'Ref in dsh://<source>/<id> form, normally copied from a seek_search hit.' },
       },
     },
-    async (args, exec) => service.resolve(args?.ref, callerOf(exec)),
+    async (args, exec) => {
+      refreshDefaults(ctx, service)
+      return service.resolve(args?.ref, callerOf(exec))
+    },
   )
 }
 
@@ -172,12 +184,15 @@ function providerReport(service) {
 }
 
 /** `seek_providers` tool: provider discovery, including unavailable reasons. */
-function providersTool(service) {
+function providersTool(ctx, service) {
   return tool(
     'seek_providers',
-    'List Seek evidence providers and whether each first-party source is ready or unavailable, with the reason.',
+    'List Seek evidence providers and whether each first-party source (locator, memento, trace) is ready or unavailable, with the reason.',
     { type: 'object', additionalProperties: false, properties: {} },
-    async () => providerReport(service),
+    async () => {
+      refreshDefaults(ctx, service)
+      return providerReport(service)
+    },
   )
 }
 
@@ -185,7 +200,7 @@ function providersTool(service) {
 function registerDefaultsTool(ctx, service) {
   return tool(
     'seek_register_defaults',
-    'Register the first-party locator and memento providers when their host services are available. Safe to call repeatedly; missing dependencies are reported in sources, not thrown.',
+    'Register the first-party locator, memento and trace providers when their host services are available. Safe to call repeatedly; missing dependencies are reported in sources, not thrown.',
     { type: 'object', additionalProperties: false, properties: {} },
     async () => {
       registerDefaultProviders(ctx, service)
@@ -197,9 +212,9 @@ function registerDefaultsTool(ctx, service) {
 /** Build the Seek agent tools in registration order. */
 export function createTools(ctx, service) {
   return [
-    searchTool(service),
-    resolveTool(service),
-    providersTool(service),
+    searchTool(ctx, service),
+    resolveTool(ctx, service),
+    providersTool(ctx, service),
     registerDefaultsTool(ctx, service),
   ]
 }

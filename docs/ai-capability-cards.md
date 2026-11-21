@@ -17,7 +17,7 @@
   - 参数：`query`；返回：{actions:[{id,title,risk,description?}]}
 - **act_invoke** · `E·A` · since 0.2 — 按 id 调用一个 Act 动作；write/danger 无 Grant 时返回 grant_required。
   - 用：调用宿主预置的 app 动作；0.3 的 fs.read/write/list/undo 也走这里，写前用 preview:true。 不用：不要把 read 动作当写动作；没有 Grant 时不要反复重试，按 hint 走 allow_request/os_request。
-  - 参数：`id`*、`args`、`preview`；返回：{ok,actionId,result}；preview 时 {ok,preview}；失败 {ok:false,code,capability?}
+  - 参数：`id`*、`args`、`preview`、`tainted`、`taintToken`；返回：{ok,actionId,result}；preview 时 {ok,preview}；失败 {ok:false,code,capability?}
 
 ## allow（4）
 

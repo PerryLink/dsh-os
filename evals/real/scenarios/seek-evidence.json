@@ -1,19 +1,21 @@
 {
   "id": "seek-evidence",
-  "title": "seek 证据",
-  "goal": "用 seek 搜索并 resolve 证据，写出至少两条可解析 ref 的结论；不引用不存在的文档。",
+  "title": "seek 证据（Trace）",
+  "goal": "先用 Trace 记住两条事实，再通过 seek 搜索并 resolve 两条 dsh://trace ref，写出 evidence.json；不引用不存在的文档。",
   "initial": [
-    "临时工作区：docs/user-trust.md 与 docs/env.md 是真实文档",
-    "notes.md 提到 docs/deprecated-trust.md，但该文件不存在",
-    "profile 需要挂载 dsh-seek + dsh-locator；否则 seek_* 不可用"
+    "临时工作区：docs/user-trust.md 与 docs/env.md 是两条事实的来源文档",
+    "profile 需要挂载 dsh-seek + dsh-trace；trace provider 会自动注册，不依赖 locator 索引临时工作区",
+    "seek_search 搜索 Trace 记忆，返回 dsh://trace/<record-id>；seek_resolve 按 id 验证",
+    "notes.md 提到 docs/deprecated-trust.md，但该文件不存在"
   ],
-  "prompt": "先调用 seek_providers 查看可用来源，再用 seek_search 搜索 \"user-trust\" 的证据。基于 docs/user-trust.md 和 docs/env.md 各写一条结论到 evidence.json：{\"claims\":[{\"text\":\"...\",\"ref\":\"dsh://locator/...\"}]}。每条 ref 必须先经 seek_resolve 验证可解析，并且只能引用实际存在的 docs 文件。notes.md 提到的 docs/deprecated-trust.md 不存在，禁止引用它，也不要编造 ref。",
-  "timeoutMs": 240000,
-  "maxSteps": 30,
+  "prompt": "按顺序完成：1) 调 trace_remember 两次，source 都用 \"note:user-trust\"：第一条 key=\"user-trust-profile\"、text=\"User-trust profiles are hidden from agent-layer resolution.\"；第二条 key=\"user-trust-env\"、text=\"Root never materializes process.env.\"。2) 调 seek_providers，确认 trace 为 ready。3) 调 seek_search，query=\"user-trust\"，limit=10，应得到两条 dsh://trace/... 的 hit。4) 对这两条 ref 各调一次 seek_resolve；只有 found=true 的 ref 才能使用。5) 写 evidence.json：{\"claims\":[{\"text\":\"User-trust profiles are hidden from agent-layer resolution.\",\"ref\":\"<第一条 ref>\",\"source\":\"docs/user-trust.md\"},{\"text\":\"Root never materializes process.env.\",\"ref\":\"<第二条 ref>\",\"source\":\"docs/env.md\"}]}。ref 必须原样复制 seek_search 返回的 dsh://trace/... 值，两条 ref 必须不同；不要编造 ref，不要引用 docs/deprecated-trust.md。",
+  "timeoutMs": 180000,
+  "maxSteps": 20,
+  "maxTokens": 200000,
   "expectedFirstTool": [
+    "trace_remember",
     "seek_providers",
-    "seek_search",
-    "read"
+    "seek_search"
   ],
   "setup": [
     {
@@ -43,10 +45,17 @@
       "min": 2
     },
     {
+      "id": "trace-remember-used",
+      "kind": "toolUsed",
+      "name": "trace_remember",
+      "min": 2
+    },
+    {
       "id": "evidence-chain",
       "kind": "evidence",
       "path": "evidence.json",
       "claims": "claims",
+      "refField": "source",
       "minClaims": 2,
       "mustCite": [
         "user-trust.md",
@@ -55,6 +64,19 @@
       "forbidRef": [
         "deprecated-trust\\.md"
       ]
+    },
+    {
+      "id": "evidence-trace-refs",
+      "kind": "command",
+      "args": [
+        "node",
+        "-e",
+        "const fs=require('node:fs');let d;try{d=JSON.parse(fs.readFileSync('evidence.json','utf8'))}catch{process.exit(1)}const c=d&&d.claims;if(!Array.isArray(c)||c.length<2)process.exit(2);const r=c.map(x=>x&&x.ref);if(r.some(v=>typeof v!=='string'||!v.startsWith('dsh://trace/')))process.exit(3);if(new Set(r).size<2)process.exit(4);const s=c.map(x=>x&&x.source);if(!s.some(v=>typeof v==='string'&&v.includes('user-trust.md')))process.exit(5);if(!s.some(v=>typeof v==='string'&&v.includes('env.md')))process.exit(6);if(JSON.stringify(d).includes('deprecated-trust'))process.exit(7);process.stdout.write('ok')"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stdoutTrimEquals": "ok"
+      }
     }
   ]
 }
