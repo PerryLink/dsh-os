@@ -1,13 +1,17 @@
 # Seek · `dsh-seek`
 
 > Cross-source evidence search for DeepSeek Harness: one query, many providers,
-> verifiable `dsh://` refs, and partial results when a provider fails.
+> verifiable `dsh://` refs, ref resolution, and partial results when a provider
+> fails.
 
-**Status: 0.2.0 ships two real first-party providers.** `locator` searches file
-and session content through dsh-locator's `locator_find` tool; `memento` reads
-approved user-global memory through dsh-memento's `ctx.memory` service. Both are
-optional and auto-detected. `seek_providers` reports which sources are ready and
-why a missing source is unavailable.
+**Status: 0.3.0 adds ref resolution.** `ctx.evidence.resolve` and the
+`seek_resolve` tool route one `dsh://<source>/<id>` ref to its provider, bound
+the call with a deadline, and report `found`/`status` without inventing
+freshness. `locator` resolves through dsh-locator's `locator_resolve`;
+`memento` looks the entry up by id through `ctx.memory`. `seek_search` hits now
+carry a `resolvable` marker. Both providers are still optional and auto-detected;
+`seek_providers` reports which sources are ready and why a missing source is
+unavailable.
 
 **Not affiliated with DeepSeek.** DeepSeek and DeepSeek Harness are trademarks
 of their respective owners.
@@ -26,13 +30,13 @@ plugins are reported, never fatal.
 
 ## Built-in provider matrix
 
-| provider | corpus | call | ref | default | ACL enforced before returning hits |
-| --- | --- | --- | --- | --- | --- |
-| `locator` | indexed file bodies and session messages | dsh-locator tool `locator_find`, `mode:"content"` | `dsh://locator/<workspace-relative-path>` | on when the tool exists | `pathPrefix=<caller cwd>`; no cwd → `E_UNAUTHORIZED` |
-| `memento` | approved memory entries | dsh-memento `ctx.memory.query({ text, limit, scope:"user-global" }, { agentKey })` | `dsh://memento/<entry-id>` | on when `ctx.memory` exists | only `user-global` + caller `agentKey`; workspace scope is never queried |
+| provider | corpus | search call | resolve call | ref | default | ACL enforced before returning hits |
+| --- | --- | --- | --- | --- | --- | --- |
+| `locator` | indexed file bodies and session messages | dsh-locator tool `locator_find`, `mode:"content"` | dsh-locator tool `locator_resolve`, `mode:"meta"`, native `ref://file` rebuilt from the caller cwd | `dsh://locator/<workspace-relative-path>` | on when `locator_find` exists | `pathPrefix=<caller cwd>`; no cwd → `E_UNAUTHORIZED` |
+| `memento` | approved memory entries | dsh-memento `ctx.memory.query({ text, limit, scope:"user-global" }, { agentKey })` | `ctx.memory.query({ scope:"user-global", limit:1000 }, { agentKey })` then match by id | `dsh://memento/<entry-id>` | on when `ctx.memory` exists | only `user-global` + caller `agentKey`; workspace scope is never queried |
 
-Not built in yet: `library`, `capability`, `web`, `session-query`, and
-`seek_resolve`. Register them through the provider protocol below.
+Not built in yet: `library`, `capability`, `web` and `session-query`. Register
+them through the provider protocol below.
 
 ### `locator` details
 
@@ -53,6 +57,13 @@ Not built in yet: `library`, `capability`, `web`, `session-query`, and
 - `content-path-denied` responses surface as `E_UNAUTHORIZED`; other locator
   failures as `E_UNAVAILABLE`/`E_STATE`. The content index is built lazily, so
   the first query may be slow; the normal per-provider timeout applies.
+- Resolve rebuilds the locator-native `ref://file?path=<absolute>` from the ref
+  id and the caller cwd, then calls `locator_resolve` in `mode:"meta"`. The
+  locator applies its root ACL to that path before reading metadata. No cwd →
+  `E_UNAUTHORIZED`; a missing `locator_resolve` (older locator) → `E_UNAVAILABLE`.
+  The rebuilt ref carries no mtime/size/hash snapshot, so locator compares the
+  file with its own index: `fresh`/`stale` mean found, `missing`/`tombstoned`
+  mean not found, and `unknown` is kept as unverified.
 
 ### `memento` details
 
@@ -71,7 +82,13 @@ Not built in yet: `library`, `capability`, `web`, `session-query`, and
   capped at 2000 characters.
 - **Side effect:** dsh-memento increments `recallCount`/`lastRecalled` for query
   hits even when no session id is passed. Seek does not pass `sessionId`, so it
-  does not create a memento `recalled` audit event.
+  does not create a memento `recalled` audit event. Resolve performs one
+  caller-scoped query (up to 1000 entries) and therefore has the same recall
+  side effect.
+- Resolve has no get-by-id API to call: it queries `user-global` with the
+  caller's `agentKey`, then matches the id. A found entry is `found: true` with
+  `status: "unknown"` because memory has no verifiable snapshot; it is never
+  reported as `fresh`.
 
 ## Provider protocol
 
@@ -155,11 +172,33 @@ Invalid or mismatched hits are omitted from the result and reported as one
 - Uses `Promise.allSettled`, so one rejected, timed-out or malformed provider
   only adds an entry to `errors`; the other providers still return hits.
 
+### Resolve semantics
+
+`evidence.resolve(ref, { timeoutMs, signal, cwd, agentKey, agent })`:
+
+- Requires a valid `dsh://<source>/<id>` ref; anything else throws
+  `E_INVALID_ARGUMENT` (including overlong refs and `.`/`..` segments).
+- Routes by `<source>` to that provider's `resolve`. With no provider, or a
+  provider without `resolve`, it returns
+  `{ ref, found: false, status: "unsupported", source, checkedAt }` — it never
+  falls back to another provider and never fabricates `fresh`.
+- Bounds the provider by `timeoutMs` (default 10000) and the caller `signal`,
+  exactly like search. A timeout returns `status: "timeout"` with
+  `error.code: "provider_timeout"`; another failure returns `status: "error"` and
+  the provider's stable `E_*` code. The query is not rejected unless the caller
+  itself aborts (`code: "aborted"`).
+- Successful results are
+  `{ ref, found, status, source, checkedAt, title?, freshness? }`.
+  `status` is one of `fresh|stale|missing|tombstoned|unknown`; `unknown` is
+  reported as `found: false` unless the provider explicitly says otherwise
+  (memento does, because the entry exists but cannot be freshness-checked).
+
 ## Agent tools
 
 | Tool | Arguments | Result |
 | --- | --- | --- |
-| `seek_search` | `query` (required), `sources?`, `limit?` | `{ query, hits, total, errors }`; forwards `exec.signal` and the caller's cwd/agentKey |
+| `seek_search` | `query` (required), `sources?`, `limit?` | `{ query, hits, total, errors }`; each hit has `resolvable`; forwards `exec.signal` and the caller's cwd/agentKey |
+| `seek_resolve` | `ref` (required) | `{ ref, found, status, source, title?, freshness?, checkedAt }`, or `status: "unsupported"`/`"timeout"`/`"error"` with an `error` block. Read-only |
 | `seek_providers` | none | `{ providers: string[], sources: [{ name, status: "ready" or "unavailable", reason? }] }` |
 | `seek_register_defaults` | none | retries locator/memento registration, then returns the same report |
 
@@ -171,7 +210,8 @@ lossless JSON through the host tool pipeline.
 Expected failures throw an `Error` with a stable `code`:
 `invalid_provider`, `provider_exists`, `invalid_query`, `invalid_limit`,
 `invalid_options`, `invalid_sources`, `invalid_timeout`, `invalid_signal`,
-`aborted`, and provider-side `E_UNAVAILABLE`/`E_UNAUTHORIZED`/`E_STATE`.
+`aborted`, resolve's `E_INVALID_ARGUMENT`, and provider-side
+`E_UNAVAILABLE`/`E_UNAUTHORIZED`/`E_STATE`.
 `E_UNAUTHORIZED` is the Seek-specific alias for the module-contract `E_DENIED`
 ACL failure.
 
@@ -185,13 +225,19 @@ Per-query provider problems are returned, not thrown:
 }
 ```
 
-## Limits of 0.2.0
+## Limits of 0.3.0
 
 - Two first-party providers only: `locator` (content) and `memento`
   (user-global). No `library`, `capability`, `web` or `session-query` adapter.
-- No `seek_resolve`, permissions model, cache or persistence. `freshness` is
-  either the locator payload or `{ state: "unknown" }` for memento; Seek never
-  synthesizes `fresh`.
+- `resolve` is provider-routed only. There is no cache, persistence or
+  permissions model, and no native-ref carrier in Seek refs: locator resolve
+  needs the caller cwd to rebuild the locator-native file ref, and a locator
+  file ref cannot pin a historical snapshot (its `fresh`/`stale` compare the
+  current file with the locator index).
+- `freshness` is either the locator payload or `{ state: "unknown" }` for
+  memento; Seek never synthesizes `fresh`.
+- Resolution does not grant new read access: locator applies `resolveWithinRoots`
+  and memento applies the caller `agentKey` filter before returning metadata.
 - No network I/O and no writes to provider data. Seek only reads. memento's
   recall counter is updated by its own `query`, as documented above.
 - Provider callers should still apply their own ACLs before returning hits;
@@ -206,8 +252,8 @@ node --test
 ```
 
 Pure ESM JavaScript, Node 22+, no runtime dependencies and no build step. Tests
-mock `locator_find` and `ctx.memory`; no real locator/memento plugin or network
-is used.
+mock `locator_find`, `locator_resolve` and `ctx.memory`; no real
+locator/memento plugin or network is used.
 
 ## License
 

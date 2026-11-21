@@ -1,63 +1,67 @@
-<div align="center">
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/dsh-os-hero-en-dark.webp">
-  <img src="docs/assets/dsh-os-hero-en-light.webp" width="100%" alt="dsh-os: a real dsh-os list catalog — Act 0.1.1, Allow 0.1.2 and Check 0.2.0, scoped where npm requires it — with the 6/6 grant-gate demo and the green 20-package conformance on the right">
-</picture>
-
 # dsh-os
 
-**OS-level primitives for DeepSeek Harness — twenty small packages that stay independent.**
+A family of **OS-level primitives for DeepSeek Harness**: 11 core modules
+(Act, Allow, Snip, Check, Nest, Trigger, Seek, Trace, Stage, Ring, Root), 5
+optional modules (Help, Context, Cost, Backup, Notify), plus a thin contract,
+an optional UI shell, a catalog CLI and a dependency-only kit.
 
-*11 core modules + 5 optional + a contract, a React shell, a catalog CLI and a dependency-only kit; one Host service per module, zero runtime dependencies, and a write that never runs without a human Grant.*
+The modules stay small and independent: one Host service, ≤6 agent tools,
+zero runtime dependencies, independent semver, no cross-module imports. The
+contract (`@perrylink/dsh-os-contract`) and the optional shell are the only
+shared layers; the kit contains no business code.
 
-[简体中文](README-zh.md) · [Español](README-es.md) · [Português](README-pt.md) · [हिन्दी](README-hi.md)
+> **Not affiliated with DeepSeek.** DeepSeek and DeepSeek Harness are
+> trademarks of their respective owners. These are independent community
+> packages, published under MIT.
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Node](https://img.shields.io/badge/node-%3E%3D22.19.0-brightgreen.svg)]()
+[![Terminal card: dsh-check prints "Check REGRESSION" and exits 1](docs/assets/check-demo.svg)](examples/os-kit/README.md)
 
-</div>
+**Runnable in 10 minutes:** [`examples/os-kit`](examples/os-kit/README.md) has
+two dependency-free demos — Allow + Act + Snip (deny → 30-minute Grant → allow
+→ revoke → deny) and the Check regression gate. `node examples/os-kit/demo.mjs`
+needs only Node 22+; nothing is installed or published.
 
----
+**Docs:** [Quickstart](docs/quickstart.md) ·
+[AI handbook](docs/ai-handbook.md) ·
+[Architecture 0.3](docs/architecture-0.3.md) ·
+[AI handbook](docs/ai-handbook.md) ·
+[Architecture 0.3](docs/architecture-0.3.md) ·
+[AI capability cards](docs/ai-capability-cards.md) ·
+[Validation plan](docs/validation/PLAN.md) ·
+[0.2.0 smoke](docs/validation/SMOKE.md) ·
+[Recipes](docs/recipes/) (CI gate, agent writes, clipboard) ·
+[Troubleshooting](docs/troubleshooting.md).
 
 ## Packages
 
 | Product | Package | Status | Design |
 |---|---|---|---|
 | **Act** | `dsh-act` | 0.3.0 (real fs actions) | [design](docs/design/01-act.md) |
-| **Allow** | `dsh-allow` | 0.3.0 (request/approve) | [design](docs/design/02-allow.md) |
+| **Allow** | `dsh-allow` | 0.4.0 (one-time grants) | [design](docs/design/02-allow.md) |
 | **Snip** | `dsh-snip` | 0.2.0 (Win/mac/Linux capture) | [design](docs/design/03-snip.md) |
-| **Check** | `@perrylink/dsh-check` | 0.2.0 (headless runner + diff) | [design](docs/design/04-check.md) |
+| **Check** | `@perrylink/dsh-check` | 0.3.0 (runner + security) | [design](docs/design/04-check.md) |
 | **Nest** | `dsh-nest` | 0.1.0 MVP | [design](docs/design/05-nest.md) |
-| **Trigger** | `dsh-trigger` | 0.2.0 (agent/fs/webhook sources) | [design](docs/design/06-trigger.md) |
-| **Seek** | `dsh-seek` | 0.2.0 (locator + memento providers) | [design](docs/design/07-seek.md) |
-| **Trace** | `@perrylink/dsh-trace` | 0.2.0 (memento adapter) | [design](docs/design/08-trace.md) |
+| **Trigger** | `dsh-trigger` | 0.3.0 (payload + sources) | [design](docs/design/06-trigger.md) |
+| **Seek** | `dsh-seek` | 0.3.0 (providers + resolve) | [design](docs/design/07-seek.md) |
+| **Trace** | `@perrylink/dsh-trace` | 0.3.0 (memento + ref verify) | [design](docs/design/08-trace.md) |
 | **Stage** | `dsh-stage` | 0.2.0 (macOS/Windows adapters) | [design](docs/design/09-stage.md) |
-| **Ring** | `dsh-ring` | 0.2.0 (webhook/ntfy/console) | [design](docs/design/10-ring.md) |
+| **Ring** | `dsh-ring` | 0.3.0 (channels + receipts) | [design](docs/design/10-ring.md) |
 | **Root** | `@perrylink/dsh-root` | 0.1.2 MVP | [design](docs/design/11-root.md) |
 | **Help** | `dsh-help` | 0.1.0 optional | install doctor / first run |
 | **Context** | `@perrylink/dsh-context` | 0.1.0 optional | context provider protocol |
 | **Cost** | `@perrylink/dsh-cost` | 0.1.0 optional | adapter for `dsh-cost-meter` |
-| **Backup** | `@perrylink/dsh-backup` | 0.1.0 optional | snapshot manifest / restore plan |
+| **Backup** | `@perrylink/dsh-backup` | 0.2.0 optional | allowlisted snapshot / restore plan |
 | **Notify** | `@perrylink/dsh-notify` | 0.1.0 optional | channel registry / attention router |
 | **Shell** | `@perrylink/dsh-os-shell` | 0.3.0 optional | approvals + activity tabs |
 | **CLI** | `@perrylink/dsh-os-cli` | 0.2.0 tool | `dsh-os list/doctor/install/approvals` |
 | **Contract** | `@perrylink/dsh-os-contract` | 0.2.0 library | result/error/handle protocols |
-| **Kit** | `dsh-os-kit` | 0.3.0 meta bundle | installs Act/Allow 0.3 + Snip/Check 0.2 |
-| **Kernel** | `@perrylink/dsh-os-kernel` | 0.1.0 core | capability registry + 5 `os_*` verbs |
-| **MCP** | `@perrylink/dsh-os-mcp` | 0.1.0 tool | read-only MCP server prototype |
+| **Kit** | `dsh-os-kit` | 0.4.0 meta bundle | installs Act/Allow 0.4 + Snip/Check 0.3 |
+| **Kernel** | `@perrylink/dsh-os-kernel` | 0.2.0 core | 76 legacy tools + `os_*` verbs |
+| **MCP** | `@perrylink/dsh-os-mcp` | 0.2.0 tool | read-only default + write approval path |
 
 `Check`, `Trace`, `Root`, `Context`, `Cost`, `Backup`, `Notify`, `Shell`, `CLI`
 and `Contract` use the `@perrylink/` scope where npm's name-similarity rules
 require it; the product names stay bare.
-
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/dsh-os-flow-v5-dark.svg">
-  <img src="docs/assets/dsh-os-flow-v5-light.svg" width="100%" alt="dsh-os structure: packages/* becomes standalone DSH bundles, each with its own cordis.patch.yml layer, installed by dsh plugin add (or the dependency-only dsh-os-kit) and exposing one ctx service; test-all, conformance, pack-smoke, check-versions and examples-smoke are the local gates, and the dsh-check gate diffs two run JSON files to a REGRESSION">
-</picture>
-
-*Structure: package → patch layer → service → gate; `dsh-os-kit` installs Act + Allow + Snip + Check in one command, and the same gates run in CI and locally. The token labels inside the diagram are the real package, service and command names, so the same picture serves all five languages.*
 
 ## Install
 
@@ -120,11 +124,6 @@ adapter, Ring webhook/ntfy/console channels and the React shell.
 four-gate release check.
 
 ## Development
-
-![dsh-os real run: the zero-install demo walks deny → 30-minute Grant → allow → revoke → deny in 6/6 steps, the dsh-check gate reports a REGRESSION and exits 1, and conformance passes 20 packages with 0 errors](docs/assets/dsh-os-demo.gif)
-
-*Animated: the real stdout of `node examples/os-kit/demo.mjs`, `bash examples/os-kit/check-demo/run-check-demo.sh` and `node scripts/conformance.mjs` on 2026-11-21 (selected lines; Grant ids and `clipboard://` handles differ per run). Nothing is installed and no network is used.*
-
 
 ```sh
 node scripts/scaffold.mjs

@@ -9,7 +9,7 @@ export default {
   initial: [
     '临时仓库：src/math.mjs 返回 a+b+1，测试期望 add(2,2)=4',
     'act 提供内置 fs.write（workdir 限定在临时仓库）',
-    'check 配置了本地 node --test runner',
+    'check 配置了本地 node --test runner；宿主预授权 check:run，写文件仍需批准',
   ],
   allowedInterventions: ['human.approve', 'human.grant', 'host.registerAction'],
   success: ['node --test 退出 0', '测试文件哈希不变', '源码 diff ≤3 行', '隐藏用例 add(3,5)=8'],
@@ -31,6 +31,9 @@ export default {
       tasks: [{ id: 'math.add', result: { passed: false, detail: 'not ok 1 - adds 2+2\n  expected: 4\n  actual: 5' }, trajectory: { steps: 1, toolCalls: 1, errors: 1 }, cost: { usd: 0, tokens: 0 }, approvals: { asked: 0, rejected: 0 } }],
     }
     await env.mount({ act: { workdir: dir }, check: { runner: env.testRunner('src') } })
+    // check_run now needs a Grant. The host pre-authorizes the check capability
+    // (no human turn); the source write still requires the one approval below.
+    env.ctx.get('allow').issue({ subject: env.subject, capability: 'check:run', scope: '*', approver: 'host' })
   },
   async policy(ai) {
     await ai.call('check_compare', { old: ai.state.oldRun, new: ai.state.badRun })

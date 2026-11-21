@@ -116,7 +116,7 @@ test('os_request needs ctx.allow.request and os_observe reads back the request',
   ctx.allow = {
     request: async request => ({ requestId: 'req_1', status: 'pending', hint: 'Ask a human.', echo: request }),
   }
-  const requested = await tool('os_request').execute({ id: 'demo.write', args: { value: 1 }, reason: 'need it' })
+  const requested = await tool('os_request').execute({ id: 'demo.write', args: { value: 1 }, reason: 'need it' }, { subject: 'session-1' })
   assert.equal(requested.ok, true)
   assert.equal(requested.requestId, 'req_1')
   assert.equal(requested.status, 'pending')
@@ -159,7 +159,7 @@ test('os_help returns a 4-step plan with capabilities and risks; os_status repor
 
   const status = await tool('os_status').execute({})
   assert.equal(status.ok, true)
-  assert.equal(status.version, '0.1.0')
+  assert.equal(status.version, '0.2.0')
   assert.deepEqual(status.modules, ['demo'])
   assert.equal(status.health.status, 'ok')
   assert.equal(status.tools.length, 6)

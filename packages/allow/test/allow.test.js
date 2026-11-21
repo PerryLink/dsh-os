@@ -71,7 +71,7 @@ test('check denies unknown subjects, capabilities and scope mismatches', () => {
   const { service } = fakeContext()
   assert.deepEqual(
     service.check({ subject: 'nobody', capability: 'fs.write', scope: 'x' }),
-    { allowed: false, reason: 'no-grant' },
+    { allowed: false, reason: 'no-grant', remainingUses: null },
   )
 
   service.issue({ subject: 's', capability: 'fs.write', scope: 'repo:src' })
@@ -264,7 +264,7 @@ test('a persisted grant with a non-numeric expiresAt is dropped (fail closed)', 
       audit: [],
     }))
     const { service } = fakeContext({ stateFile })
-    assert.deepEqual(service.check({ subject: 's', capability: 'c' }), { allowed: false, reason: 'no-grant' })
+    assert.deepEqual(service.check({ subject: 's', capability: 'c' }), { allowed: false, reason: 'no-grant', remainingUses: null })
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

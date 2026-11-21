@@ -1,31 +1,23 @@
 /**
  * dsh-ring — approval SLA and escalation receipts for DeepSeek Harness.
  *
- * 0.2.0: `ctx.ring` is an in-memory approval-case ledger with a deterministic
- * SLA state machine advanced by `tick(now)`. No channel is enabled by default:
- * every step writes a local receipt, and only an explicit `configureChannels()`
- * lets a tick deliver through webhook, ntfy or console. Delivery is bounded,
- * best-effort and never approves anything. Plain ESM, no runtime dependencies.
+ * 0.3.0: `ctx.ring` is an in-memory approval-case ledger with a deterministic
+ * SLA state machine advanced by `tick(now)` (also exposed as `ring_tick`). No
+ * channel is enabled by default: every step writes a local receipt, and only an
+ * explicit `configureChannels()` lets a tick or `notify()` deliver through
+ * webhook, ntfy or console. `notify()` records a delivery receipt on success
+ * and failure, deduped per case/channel/level. Delivery is bounded, best-effort
+ * and never approves anything. Plain ESM, no runtime dependencies.
  * @module dsh-ring
  */
 import { randomUUID } from 'node:crypto'
 import { buildChannels, buildMessage, providerForLabel } from './lib/channels/index.js'
+import { createTools } from './lib/tools.js'
+import { DEFAULT_ESCALATION_CHAIN, DEFAULT_TTL_MS, RISKS, STATES } from './lib/constants.js'
 
 export const name = 'dsh-ring'
 export const inject = ['tools']
-
-/** States; `resolved` and `expired` close a case for tick purposes. */
-export const STATES = ['pending', 'notified', 'escalated', 'acked', 'resolved', 'expired']
-export const RISKS = ['read', 'write', 'exec', 'danger']
-export const DEFAULT_TTL_MS = 60 * 60 * 1000
-
-/** Default SLA: t0 0s, t1 3m, t2 10m, t3 30m; case TTL is 60m. */
-export const DEFAULT_ESCALATION_CHAIN = Object.freeze([
-  { level: 0, afterMs: 0, channel: 'local' },
-  { level: 1, afterMs: 3 * 60 * 1000, channel: 'local' },
-  { level: 2, afterMs: 10 * 60 * 1000, channel: 'webhook' },
-  { level: 3, afterMs: 30 * 60 * 1000, channel: 'voice' },
-])
+export { createTools, DEFAULT_ESCALATION_CHAIN, DEFAULT_TTL_MS, RISKS, STATES }
 
 const MAX_TEXT = 128
 const CHAIN_DEFAULT_CHANNEL = level => (level >= 3 ? 'voice' : level === 2 ? 'webhook' : 'local')
@@ -95,6 +87,7 @@ export class RingService {
   #cases = new Map()
   #receipts = []
   #channels = new Map()
+  #deliveries = new Map()
 
   constructor(ctx, config = {}) {
     this.ctx = ctx
@@ -249,8 +242,10 @@ export class RingService {
   /**
    * Deliver one notification for a known case through a configured channel.
    * Omit `channel` to use the case's current chain label (`local`, `webhook`,
-   * `voice`, or a provider name). Resolves `{ delivery }`; a missing provider
-   * or a failed request rejects with `E_UNAVAILABLE`.
+   * `voice`, or a provider name). Every attempt writes a `delivery` receipt
+   * (success or failure); a repeated successful case+channel+level is returned
+   * as `{ delivery, deduped: true }` without a second send. Failure rejects
+   * with `E_UNAVAILABLE` after the receipt is recorded.
    */
   async notify(caseOrId, options = {}) {
     const kase = this.#mustGet(typeof caseOrId === 'string' ? caseOrId : caseOrId?.id)
@@ -259,18 +254,25 @@ export class RingService {
       ? kase.escalationChain.find(entry => entry.level === kase.level)?.channel
       : readText(options.channel, 'channel', 'E_INPUT', 64)
     const provider = providerForLabel(label)
+    const dedupeKey = this.#dedupeKey(kase, provider ?? label)
+    const prior = this.#deliveries.get(dedupeKey)
+    if (prior !== undefined) return { delivery: clone(prior), deduped: true }
     const channel = provider === null ? undefined : this.#channels.get(provider)
+    const at = readTimestamp(this.clock(), 'clock')
     if (channel === undefined) {
+      this.#recordDelivery(kase, { channel: provider ?? label, ok: false, error: 'E_UNAVAILABLE', at, dedupeKey })
       fail('E_UNAVAILABLE', `channel "${label ?? `t${kase.level}`}" is not configured for delivery`)
     }
-    const at = readTimestamp(this.clock(), 'clock')
     try {
       const result = await channel.send(buildMessage(kase, label, at))
-      const delivery = { caseId: kase.id, channel: provider, ok: true, error: null, at }
+      const delivery = { caseId: kase.id, channel: provider, ok: true, error: null, at, dedupeKey }
       if (result?.status !== undefined) delivery.status = result.status
-      return { delivery }
+      this.#deliveries.set(dedupeKey, Object.freeze(clone(delivery)))
+      this.#recordDelivery(kase, delivery)
+      return { delivery: clone(delivery) }
     } catch (error) {
       const safe = error?.code === 'E_UNAVAILABLE' && typeof error?.message === 'string' && !error.message.includes('://')
+      this.#recordDelivery(kase, { channel: provider, ok: false, error: 'E_UNAVAILABLE', at, dedupeKey })
       fail('E_UNAVAILABLE', safe ? error.message : `${provider} delivery failed`)
     }
   }
@@ -302,9 +304,12 @@ export class RingService {
         kase.state = 'notified'
         kase.notifiedAt = at
         kase.updatedAt = at
-        receipts.push(this.#record(kase, 'delivery', at, { channel: t0.channel, to: 't0' }))
+        const sent = await this.#deliver(kase, t0.channel, at, deliveries)
+        receipts.push(this.#record(kase, 'delivery', at, {
+          channel: t0.channel, to: 't0', source: 'tick',
+          ...(sent === null ? { delivered: false } : { delivered: true, ...sent }),
+        }))
         changed.add(kase.id)
-        await this.#deliver(kase, t0.channel, at, deliveries)
       }
       if (!['notified', 'escalated'].includes(kase.state)) continue
       const due = kase.escalationChain
@@ -316,7 +321,7 @@ export class RingService {
       kase.level = next.level
       kase.escalatedAt = at
       kase.updatedAt = at
-      receipts.push(this.#record(kase, 'escalation', at, { channel: next.channel, to: `t${next.level}` }))
+      receipts.push(this.#record(kase, 'escalation', at, { channel: next.channel, to: `t${next.level}`, source: 'tick' }))
       changed.add(kase.id)
       await this.#deliver(kase, next.channel, at, deliveries)
     }
@@ -328,14 +333,34 @@ export class RingService {
     }
   }
 
+  /** Send once for a tick step; deduped sends return the prior outcome. */
   async #deliver(kase, label, at, deliveries) {
     const provider = providerForLabel(label)
-    if (provider === null || !this.#channels.has(provider)) return
-    try {
-      deliveries.push((await this.notify(kase, { channel: label })).delivery)
-    } catch {
-      deliveries.push({ caseId: kase.id, channel: provider, ok: false, error: 'E_UNAVAILABLE', at })
+    if (provider === null || !this.#channels.has(provider)) return null
+    const dedupeKey = this.#dedupeKey(kase, provider)
+    const prior = this.#deliveries.get(dedupeKey)
+    if (prior !== undefined) {
+      return { ok: prior.ok, error: prior.error, dedupeKey, ...(prior.status === undefined ? {} : { status: prior.status }) }
     }
+    let delivery
+    try {
+      const result = await this.#channels.get(provider).send(buildMessage(kase, label, at))
+      delivery = { caseId: kase.id, channel: provider, ok: true, error: null, at, dedupeKey }
+      if (result?.status !== undefined) delivery.status = result.status
+      this.#deliveries.set(dedupeKey, Object.freeze(clone(delivery)))
+    } catch {
+      delivery = { caseId: kase.id, channel: provider, ok: false, error: 'E_UNAVAILABLE', at, dedupeKey }
+    }
+    deliveries.push(delivery)
+    return { ok: delivery.ok, error: delivery.error, dedupeKey, ...(delivery.status === undefined ? {} : { status: delivery.status }) }
+  }
+
+  #dedupeKey(kase, channel) {
+    return `${kase.id}:t${kase.level}:${channel ?? 'none'}`
+  }
+
+  #recordDelivery(kase, delivery) {
+    return this.#record(kase, 'delivery', delivery.at, { ...delivery, source: 'notify' })
   }
 
   #mustGet(id) {
@@ -354,66 +379,7 @@ export class RingService {
   }
 }
 
-const OUTPUT = { schema: { type: 'object', additionalProperties: true }, render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }] }
-const argsSchema = (properties, required) => ({ type: 'object', additionalProperties: false, properties, ...(required === undefined ? {} : { required }) })
-
-const CHAIN_SCHEMA = {
-  type: 'array',
-  description: 'Full SLA chain; omit for t0 0s, t1 3m, t2 10m, t3 30m.',
-  items: {
-    anyOf: [
-      { type: 'number', minimum: 0 },
-      { type: 'object', additionalProperties: false, properties: { level: { type: 'integer', minimum: 0 }, afterMs: { type: 'number', minimum: 0 }, channel: { type: 'string' } } },
-    ],
-  },
-}
-
-const tool = (name, description, parameters, execute) => ({ name, description, parameters, output: OUTPUT, execute })
-
-/** Plain ToolDefinition objects; no dependency on `@deepseek-ai/dsh-tools`. */
-export function createTools(service) {
-  return [
-    tool('ring_raise', 'Raise a pending approval case with an SLA escalation chain. Delivery only happens when a channel is explicitly configured.',
-      argsSchema({
-        source: { type: 'string', description: 'Origin, e.g. approval, hook, act or manual.' },
-        risk: { type: 'string', enum: RISKS, description: 'Defaults to write.' },
-        ttlMs: { type: 'number', minimum: 1, description: 'Case lifetime in ms; defaults to 60 minutes.' },
-        escalationChain: CHAIN_SCHEMA,
-      }, ['source']),
-      async args => ({ case: service.raise(args ?? {}) })),
-    tool('ring_ack', 'Acknowledge and claim a case. Ack stops escalation but is not approval.',
-      argsSchema({
-        id: { type: 'string' },
-        by: { type: 'string', description: 'Principal acknowledging the case.' },
-      }, ['id', 'by']),
-      async args => ({ case: service.ack(args?.id, { by: args?.by }) })),
-    tool('ring_escalate', 'Escalate a case to a chain level (number or t1..t3) or target label; omit to target the next level.',
-      argsSchema({
-        id: { type: 'string' },
-        to: { type: ['integer', 'string'], description: 'Escalation level or target label.' },
-      }, ['id']),
-      async args => ({ case: service.escalate(args?.id, args?.to === undefined ? {} : { to: args.to }) })),
-    tool('ring_list', 'List approval cases, optionally filtered by status.',
-      argsSchema({
-        status: { type: 'string', enum: STATES },
-      }),
-      async args => ({ cases: service.list(args?.status === undefined ? {} : { status: args.status }) })),
-    tool('ring_receipts', 'List the audit receipts for one case (delivery, escalation, ack, decision or expiry).',
-      argsSchema({ id: { type: 'string' } }, ['id']),
-      async args => ({ receipts: service.receipts(args?.id) })),
-    tool('ring_channels', 'List configured notification channels. No network is used unless a channel is explicitly configured.',
-      argsSchema({}),
-      async () => ({ channels: service.channels() })),
-    tool('ring_notify', 'Send one notification for a case through a configured channel; omit channel to use the current chain label.',
-      argsSchema({
-        id: { type: 'string' },
-        channel: { type: 'string', description: 'webhook, ntfy, console, local or voice.' },
-      }, ['id']),
-      async args => service.notify(args?.id, args?.channel === undefined ? {} : { channel: args.channel })),
-  ]
-}
-
-/** Mount the plugin at `ctx.ring` and register the seven agent tools. */
+/** Mount the plugin at `ctx.ring` and register the eight agent tools. */
 export function apply(ctx, config = {}) {
   const service = new RingService(ctx, config)
   ctx.provide('ring', service)

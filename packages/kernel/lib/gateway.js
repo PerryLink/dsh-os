@@ -4,15 +4,11 @@
  */
 import { RISKS } from './descriptor.js'
 import { fingerprint } from './registry.js'
+import { VERSION, RESULT_SCHEMA, ok as makeResult, err as failure, legacyOutcome } from './envelope.js'
 
-export const VERSION = '0.1.0'
-export const RESULT_SCHEMA = 'os.result/v1'
+export { VERSION, RESULT_SCHEMA }
 export const TOOL_NAMES = Object.freeze(['os_find', 'os_do', 'os_request', 'os_observe', 'os_help', 'os_status'])
 
-const CODES = new Set([
-  'E_INVALID_ARGUMENT', 'E_DENIED', 'E_NOT_FOUND', 'E_CONFLICT', 'E_UNAVAILABLE',
-  'E_LIMIT', 'E_STATE', 'E_TIMEOUT', 'E_INTERNAL',
-])
 const RISK_RANK = Object.freeze({ read: 0, write: 1, execute: 2, network: 2, approval: 2, secret: 3 })
 const OUTPUT = {
   schema: { type: 'object', additionalProperties: true },
@@ -20,31 +16,9 @@ const OUTPUT = {
 }
 const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value)
 const textOf = value => typeof value === 'string' && value.trim() ? value.trim() : null
-const clip = (text, max) => text.length > max ? `${text.slice(0, max - 1)}…` : text
-const uid = kind => `${kind}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
-const mapCode = code => CODES.has(code) ? code : 'E_UNAVAILABLE'
 const maxRisk = risk => Math.max(...risk.map(item => RISK_RANK[item] ?? 0))
 const isRisky = descriptor =>
   descriptor.risk.some(risk => risk === 'write' || risk === 'execute') || descriptor.idempotency === 'destructive'
-
-function failure(code, message, options = {}) {
-  return {
-    ok: false,
-    error: {
-      code,
-      subcode: options.subcode ?? null,
-      message: clip(message, 240),
-      retryable: options.retryable === true,
-      retryAfterMs: options.retryable === true ? (options.retryAfterMs ?? 0) : null,
-      remediation: options.remediation ?? 'Report the requestId to the maintainer.',
-      nextTools: (options.nextTools ?? []).slice(0, 3),
-      requestId: options.requestId ?? uid('req'),
-      auditId: options.auditId ?? null,
-      details: options.details ?? {},
-      cause: null,
-    },
-  }
-}
 
 const notFound = (id, requestId) => failure('E_NOT_FOUND', `No capability named "${id}".`, {
   subcode: 'unknown_capability',
@@ -99,36 +73,20 @@ export function createGateway(registry, options = {}) {
     if (typeof ref === 'string' && ref.startsWith('dsh://')) handles.set(ref, { ref })
   }
 
-  function makeResult(tool, value, opts = {}) {
-    const items = Array.isArray(value) ? value.slice(0, 20) : Array.isArray(value?.items) ? value.items.slice(0, 20) : []
-    const total = Array.isArray(value) ? value.length : Number.isInteger(value?.total) ? value.total : items.length
-    const data = value === undefined || Array.isArray(value) ? undefined : value
-    const summary = clip(opts.summary ?? (typeof value?.summary === 'string' ? value.summary
-      : Array.isArray(value) ? `Returned ${items.length} item(s) from ${tool}.` : `${tool} completed.`), 200)
-    const page = { limit: items.length || 0, returned: items.length, total, totalKnown: true, hasMore: total > items.length, nextCursor: null, sort: 'none' }
-    const payload = { items, page, data }
-    const result = {
-      schema: RESULT_SCHEMA,
-      ok: true,
-      tool,
-      requestId: opts.requestId ?? uid('req'),
-      auditId: null,
-      summary,
-      items,
-      page,
-      handles: Array.isArray(value?.handles) ? value.handles.slice(0, 5) : [],
-      truncated: false,
-      warnings: Array.isArray(value?.warnings) ? value.warnings.slice(0, 20) : [],
-      cost: { tokens: Math.ceil(JSON.stringify(payload).length / 4), tokensEstimated: true, latencyMs: opts.latencyMs ?? 0, money: { usd: 0, estimated: false } },
-      next: Array.isArray(opts.next) ? opts.next.slice(0, 3) : Array.isArray(value?.next) ? value.next.slice(0, 3) : [],
-      provenance: { source: 'kernel', sourceVersion: VERSION, observedAt: Date.now(), freshness: 'live', hash: `fnv1a:${fingerprint(payload)}`, hashScope: 'items+page+data' },
-    }
-    if (data !== undefined) result.data = data
-    if (isObject(value?.job)) result.job = value.job
-    return result
+  // Lazy legacy bridge: the first os_find/os_status adapts the host tools that
+  // are visible to the calling agent. Hosts without schemas/get are skipped.
+  let legacyReady = false
+  const refreshLegacy = typeof registry.refreshLegacy === 'function' ? registry.refreshLegacy.bind(registry) : null
+  async function ensureLegacy(exec) {
+    if (legacyReady || !refreshLegacy) return
+    const tools = ctx?.tools
+    if (!tools || typeof tools.schemas !== 'function' || typeof tools.get !== 'function') return
+    try { await refreshLegacy({ scope: exec?.agent }) } catch { return }
+    legacyReady = true
   }
 
-  async function find(input = {}) {
+  async function find(input = {}, exec = {}) {
+    await ensureLegacy(exec)
     const intent = textOf(input.intent)
     if (!intent) return failure('E_INVALID_ARGUMENT', 'intent must be a non-empty string.', {
       remediation: 'Pass a short task intent, for example "search clipboard history".',
@@ -181,6 +139,7 @@ export function createGateway(registry, options = {}) {
       remediation: 'Pass args as a JSON object matching the capability inputSchema.',
       requestId: exec?.requestId,
     })
+    if (id.startsWith('legacy.')) await ensureLegacy(exec)
     const descriptor = await registry.resolve(id)
     if (!descriptor) return notFound(id, exec?.requestId)
     const gated = isRisky(descriptor)
@@ -210,7 +169,7 @@ export function createGateway(registry, options = {}) {
     let outcome
     try {
       outcome = await registry.invoke(descriptor.id, args, {
-        ctx, subject: exec?.subject, signal: exec?.signal, grant, requestId: exec?.requestId,
+        ctx, subject: exec?.subject, agent: exec?.agent, signal: exec?.signal, grant, requestId: exec?.requestId,
       })
     } catch (error) {
       return failure('E_INTERNAL', error?.message ?? String(error), {
@@ -220,7 +179,7 @@ export function createGateway(registry, options = {}) {
       })
     }
     if (!outcome.ok) {
-      return failure(mapCode(outcome.code), outcome.message ?? `Capability ${descriptor.id} failed.`, {
+      return failure(outcome.legacyCode ?? outcome.code, outcome.message ?? `Capability ${descriptor.id} failed.`, {
         subcode: outcome.code === 'E_DENIED' ? 'grant_required' : null,
         remediation: outcome.code === 'E_DENIED'
           ? 'Call os_request with the same id and args, then retry os_do after approval.'
@@ -229,11 +188,33 @@ export function createGateway(registry, options = {}) {
           ? [{ tool: 'os_request', args: { id: descriptor.id, args }, why: 'request a grant' }]
           : [{ tool: 'os_find', args: { intent: descriptor.id }, why: 'inspect the capability card' }],
         requestId: exec?.requestId,
-        details: { capability: descriptor.id, legacyCode: outcome.legacyCode ?? null },
+        details: { capability: descriptor.id },
       })
     }
-    const result = makeResult(descriptor.id, outcome.value, { requestId: exec?.requestId, latencyMs: Date.now() - started })
-    remember(outcome.value)
+    // Legacy tools often return their own `{ ok, error }` envelope; normalize it
+    // through the kernel's err()/ok() pair instead of nesting it as data.
+    const normalized = descriptor.legacy === true ? legacyOutcome(outcome.value) : null
+    if (normalized?.ok === false) {
+      const legacy = normalized.error
+      const code = legacy.code ?? 'E_INTERNAL'
+      const denied = code === 'E_DENIED' || code === 'grant_required'
+      return failure(code, legacy.message ?? `Legacy capability ${descriptor.id} failed.`, {
+        subcode: legacy.subcode ?? (denied ? 'grant_required' : null),
+        retryable: legacy.retryable,
+        retryAfterMs: legacy.retryAfterMs,
+        remediation: legacy.remediation ?? (denied
+          ? 'Call os_request with the same id and args, then retry os_do after approval.'
+          : undefined),
+        nextTools: Array.isArray(legacy.nextTools) ? legacy.nextTools : denied
+          ? [{ tool: 'os_request', args: { id: descriptor.id, args }, why: 'request a grant' }]
+          : undefined,
+        requestId: exec?.requestId,
+        details: { capability: descriptor.id, ...(isObject(legacy.details) ? legacy.details : {}) },
+      })
+    }
+    const value = normalized?.ok === true ? normalized.value : outcome.value
+    const result = makeResult(descriptor.id, value, { requestId: exec?.requestId, latencyMs: Date.now() - started })
+    remember(value)
     if (slot) idempotency.set(slot, { argsHash: fingerprint(args), result })
     return result
   }
@@ -266,11 +247,18 @@ export function createGateway(registry, options = {}) {
     }
     let response
     try {
+      const subject = textOf(exec?.subject)
+      if (!subject) {
+        return failure('E_INVALID_ARGUMENT', 'os_request needs an executing subject.', {
+          remediation: 'Call os_request from an agent turn; the host supplies exec.subject.',
+          requestId: exec?.requestId,
+        })
+      }
       response = await allow.request({
-        capability: id, operationId: id, id, args, reason, subject: exec?.subject, purposeCode: descriptor.id,
+        subject, capability: id, scope: '*', maxUses: 1, reason,
       })
     } catch (error) {
-      return failure(mapCode(error?.code), error?.message ?? String(error), {
+      return failure(error?.code, error?.message ?? String(error), {
         remediation: 'Fix the request args, or inspect Allow with os_status, then retry os_request.',
         requestId: exec?.requestId,
       })
@@ -369,15 +357,21 @@ export function createGateway(registry, options = {}) {
     }
   }
 
-  async function status() {
+  async function status(_input = {}, exec = {}) {
+    await ensureLegacy(exec)
     const all = registry.list({ includeDeprecated: true, limit: 200 })
-    const modules = [...new Set(all.map(descriptor => descriptor.id.split('.')[0]))].sort()
+    const legacy = all.filter(descriptor => descriptor.legacy === true).length
+    const counts = typeof registry.stats === 'function' ? registry.stats() : { legacy, capabilities: all.length - legacy, total: all.length }
+    const modules = [...new Set(all.filter(descriptor => descriptor.legacy !== true).map(descriptor => descriptor.id.split('.')[0]))].sort()
     return {
       ok: true,
       version: VERSION,
       modules,
-      capabilities: all.length,
-      health: { status: 'ok', capabilities: all.length, namespaces: modules.length, deprecated: all.filter(descriptor => descriptor.deprecated).length },
+      ...counts,
+      health: {
+        status: 'ok', ...counts,
+        namespaces: modules.length, deprecated: all.filter(descriptor => descriptor.deprecated).length,
+      },
       tools: [...TOOL_NAMES],
     }
   }

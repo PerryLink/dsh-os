@@ -77,7 +77,7 @@ test('fire matches the exact event, runs actions and records one run each', asyn
   assert.deepEqual(fired.results.find(entry => entry.triggerId === 'tg_first').result, { pong: true })
   for (const run of fired.runs) {
     assert.deepEqual(Object.keys(run).sort(), [
-      'durationMs', 'error', 'event', 'id', 'ok', 'startedAt', 'triggerId',
+      'durationMs', 'error', 'event', 'id', 'ok', 'path', 'payload', 'startedAt', 'triggerId',
     ])
     assert.match(run.id, /^run_/)
     assert.equal(run.event, 'demo/ping')
@@ -85,10 +85,87 @@ test('fire matches the exact event, runs actions and records one run each', asyn
     assert.equal(run.error, null)
     assert.equal(run.startedAt, 1010)
     assert.equal(run.durationMs, 0)
+    assert.deepEqual(run.payload, { n: 1 })
+    assert.equal(run.path, null)
   }
   assert.deepEqual(service.runs().map(run => run.triggerId), ['tg_second', 'tg_first'])
   assert.equal(service.list().length, 3)
   assert.equal(summarize(service.list()[0]).action, 'function')
+})
+
+test('runs keep a redacted, bounded payload and an event display path', async () => {
+  const { ctx, service } = setup()
+  service.register({ id: 'tg_fs', event: 'fs.change', action: 'record' })
+  const payload = {
+    type: 'fs.change',
+    path: '/work/reports/app.txt',
+    kind: 'change',
+    access_token: 'ghp_abcdefghijklmnopqrstuvwxyz012345',
+    nested: { apiKey: 'sk-abcdefghijklmnopqrstuvwxyz', note: 'AKIAABCDEFGHIJKLMNOP' },
+    pem: '-----BEGIN RSA PRIVATE KEY-----\nMIIEsecret\n-----END RSA PRIVATE KEY-----',
+    blob: 'x'.repeat(20_000),
+  }
+  await service.fire('fs.change', payload)
+
+  const [run] = service.runs(1)
+  assert.equal(run.path, 'app.txt')
+  assert.equal(run.payload.path, '/work/reports/app.txt')
+  assert.equal(run.payload.kind, 'change')
+  assert.equal(run.payload.access_token, '[REDACTED]')
+  assert.equal(run.payload.nested.apiKey, '[REDACTED]')
+  assert.equal(run.payload.pem, '[REDACTED_PRIVATE_KEY]')
+  assert.match(run.payload.nested.note, /\[REDACTED_AWS_KEY\]/)
+  assert.ok(run.payload.blob.endsWith('…[truncated]'))
+
+  const stored = JSON.stringify(run.payload)
+  for (const raw of ['ghp_abcdefghijklmnopqrstuvwxyz012345', 'sk-abcdefghijklmnopqrstuvwxyz', 'AKIAABCDEFGHIJKLMNOP', 'MIIEsecret']) {
+    assert.equal(stored.includes(raw), false, `payload leaks ${raw.slice(0, 8)}`)
+  }
+  assert.ok(Buffer.byteLength(stored) <= 2048)
+  assert.ok(Object.isFrozen(run.payload))
+  assert.ok(Object.isFrozen(run.payload.nested))
+
+  // The projection is what trigger_runs exposes, and it never mutates the
+  // live payload that conditions and actions receive.
+  const viaTool = await ctx._tools.get('trigger_runs').execute({ limit: 1 })
+  assert.equal(viaTool.runs[0].path, 'app.txt')
+  assert.deepEqual(viaTool.runs[0].payload.nested, { apiKey: '[REDACTED]', note: '[REDACTED_AWS_KEY]' })
+  assert.equal(payload.nested.apiKey, 'sk-abcdefghijklmnopqrstuvwxyz')
+  assert.equal(payload.blob.length, 20_000)
+
+  // A path inside the working directory stays relative, with no leading `./`.
+  const inside = `${process.cwd()}/test/fixture.txt`
+  await service.fire('fs.change', { path: inside, kind: 'add' })
+  assert.equal(service.runs(1)[0].path, 'test/fixture.txt')
+
+  // The display path is a redaction surface too: a token in a directory name
+  // must not reach the ledger just because it is not inside the payload.
+  const secretPath = `${process.cwd()}/sk-abcdefghijklmnopqrstuvwxyz/fixture.txt`
+  await service.fire('fs.change', { path: secretPath })
+  const secretRun = service.runs(1)[0]
+  assert.equal(secretRun.path.includes('sk-abcdefghijklmnopqrstuvwxyz'), false)
+  assert.match(secretRun.path, /REDACTED_API_KEY/)
+})
+
+test('oversized nested payloads degrade to a bounded redacted preview', async () => {
+  const { service } = setup()
+  service.register({ id: 'tg_big', event: 'big', action: () => {} })
+  const noisy = `${String.fromCharCode(1)}${'"'.repeat(300)}`
+  const item = Object.fromEntries(Array.from({ length: 16 }, (_, index) => [`k${index}`, noisy]))
+  const payload = {
+    items: Array.from({ length: 32 }, () => item),
+    note: 'ghp_abcdefghijklmnopqrstuvwxyz012345',
+    path: '/work/deep.txt',
+  }
+  await service.fire('big', payload)
+
+  const run = service.runs(1)[0]
+  assert.equal(run.path, 'deep.txt')
+  assert.equal(run.payload.truncated, true)
+  assert.equal(typeof run.payload.preview, 'string')
+  const stored = JSON.stringify(run.payload)
+  assert.ok(Buffer.byteLength(stored) <= 2048)
+  assert.equal(stored.includes('ghp_abcdefghijklmnopqrstuvwxyz012345'), false)
 })
 
 test('conditions filter with a function and the field/op/value DSL', async () => {

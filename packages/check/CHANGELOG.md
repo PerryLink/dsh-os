@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.3.0
+
+- Gate the `check_run` agent tool behind an Allow Grant for capability
+  `check:run` (or `act:invoke:check.run`); missing Grant/service/subject returns
+  `E_DENIED` with an `allow_request` hint and spawns nothing. The trusted
+  `ctx.check.run()` host seam is not gated.
+- Add a rolling-hour budget: `maxRunsPerHour` (default 10) always applies;
+  `maxCostUsd` (default 5) applies when `costMeter` is configured, otherwise
+  only the run count is limited. Over-limit returns `E_LIMIT` before spawning.
+- Sanitize the child environment: inherit only `PATH`, `HOME`, `DSH_*` and
+  `NODE_*` (dropping `NODE_OPTIONS`); host API keys are no longer passed
+  through. Explicit `env` config is still trusted and merged last.
+- Add `allowedDshBins` to pin `dshBin` to an executable allowlist.
+- Cap captured stdout at 2 MiB (`raw.stdoutBytes`, `raw.stdoutTruncated`);
+  forward `AbortSignal` from `check_run` through SIGINT → SIGKILL.
+- Record one prompt-free audit entry per run (`runId`, `taskId`, `profile`,
+  `exitCode`, `durationMs`, optional `costUsd`) in `ctx.check.audit()`.
+
 ## 0.2.0
 
 - Add the real headless runner: `lib/runner.js` spawns

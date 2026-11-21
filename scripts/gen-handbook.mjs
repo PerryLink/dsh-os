@@ -349,9 +349,16 @@ const NOTES = {
   ring_notify: [
     '通过已配置频道为一个 case 发通知；省略 channel 用当前链标签。',
     'case 已 raise 且频道就绪。',
-    '不要当创建/升级（它只发一次）；无频道或 provider 不匹配会失败，且投递不进 receipts。',
+    '不要当创建/升级（它只发一次）；无频道或 provider 不匹配会失败。',
     '{delivery:{caseId,channel,ok,error,at,status?}}',
     'N·A',
+  ],
+  ring_tick: [
+    '推进所有 pending/escalated case 的 SLA：升级、补投递并写 receipt。',
+    '需要主动升级或补投递回执时。',
+    '不要用它代替人类决策；tick 只升级/通知，不批准。',
+    '{cases,receipts}',
+    'W·A',
   ],
   // ---- root ----
   root_set: [
@@ -390,6 +397,13 @@ const NOTES = {
     'R·S',
   ],
   // ---- seek ----
+  seek_resolve: [
+    '解析一个 dsh:// ref，返回 found/status/source/freshness；不执行搜索。',
+    '拿到 hit 后核验它是否还存在、是否过期。',
+    '不要把 resolve 当搜索；找不到时检查 ref 格式和 provider。',
+    '{ref,found,status,source,title?,freshness?,checkedAt}',
+    'R',
+  ],
   seek_search: [
     '跨已注册证据 provider 搜索，去重返回 dsh:// refs、snippet 和 per-provider errors。',
     '查历史决定或文件证据。',

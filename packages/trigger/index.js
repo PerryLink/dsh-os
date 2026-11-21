@@ -1,10 +1,10 @@
 /**
  * dsh-trigger — in-memory event-to-action trigger fabric for DeepSeek Harness.
  *
- * 0.2.0: `ctx.triggers`, a small condition DSL, per-trigger cooldown, an
- * in-memory run ledger, seven agent tools and three real event sources —
- * agent (`session/event` + `agent/*`), fs (`fs.watch` invalidation + snapshot
- * diff) and webhook (loopback HTTP when `ctx.webServer` exists).
+ * 0.3.0: `ctx.triggers`, a small condition DSL, per-trigger cooldown, an
+ * in-memory run ledger with a redacted, 2 KiB-bounded payload + display path,
+ * seven agent tools and three real event sources — agent (`session/event` +
+ * `agent/*`), fs (`fs.watch` invalidation + snapshot diff) and webhook.
  * @module dsh-trigger
  */
 import { randomUUID } from 'node:crypto'
@@ -13,6 +13,7 @@ import { createAgentSource } from './lib/sources/agent.js'
 import { createFsSource } from './lib/sources/fs.js'
 import { createWebhookSource } from './lib/sources/webhook.js'
 import { makeSourceTools } from './lib/source-tools.js'
+import { runFields } from './lib/payload.js'
 
 /** Cordis plugin name. */
 export const name = 'dsh-trigger'
@@ -282,6 +283,7 @@ export class TriggerService {
     const runs = []
     const skipped = []
     const results = []
+    const observed = runFields(payload)
 
     for (const trigger of [...this.#triggers.values()]) {
       if (trigger.event !== event) continue
@@ -311,6 +313,8 @@ export class TriggerService {
         id: `run_${randomUUID()}`,
         triggerId: trigger.id,
         event,
+        payload: observed.payload,
+        path: observed.path,
         ok: true,
         error: null,
         startedAt,

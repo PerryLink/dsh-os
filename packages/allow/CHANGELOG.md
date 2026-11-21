@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.4.0
+
+- Grants are now consumable: each Grant carries `maxUses` (default `Infinity` for
+  backward compatibility), `uses` and `lastUsedAt`. A successful `check`
+  consumes one use in the same synchronous turn; the last use moves the Grant to
+  `status: 'used'`, records an `exhausted` security event, and later checks are
+  denied with `reason: 'grant_exhausted'`. `check` returns `remainingUses`
+  (`null` for an unlimited Grant).
+- Requests carry a use budget: `request({ maxUses? })` defaults to 1 and caps at
+  100. `approve({ maxUses? })` also defaults to 1 and may only lower the
+  requested value (`E_MAX_USES`); a human cannot use an approval to widen the
+  budget, and `approve` rejects `subject`/`approver` fields. The legacy
+  `allow_issue` path stays unlimited unless `maxUses` is given.
+- Idempotency and replay: approving the same request twice returns the same
+  Grant and adds no audit row; re-approving cannot revive an exhausted Grant.
+  Replaying the same `act_invoke` call after the budget is spent is denied.
+  Finite consumption is persisted, so a restart cannot restore spent uses;
+  interleaved checks in one process cannot overdraw a Grant.
+- Persistence stays on state version 2 (the standalone approvals CLI reads it).
+  Version 1/2 grants without the new fields load as `uses: 0`,
+  `maxUses: Infinity`; `null` is the JSON form of `Infinity`. A Grant written by
+  the CLI (which predates `maxUses`) adopts its request's finite budget on load.
+  Requests with `maxUses > 1` must be approved through the service; the 0.3 CLI
+  hashes only the five legacy fields and refuses them with `E_REQUEST_HASH`.
+- Tools: `allow_check` consumes and reports `remainingUses`; `allow_request`,
+  `allow_issue` and `allow_approve` accept `maxUses`; `allow_list` accepts
+  `status: 'used'`.
+- Packaging: include `lib/` in the published tarball (0.3 omitted it).
+- Tests: 34 cases, including one approval → exactly one real `act_invoke` write,
+  replay denial, `remainingUses`, legacy multi-use Grants, restart persistence,
+  CLI-style Grant adoption and single-threaded concurrent checks.
+
 ## 0.3.0
 
 - Add the `Request` object (`pending | approved | denied | expired`) and the

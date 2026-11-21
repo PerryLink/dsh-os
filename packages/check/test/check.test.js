@@ -184,13 +184,18 @@ test('ctx.check.run injects a runner and check_run only appears when runnable', 
     },
   }
   const ctx = fakeContext()
+  ctx.provide('allow', { check: async () => ({ allowed: true }) })
   const check = apply(ctx, { runner })
   assert.equal(ctx._tools.has('check_run'), true)
   const record = await check.run({ id: 'x', prompt: 'hi' }, { timeoutMs: 1234 })
   assert.equal(record.result.text, 'ran')
   assert.equal(calls[0].task.id, 'x')
   assert.equal(calls[0].options.timeoutMs, 1234)
-  assert.equal((await ctx._tools.get('check_run').execute({ prompt: 'hi', id: 'tool' })).taskId, 'tool')
+  const ran = await ctx._tools.get('check_run').execute(
+    { prompt: 'hi', id: 'tool' },
+    { agent: { session: { id: 'agent:test' } } },
+  )
+  assert.equal(ran.taskId, 'tool')
   await assert.rejects(ctx._tools.get('check_run').execute({ prompt: '' }), /non-empty prompt/)
   const perCall = await check.run({ id: 'z', prompt: 'hi' }, {
     runner: { run: async () => ({ ok: true, code: null, taskId: 'z' }) },

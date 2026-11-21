@@ -15,10 +15,11 @@ import {
   MAX_SCOPE_LENGTH, MAX_APPROVER_LENGTH, MAX_AUDIT_ENTRIES,
   MAX_CHECK_AUDIT_ENTRIES, REQUEST_TTL_MS, MAX_REQUEST_TTL_MS,
   DEFAULT_WAIT_MS, MAX_WAIT_MS, MAX_REASON_LENGTH, REQUEST_STATES,
+  DEFAULT_MAX_USES, MAX_USES, GRANT_STATES,
   GrantStore, createTools, fail, text, objectInput, normalizeScope,
   scopeCovers, narrowScope, resolveTtl, resolveRequestTtl, resolveWait,
-  cleanReason, canonical, hashRequest, validRequest, clone, cloneEvidence,
-  validGrant, loadCounts, isCheck, REQUEST_FIELDS,
+  resolveMaxUses, cleanReason, canonical, hashRequest, validRequest, clone,
+  cloneEvidence, validGrant, loadCounts, isCheck, REQUEST_FIELDS,
 } from './lib/core.js'
 
 export {
@@ -26,6 +27,7 @@ export {
   MAX_SCOPE_LENGTH, MAX_APPROVER_LENGTH, MAX_AUDIT_ENTRIES,
   MAX_CHECK_AUDIT_ENTRIES, REQUEST_TTL_MS, MAX_REQUEST_TTL_MS,
   DEFAULT_WAIT_MS, MAX_WAIT_MS, MAX_REASON_LENGTH, REQUEST_STATES,
+  DEFAULT_MAX_USES, MAX_USES, GRANT_STATES,
   GrantStore, createTools, isCheck, REQUEST_FIELDS,
 } from './lib/core.js'
 
@@ -80,6 +82,10 @@ export class AllowService {
       ? 'user'
       : text(args.approver, 'approver', 'E_APPROVER', MAX_APPROVER_LENGTH)
     const ttlMs = resolveTtl(args.ttlMs)
+    // Legacy admin grants stay unlimited unless a finite budget is asked for.
+    const maxUses = args.maxUses === undefined || args.maxUses === Infinity
+      ? Infinity
+      : resolveMaxUses(args.maxUses)
     const evidence = cloneEvidence(args.evidence)
     const now = this.store.now()
     const grant = {
@@ -90,6 +96,9 @@ export class AllowService {
       status: 'active',
       createdAt: now,
       expiresAt: now + ttlMs,
+      maxUses,
+      uses: 0,
+      lastUsedAt: null,
       approver,
     }
     if (evidence !== undefined) grant.evidence = evidence
@@ -114,10 +123,11 @@ export class AllowService {
     const capability = text(args.capability, 'capability', 'E_CAPABILITY', MAX_CAPABILITY_LENGTH)
     const scope = normalizeScope(args.scope)
     const ttlMs = resolveRequestTtl(args.ttlMs)
+    const maxUses = resolveMaxUses(args.maxUses)
     const reason = cleanReason(args.reason)
     const now = this.store.now()
     const request = {
-      id: `req_${randomUUID()}`, subject, capability, scope, ttlMs, reason,
+      id: `req_${randomUUID()}`, subject, capability, scope, ttlMs, maxUses, reason,
       status: 'pending', createdAt: now, expiresAt: now + ttlMs, requestHash: '',
     }
     request.requestHash = hashRequest(request)
@@ -148,7 +158,7 @@ export class AllowService {
   approve(input = {}) {
     const args = objectInput(input)
     for (const key of Object.keys(args)) {
-      if (key !== 'id' && key !== 'by' && key !== 'scope') fail('E_INPUT', `unknown approve field: ${key}`)
+      if (key !== 'id' && key !== 'by' && key !== 'scope' && key !== 'maxUses') fail('E_INPUT', `unknown approve field: ${key}`)
     }
     const id = text(args.id, 'request id', 'E_ID', 128)
     const by = text(args.by, 'by', 'E_APPROVER', MAX_APPROVER_LENGTH)
@@ -161,11 +171,16 @@ export class AllowService {
     }
     if (request.status === 'denied') fail('E_REQUEST_DENIED', 'request was denied')
     if (request.status === 'expired') fail('E_REQUEST_EXPIRED', 'request expired')
+    // Approval starts at one use and may only lower the requested budget.
+    const maxUses = resolveMaxUses(args.maxUses)
+    const requestedMaxUses = request.maxUses === undefined ? Infinity : request.maxUses
+    if (maxUses > requestedMaxUses) fail('E_MAX_USES', `maxUses ${maxUses} exceeds the requested ${requestedMaxUses}`)
     const now = this.store.now()
     const scope = args.scope === undefined ? clone(request.scope) : narrowScope(request.scope, args.scope)
     const grant = {
       id: `grant_${randomUUID()}`, subject: request.subject, capability: request.capability,
       scope, status: 'active', createdAt: now, expiresAt: now + DEFAULT_TTL_MS,
+      maxUses, uses: 0, lastUsedAt: null,
       approver: by, requestId: request.id, requestHash: request.requestHash,
     }
     const before = clone(request)
@@ -256,13 +271,37 @@ export class AllowService {
       || requested.every(scope => scopeCovers(grant.scope, scope)))
 
     if (matched) {
+      const maxUses = matched.maxUses ?? Infinity
+      const before = {
+        status: matched.status, uses: matched.uses,
+        lastUsedAt: matched.lastUsedAt, usedAt: matched.usedAt,
+      }
+      const uses = (matched.uses ?? 0) + 1
+      const remainingUses = maxUses === Infinity ? null : Math.max(0, maxUses - uses)
+      matched.uses = uses
+      matched.lastUsedAt = now
       matched.usedAt = now
-      this.store.record('allowed', matched)
-      return { allowed: true, grant: clone(matched), reason: 'allowed' }
+      const exhausted = maxUses !== Infinity && uses >= maxUses
+      if (exhausted) matched.status = 'used'
+      // A finite budget is a one-shot promise across restarts, so consumption
+      // is persisted atomically. Unlimited legacy grants keep the 0.1 behavior
+      // of answering checks from memory without rewriting the state file.
+      if (maxUses !== Infinity) {
+        try {
+          this.store.save()
+        } catch (error) {
+          Object.assign(matched, before)
+          throw error
+        }
+      }
+      this.store.record('allowed', matched, { uses, remainingUses })
+      if (exhausted) this.store.record('exhausted', matched, { uses, maxUses })
+      return { allowed: true, grant: clone(matched), reason: 'allowed', remainingUses }
     }
 
     const expired = candidates.find(grant => grant.status === 'expired')
     const revoked = candidates.find(grant => grant.status === 'revoked')
+    const used = candidates.find(grant => grant.status === 'used')
     let reason = 'no-grant'
     let grant
     if (active.length > 0) {
@@ -274,7 +313,13 @@ export class AllowService {
     } else if (revoked) {
       reason = 'revoked'
       grant = revoked
+    } else if (used) {
+      reason = 'grant_exhausted'
+      grant = used
     }
+    const remainingUses = grant === undefined || grant.maxUses === Infinity
+      ? null
+      : Math.max(0, grant.maxUses - (grant.uses ?? 0))
     this.store.record('denied', null, {
       subject,
       capability,
@@ -283,8 +328,8 @@ export class AllowService {
       ...(grant ? { grantId: grant.id } : {}),
     })
     return grant
-      ? { allowed: false, grant: clone(grant), reason }
-      : { allowed: false, reason }
+      ? { allowed: false, grant: clone(grant), reason, remainingUses }
+      : { allowed: false, reason, remainingUses: null }
   }
 
   /**

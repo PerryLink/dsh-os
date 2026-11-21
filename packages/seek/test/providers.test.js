@@ -56,7 +56,7 @@ test('apply auto-registers locator and memento when their host services exist', 
   ])
   assert.deepEqual(
     [...ctx._registry.keys()].filter(name => name.startsWith('seek_')),
-    ['seek_search', 'seek_providers', 'seek_register_defaults'],
+    ['seek_search', 'seek_resolve', 'seek_providers', 'seek_register_defaults'],
   )
 })
 
@@ -291,4 +291,152 @@ test('seek_search forwards exec.agent cwd and agentKey to providers', async () =
   assert.equal(locatorCalls[0].args.pathPrefix, '/work')
   assert.equal(locatorCalls[0].exec.agent.session.id, 's1')
   assert.deepEqual(memoryCalls[0].opts, { agentKey: 'reviewer' })
+})
+
+function fakeLocatorResolve(result, calls = []) {
+  return {
+    name: 'locator_resolve',
+    async execute(args, exec) {
+      calls.push({ args, exec })
+      return typeof result === 'function' ? await result(args, exec) : result
+    },
+  }
+}
+
+test('locator resolve rebuilds a native file ref and maps the locator status', async () => {
+  const calls = []
+  const resolveTool = fakeLocatorResolve({
+    ok: true,
+    status: 'stale',
+    title: 'a b.ts',
+    freshness: { state: 'stale', observedAt: 9 },
+    checkedAt: 7,
+  }, calls)
+  const { ctx, service } = setup({ tools: [fakeLocator([]), resolveTool] })
+  assert.deepEqual(service.providers(), ['locator'])
+
+  const result = await service.resolve('dsh://locator/src/a%20b.ts', {
+    cwd: '/work',
+    agent: { session: { id: 's1' } },
+  })
+  assert.deepEqual(result, {
+    ref: 'dsh://locator/src/a%20b.ts',
+    found: true,
+    status: 'stale',
+    source: 'locator',
+    checkedAt: 7,
+    title: 'a b.ts',
+    freshness: { state: 'stale', observedAt: 9 },
+  })
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].args.mode, 'meta')
+  const native = new URL(calls[0].args.ref)
+  assert.equal(native.protocol, 'ref:')
+  assert.equal(native.host, 'file')
+  assert.equal(native.searchParams.get('path'), '/work/src/a b.ts')
+  assert.equal(calls[0].exec.agent.session.id, 's1')
+})
+
+test('locator resolve maps missing and unknown without inventing freshness', async () => {
+  const { service } = setup({ tools: [fakeLocator([]), fakeLocatorResolve({ ok: true, status: 'missing', checkedAt: 3 })] })
+  const missing = await service.resolve('dsh://locator/gone.ts', { cwd: '/work' })
+  assert.equal(missing.found, false)
+  assert.equal(missing.status, 'missing')
+  assert.equal(missing.checkedAt, 3)
+
+  const unknown = setup({ tools: [fakeLocator([]), fakeLocatorResolve({ ok: true, status: 'unknown' })] })
+  const outcome = await unknown.service.resolve('dsh://locator/never-indexed.ts', { cwd: '/work' })
+  assert.equal(outcome.found, false)
+  assert.equal(outcome.status, 'unknown')
+  assert.equal(typeof outcome.checkedAt, 'number')
+})
+
+test('locator resolve fails closed without cwd, without the tool or on denial', async () => {
+  const withResolve = setup({ tools: [fakeLocator([]), fakeLocatorResolve({ ok: true, status: 'fresh' })] })
+  const noCwd = await withResolve.service.resolve('dsh://locator/a.ts', {})
+  assert.equal(noCwd.status, 'error')
+  assert.equal(noCwd.error.code, 'E_UNAUTHORIZED')
+
+  const noTool = setup({ tools: [fakeLocator([])] })
+  const unsupported = await noTool.service.resolve('dsh://locator/a.ts', { cwd: '/work' })
+  assert.equal(unsupported.status, 'error')
+  assert.equal(unsupported.error.code, 'E_UNAVAILABLE')
+
+  const denied = setup({
+    tools: [fakeLocator([]), fakeLocatorResolve({ ok: false, error: 'content-path-denied: cwd is outside roots' })],
+  })
+  const refused = await denied.service.resolve('dsh://locator/a.ts', { cwd: '/outside' })
+  assert.equal(refused.status, 'error')
+  assert.equal(refused.error.code, 'E_UNAUTHORIZED')
+
+  const traversal = await withResolve.service.resolve('dsh://locator/..%2Fsecret', { cwd: '/work' })
+  assert.equal(traversal.status, 'error')
+  assert.equal(traversal.error.code, 'E_UNAUTHORIZED')
+})
+
+test('locator search hits are marked resolvable', async () => {
+  const { service } = setup({
+    tools: [fakeLocator([{ kind: 'file', path: '/work/a.ts' }]), fakeLocatorResolve({ ok: true, status: 'fresh' })],
+  })
+  const result = await service.search('x', { cwd: '/work' })
+  assert.equal(result.hits.length, 1)
+  assert.equal(result.hits[0].resolvable, true)
+})
+
+test('memento resolve looks an entry up by id through the caller-scoped query', async () => {
+  const calls = []
+  const { service } = setup({
+    memory: fakeMemory([
+      {
+        id: '11111111-1111-4111-8111-111111111111',
+        scope: 'user-global',
+        agentKey: '',
+        text: 'Retry policy: 3 attempts\nDetails',
+      },
+      {
+        id: '22222222-2222-4222-8222-222222222222',
+        scope: 'user-global',
+        agentKey: 'other',
+        text: 'Other agent note',
+      },
+    ], calls),
+  })
+
+  const found = await service.resolve('dsh://memento/11111111-1111-4111-8111-111111111111', {
+    agentKey: 'reviewer',
+    agent: {},
+  })
+  assert.equal(found.found, true)
+  assert.equal(found.status, 'unknown')
+  assert.equal(found.source, 'memento')
+  assert.equal(found.title, 'Retry policy: 3 attempts')
+  assert.deepEqual(found.freshness, { state: 'unknown' })
+  assert.equal(typeof found.checkedAt, 'number')
+  assert.deepEqual(calls[0].filter, { scope: 'user-global', limit: 1000 })
+  assert.deepEqual(calls[0].opts, { agentKey: 'reviewer' })
+
+  const missing = await service.resolve('dsh://memento/33333333-3333-4333-8333-333333333333', {
+    agentKey: 'reviewer',
+    agent: {},
+  })
+  assert.equal(missing.found, false)
+  assert.equal(missing.status, 'missing')
+
+  const foreign = await service.resolve('dsh://memento/22222222-2222-4222-8222-222222222222', {
+    agentKey: 'reviewer',
+    agent: {},
+  })
+  assert.equal(foreign.found, false)
+})
+
+test('memento resolve requires the service and a caller agent', async () => {
+  await assert.rejects(
+    createMementoProvider(fakeContext()).resolve('dsh://memento/id-1', { agentKey: 'reviewer' }),
+    error => error.code === 'E_UNAVAILABLE',
+  )
+
+  const { service } = setup({ memory: fakeMemory([]) })
+  const noCaller = await service.resolve('dsh://memento/id-1', {})
+  assert.equal(noCaller.status, 'error')
+  assert.equal(noCaller.error.code, 'E_UNAUTHORIZED')
 })

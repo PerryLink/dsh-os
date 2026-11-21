@@ -12,7 +12,7 @@
     "name": "dsh-allow",
     "product": "Allow",
     "service": "allow",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "stability": "experimental",
     "description": "Revocable capability grants and an audit-ready permission center for DeepSeek Harness.",
     "install": "dsh plugin --profile web add dsh-allow"
@@ -30,7 +30,7 @@
     "name": "@perrylink/dsh-check",
     "product": "Check",
     "service": "check",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "stability": "experimental",
     "description": "Paired-environment regression canary for DeepSeek Harness upgrades, model changes and plugin updates.",
     "install": "dsh plugin --profile web add @perrylink/dsh-check"
@@ -48,7 +48,7 @@
     "name": "dsh-trigger",
     "product": "Trigger",
     "service": "triggers",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "stability": "experimental",
     "description": "Event-to-action trigger fabric for DeepSeek Harness: condition DSL, cooldown, run ledger and real agent / fs / webhook event sources.",
     "install": "dsh plugin --profile web add dsh-trigger"
@@ -57,18 +57,18 @@
     "name": "dsh-seek",
     "product": "Seek",
     "service": "evidence",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "stability": "experimental",
-    "description": "Cross-source evidence search for DeepSeek Harness with verifiable refs, freshness and real locator/memento providers.",
+    "description": "Cross-source evidence search for DeepSeek Harness with verifiable refs, resolvable markers, resolve routing and real locator/memento providers.",
     "install": "dsh plugin --profile web add dsh-seek"
   },
   {
     "name": "@perrylink/dsh-trace",
     "product": "Trace",
     "service": "trace",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "stability": "experimental",
-    "description": "Auditable long-term memory governance for DeepSeek Harness: provenance, expiry, conflict, forget, and a read-only dsh-memento bridge.",
+    "description": "Auditable long-term memory governance for DeepSeek Harness: provenance, expiry, conflict, forget, optional dsh:// ref verification, and a read-only dsh-memento bridge.",
     "install": "dsh plugin --profile web add @perrylink/dsh-trace"
   },
   {
@@ -84,7 +84,7 @@
     "name": "dsh-ring",
     "product": "Ring",
     "service": "ring",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "stability": "experimental",
     "description": "Approval SLA and escalation receipts for DeepSeek Harness: ack, escalate, audit and opt-in webhook/ntfy delivery.",
     "install": "dsh plugin --profile web add dsh-ring"
@@ -102,9 +102,9 @@
     "name": "@perrylink/dsh-os-kernel",
     "product": "Kernel",
     "service": "kernel",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "stability": "experimental",
-    "description": "Thin capability kernel for dsh-os: descriptor protocol, registry and six os_* agent verbs.",
+    "description": "Thin capability kernel for dsh-os: descriptor protocol, registry, legacy tool bridge and six os_* agent verbs.",
     "install": "dsh plugin --profile web add @perrylink/dsh-os-kernel"
   },
   {
@@ -141,9 +141,9 @@
     "name": "@perrylink/dsh-backup",
     "product": "Backup",
     "service": "backup",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "stability": "experimental",
-    "description": "Read-only filesystem snapshot manifests and restore plans for DeepSeek Harness: inventory only, no copying and no deleting.",
+    "description": "Read-only, allowlisted filesystem snapshot manifests and restore plans for DeepSeek Harness: metadata inventory with sensitive-path exclusions and hard caps, no copying and no deleting.",
     "install": "dsh plugin --profile web add @perrylink/dsh-backup",
     "optional": true
   },
@@ -171,7 +171,7 @@
     "name": "dsh-os-kit",
     "product": "Kit",
     "service": null,
-    "version": "0.3.0",
+    "version": "0.4.0",
     "stability": "experimental",
     "description": "Thin meta bundle that installs and mounts the four core dsh-os modules: Act, Allow, Snip and Check.",
     "install": "dsh plugin --profile web add dsh-os-kit",

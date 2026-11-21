@@ -1,7 +1,7 @@
 {
   "name": "@perrylink/dsh-os-kernel",
-  "version": "0.1.0",
-  "description": "Thin capability kernel for dsh-os: descriptor protocol, registry and six os_* agent verbs.",
+  "version": "0.2.0",
+  "description": "Thin capability kernel for dsh-os: descriptor protocol, registry, legacy tool bridge and six os_* agent verbs.",
   "type": "module",
   "main": "index.js",
   "exports": {
@@ -10,13 +10,16 @@
     "./registry": "./lib/registry.js",
     "./from-tool": "./lib/from-tool.js",
     "./gateway": "./lib/gateway.js",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./service": "./lib/service.js",
+    "./envelope": "./lib/envelope.js"
   },
   "files": [
     "index.js",
     "lib",
     "cordis.patch.yml",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "keywords": [

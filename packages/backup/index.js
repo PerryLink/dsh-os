@@ -1,88 +1,44 @@
 /**
- * @perrylink/dsh-backup — read-only snapshot manifests and restore plans.
+ * @perrylink/dsh-backup — read-only, allowlisted snapshot manifests and restore plans.
  *
- * 0.1.0 records filesystem metadata and compares manifests. It never copies,
- * moves, deletes or writes a file, and it never touches the restore target.
- * Executing a plan is scoped for 0.2.0.
+ * 0.2.0 adds a root allowlist, default sensitive-path exclusions, hard limits
+ * and an in-memory audit ledger. It never copies, moves, deletes or writes a
+ * file, and it never touches the restore target.
  * @module @perrylink/dsh-backup
  */
 import { createHash, randomUUID } from 'node:crypto'
-import { closeSync, lstatSync, openSync, readSync, readdirSync, readlinkSync, statSync } from 'node:fs'
-import { isAbsolute, join, resolve as resolvePath } from 'node:path'
+import {
+  closeSync, existsSync, lstatSync, openSync, readSync, readdirSync, readlinkSync,
+  realpathSync, statSync,
+} from 'node:fs'
+import { homedir } from 'node:os'
+import { basename, dirname, isAbsolute, join, parse, resolve as resolvePath, sep } from 'node:path'
+import {
+  HASH, fail, plainObject, normalize, HOME, absolute, limit, hashOption, idOf,
+  isForbidden, inside, canonical, canonicalLoose, patternList, matcher, anyMatch,
+} from './lib/path.js'
 export const name = '@perrylink/dsh-backup'
 export const inject = ['tools']
 export const SNAPSHOT_SCHEMA = 'dsh.backup.snapshot/v1'
 export const DIFF_SCHEMA = 'dsh.backup.diff/v1'
 export const PLAN_SCHEMA = 'dsh.backup.plan/v1'
-const DEFAULT_MAX_FILES = 10_000
-const DEFAULT_MAX_BYTES = 256 * 1024 * 1024
-const HASH = 'sha256'
+/** Hard caps. Service or per-call limits may lower them, never raise them. */
+export const HARD_LIMITS = Object.freeze({
+  maxFiles: 10_000,
+  maxBytes: 100 * 1024 * 1024,
+  maxFileBytes: 10 * 1024 * 1024,
+})
+/** Applied at any depth unless the host opts out explicitly in config. */
+export const DEFAULT_SENSITIVE_EXCLUDES = Object.freeze([
+  '**/.ssh', '**/.env*', '**/credentials*', '**/*.pem', '**/*.key',
+  '**/id_rsa*', '**/.git', '**/node_modules',
+])
 const CHUNK = 1024 * 1024
+const AUDIT_MAX = 200
 const COMPARED = ['type', 'size', 'mtimeMs', 'mode', 'hash', 'target']
 const clone = value => structuredClone(value)
 const compare = (left, right) => (left < right ? -1 : left > right ? 1 : 0)
-const fail = (code, message) => Object.assign(new Error(message), { code })
-const plainObject = value => value !== null && typeof value === 'object' && !Array.isArray(value)
 
-function absolute(value, field) {
-  if (typeof value !== 'string' || value.trim() === '') throw fail('E_INVALID_ARGUMENT', `${field} must be a non-empty string`)
-  if (value.includes('\0')) throw fail('E_INVALID_ARGUMENT', `${field} must not contain NUL`)
-  if (!isAbsolute(value)) throw fail('E_INVALID_ARGUMENT', `${field} must be absolute: ${JSON.stringify(value)}`)
-  if (value.split(/[\\/]/).includes('..')) throw fail('E_INVALID_ARGUMENT', `${field} must not contain "..": ${JSON.stringify(value)}`)
-  return resolvePath(value)
-}
-function limit(value, fallback, field) {
-  if (value === undefined || value === null) return fallback
-  if (!Number.isSafeInteger(value) || value < 1) throw fail('E_INVALID_ARGUMENT', `${field} must be a positive integer`)
-  return value
-}
-function hashOption(value) {
-  if (value === undefined || value === null || value === false) return null
-  if (value !== HASH) throw fail('E_INVALID_ARGUMENT', 'hash must be "sha256" or omitted')
-  return HASH
-}
-function idOf(value) {
-  if (typeof value !== 'string' || value.trim() === '') throw fail('E_INVALID_ARGUMENT', 'id must be a non-empty string')
-  return value
-}
-
-/** Relative glob patterns only: absolute patterns and `..` are rejected. */
-function patternList(value, field) {
-  if (value === undefined || value === null) return []
-  if (!Array.isArray(value)) throw fail('E_INVALID_ARGUMENT', `${field} must be an array`)
-  return value.map(item => {
-    if (typeof item !== 'string' || item.trim() === '' || item.includes('\0')) {
-      throw fail('E_INVALID_ARGUMENT', `${field} must contain non-empty strings`)
-    }
-    const pattern = item.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '')
-    if (pattern === '' || /^(\/|[A-Za-z]:)/.test(pattern) || pattern.split('/').includes('..')) {
-      throw fail('E_INVALID_ARGUMENT', `${field} must stay inside root: ${JSON.stringify(item)}`)
-    }
-    return pattern
-  })
-}
-function globToRegExp(pattern) {
-  let source = ''
-  for (let index = 0; index < pattern.length; index += 1) {
-    const char = pattern[index]
-    if (char === '*') {
-      if (pattern[index + 1] !== '*') source += '[^/]*'
-      else {
-        index += 1
-        if (pattern[index + 1] === '/') { index += 1; source += '(?:.*/)?' } else source += '.*'
-      }
-    } else if (char === '?') source += '[^/]'
-    else source += char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  }
-  return new RegExp(`^${source}$`)
-}
-/** A literal pattern also matches everything underneath it. */
-function matcher(pattern) {
-  if (!/[*?]/.test(pattern)) return rel => rel === pattern || rel.startsWith(`${pattern}/`)
-  const regexp = globToRegExp(pattern)
-  return rel => regexp.test(rel)
-}
-const anyMatch = (matchers, rel) => matchers.some(matches => matches(rel))
 function sha256File(path) {
   const hash = createHash(HASH)
   const descriptor = openSync(path, 'r')
@@ -137,6 +93,9 @@ function scan(root, options) {
         continue
       }
       if (include.length > 0 && !anyMatch(include, childRel)) continue
+      if (type === 'file' && stats.size > options.maxFileBytes) {
+        throw fail('E_LIMIT', `file ${childRel} exceeds maxFileBytes (${options.maxFileBytes})`)
+      }
       state.files += 1
       state.bytes += type === 'file' ? stats.size : 0
       if (state.files > options.maxFiles) throw fail('E_LIMIT', `snapshot exceeds maxFiles (${options.maxFiles})`)
@@ -172,40 +131,81 @@ function changesBetween(left, right) {
 }
 const indexEntries = entries => new Map(entries.map(entry => [entry.rel, entry]))
 
-/** In-memory snapshot ledger exposed as `ctx.backup`. */
+/** In-memory snapshot ledger and audit trail exposed as `ctx.backup`. */
 export class BackupService {
   #snapshots = new Map()
+  #audits = []
+  #allowedRoots
+  #defaultExclude
+  #extraExclude
   #maxFiles
   #maxBytes
+  #maxFileBytes
   #hash
   constructor(config = {}) {
-    this.#maxFiles = limit(config.maxFiles, DEFAULT_MAX_FILES, 'maxFiles')
-    this.#maxBytes = limit(config.maxBytes, DEFAULT_MAX_BYTES, 'maxBytes')
-    this.#hash = hashOption(config.hash)
-  }
-
-  /** Record a manifest for `root`; returns it. Writes nothing to disk. */
-  snapshot(options = {}) {
-    if (!plainObject(options)) throw fail('E_INVALID_ARGUMENT', 'snapshot options must be an object')
-    const root = absolute(options.root, 'root')
-    statDirectory(root, 'root')
-    const manifest = {
-      schema: SNAPSHOT_SCHEMA,
-      id: `bkp_${Date.now().toString(36)}_${randomUUID().replace(/-/g, '').slice(0, 12)}`,
-      root, createdAt: Date.now(), hash: hashOption(options.hash ?? this.#hash),
-      include: patternList(options.include, 'include'),
-      exclude: patternList(options.exclude, 'exclude'),
-      limits: { maxFiles: limit(options.maxFiles, this.#maxFiles, 'maxFiles'), maxBytes: limit(options.maxBytes, this.#maxBytes, 'maxBytes') },
-      entries: [], counts: null,
+    if (!plainObject(config)) throw fail('E_INVALID_ARGUMENT', 'config must be an object')
+    const roots = config.allowedRoots === undefined || config.allowedRoots === null
+      ? [process.cwd()] : config.allowedRoots
+    if (!Array.isArray(roots) || roots.length === 0) {
+      throw fail('E_INVALID_ARGUMENT', 'allowedRoots must be a non-empty array')
     }
-    const result = scan(root, { ...manifest.limits, include: manifest.include, exclude: manifest.exclude, hash: manifest.hash })
-    manifest.entries = result.entries
-    manifest.counts = result.counts
-    this.#snapshots.set(manifest.id, manifest)
-    return clone(manifest)
+    this.#allowedRoots = roots.map(root => {
+      const resolved = absolute(root, 'allowedRoots')
+      const real = existsSync(resolved) ? canonical(resolved, 'allowedRoots') : resolved
+      if (isForbidden(real)) throw fail('E_FORBIDDEN_ROOT', `allowedRoots must not contain ${JSON.stringify(real)}`)
+      return real
+    })
+    this.#maxFiles = limit(config.maxFiles, HARD_LIMITS.maxFiles, 'maxFiles', HARD_LIMITS.maxFiles)
+    this.#maxBytes = limit(config.maxBytes, HARD_LIMITS.maxBytes, 'maxBytes', HARD_LIMITS.maxBytes)
+    this.#maxFileBytes = limit(config.maxFileBytes, HARD_LIMITS.maxFileBytes, 'maxFileBytes', HARD_LIMITS.maxFileBytes)
+    this.#hash = hashOption(config.hash)
+    this.#extraExclude = patternList(config.exclude, 'exclude')
+    this.#defaultExclude = config.defaultExclude !== undefined
+      ? patternList(config.defaultExclude, 'defaultExclude')
+      : config.excludeSensitive === false ? [] : patternList(DEFAULT_SENSITIVE_EXCLUDES, 'defaultExclude')
   }
 
-  /** Summaries (without entries), newest first. */
+  /** Record a manifest for an allowed `root`; returns it. Writes nothing to disk. */
+  snapshot(options = {}) {
+    const startedAt = Date.now()
+    let root = null
+    try {
+      if (!plainObject(options)) throw fail('E_INVALID_ARGUMENT', 'snapshot options must be an object')
+      root = absolute(options.root, 'root')
+      const realRoot = this.#guard(canonicalLoose(root, 'root'), 'root')
+      statDirectory(realRoot, 'root')
+      const include = patternList(options.include, 'include')
+      const exclude = [...new Set([...this.#defaultExclude, ...this.#extraExclude, ...patternList(options.exclude, 'exclude')])]
+      const limits = {
+        maxFiles: limit(options.maxFiles, this.#maxFiles, 'maxFiles', HARD_LIMITS.maxFiles),
+        maxBytes: limit(options.maxBytes, this.#maxBytes, 'maxBytes', HARD_LIMITS.maxBytes),
+        maxFileBytes: limit(options.maxFileBytes, this.#maxFileBytes, 'maxFileBytes', HARD_LIMITS.maxFileBytes),
+      }
+      const hash = hashOption(options.hash ?? this.#hash)
+      const result = scan(realRoot, { ...limits, include, exclude, hash })
+      const manifest = {
+        schema: SNAPSHOT_SCHEMA,
+        id: `bkp_${Date.now().toString(36)}_${randomUUID().replace(/-/g, '').slice(0, 12)}`,
+        root: realRoot, createdAt: Date.now(), hash,
+        include, exclude, limits,
+        entries: result.entries, counts: result.counts,
+      }
+      this.#snapshots.set(manifest.id, manifest)
+      this.#record({
+        at: Date.now(), op: 'snapshot', root: realRoot, fileCount: result.counts.files,
+        bytes: result.counts.bytes, durationMs: Date.now() - startedAt, outcome: 'ok',
+      })
+      return clone(manifest)
+    } catch (error) {
+      this.#record({
+        at: Date.now(), op: 'snapshot', root, outcome: 'error',
+        code: error?.code ?? 'E_INTERNAL', durationMs: Date.now() - startedAt,
+      })
+      throw error
+    }
+  }
+
+  /** Newest-first snapshot summaries (without entries). */
   list() {
     return [...this.#snapshots.values()]
       .sort((left, right) => right.createdAt - left.createdAt || compare(left.id, right.id))
@@ -216,6 +216,12 @@ export class BackupService {
   get(id) {
     const manifest = this.#snapshots.get(idOf(id))
     return manifest === undefined ? null : clone(manifest)
+  }
+
+  /** Newest-first audit events; never contains entry or file-name lists. */
+  audit(count = 100) {
+    const size = limit(count, 100, 'count', AUDIT_MAX)
+    return this.#audits.slice(-size).reverse().map(clone)
   }
 
   /** Relative-path comparison of two manifests; read-only. */
@@ -253,38 +259,43 @@ export class BackupService {
     }
   }
 
-  /** What a 0.2.0 restore from `id` into `target` would add, overwrite or delete. */
+  /** What a restore from `id` into an allowed `target` would add, overwrite or delete. */
   planRestore(id, options = {}) {
     const manifest = this.#require(id)
     if (!plainObject(options)) throw fail('E_INVALID_ARGUMENT', 'plan options must be an object')
     const target = absolute(options.target, 'target')
+    const realTarget = this.#guard(canonicalLoose(target, 'target'), 'target')
     let stats
-    try { stats = statSync(target, { throwIfNoEntry: false }) } catch (error) {
-      throw fail('E_UNAVAILABLE', `cannot stat target ${target}: ${error.message}`)
+    try { stats = statSync(realTarget, { throwIfNoEntry: false }) } catch (error) {
+      throw fail('E_UNAVAILABLE', `cannot stat target ${realTarget}: ${error.message}`)
     }
-    if (stats && !stats.isDirectory()) throw fail('E_INVALID_ARGUMENT', `target must be a directory: ${target}`)
+    if (stats && !stats.isDirectory()) throw fail('E_INVALID_ARGUMENT', `target must be a directory: ${realTarget}`)
     const current = stats
-      ? indexEntries(scan(target, {
-        include: manifest.include, exclude: manifest.exclude,
-        maxFiles: this.#maxFiles, maxBytes: this.#maxBytes, hash: manifest.hash,
+      ? indexEntries(scan(realTarget, {
+        include: manifest.include, exclude: manifest.exclude, hash: manifest.hash,
+        ...manifest.limits,
       }).entries)
       : new Map()
     const source = indexEntries(manifest.entries)
+    const symlinkDirs = [...current.values()].filter(entry => entry.type === 'symlink').map(entry => `${entry.rel}/`)
+    if (symlinkDirs.some(prefix => [...source.keys()].some(rel => rel.startsWith(prefix)))) {
+      throw fail('E_OUTSIDE_ROOT', 'target contains a symlink in the path of a restore entry')
+    }
     const add = []
     const overwrite = []
     let unchanged = 0
     for (const [rel, entry] of source) {
       const existing = current.get(rel)
-      if (existing === undefined) add.push(join(target, rel))
-      else if (changesBetween(existing, entry).length > 0) overwrite.push(join(target, rel))
+      if (existing === undefined) add.push(join(realTarget, rel))
+      else if (changesBetween(existing, entry).length > 0) overwrite.push(join(realTarget, rel))
       else unchanged += 1
     }
-    const remove = [...current.keys()].filter(rel => !source.has(rel)).map(rel => join(target, rel))
+    const remove = [...current.keys()].filter(rel => !source.has(rel)).map(rel => join(realTarget, rel))
     add.sort(compare)
     overwrite.sort(compare)
     remove.sort(compare)
     return {
-      schema: PLAN_SCHEMA, id: manifest.id, source: manifest.root, target, createdAt: Date.now(), execute: false,
+      schema: PLAN_SCHEMA, id: manifest.id, source: manifest.root, target: realTarget, createdAt: Date.now(), execute: false,
       counts: { add: add.length, overwrite: overwrite.length, delete: remove.length, unchanged },
       add, overwrite, delete: remove,
     }
@@ -293,6 +304,25 @@ export class BackupService {
   /** Remove a manifest from the ledger; returns whether it existed. */
   forget(id) {
     return this.#snapshots.delete(idOf(id))
+  }
+
+  #record(entry) {
+    this.#audits.push(entry)
+    if (this.#audits.length > AUDIT_MAX) this.#audits.shift()
+  }
+
+  #guard(path, field) {
+    if (isForbidden(path)) {
+      throw fail('E_FORBIDDEN_ROOT', `${field} must not be the filesystem root or the home directory`)
+    }
+    const allowed = this.#allowedRoots.some(root => {
+      let base = root
+      try { base = realpathSync(root) } catch { /* keep the configured path */ }
+      if (base !== root || isForbidden(base)) return false
+      return inside(path, base)
+    })
+    if (!allowed) throw fail('E_OUTSIDE_ROOT', `${field} is outside allowedRoots: ${path}`)
+    return path
   }
 
   #require(id) {
@@ -315,11 +345,11 @@ const tool = (toolName, description, parameters, execute) =>
 export function makeTools(service) {
   return [
     tool('backup_snapshot',
-      'Record a read-only metadata manifest of an absolute directory. Never copies, moves or deletes files.',
+      'Record a read-only metadata manifest of a directory inside the configured allowedRoots. Sensitive paths are excluded and hard limits fail closed. Never copies, moves or deletes files.',
       objectSchema({
-        root: { type: 'string', description: 'Absolute directory path; no ".." segments.' },
+        root: { type: 'string', description: 'Absolute directory path inside allowedRoots; no ".." segments.' },
         include: { type: 'array', items: { type: 'string' }, description: 'Optional relative globs to include.' },
-        exclude: { type: 'array', items: { type: 'string' }, description: 'Optional relative globs to prune.' },
+        exclude: { type: 'array', items: { type: 'string' }, description: 'Optional relative globs to prune (adds to sensitive defaults).' },
       }, ['root']),
       args => service.snapshot(args)),
     tool('backup_diff',
@@ -327,10 +357,10 @@ export function makeTools(service) {
       objectSchema({ idA: { type: 'string' }, idB: { type: 'string' } }, ['idA', 'idB']),
       args => service.diff(args.idA, args.idB)),
     tool('backup_plan_restore',
-      'List the paths a restore into target would add, overwrite or delete. Does not create, write or delete anything.',
+      'List the paths a restore into an allowed target would add, overwrite or delete. Does not create, write or delete anything.',
       objectSchema({
         id: { type: 'string' },
-        target: { type: 'string', description: 'Absolute target directory; no ".." segments.' },
+        target: { type: 'string', description: 'Absolute target directory inside allowedRoots; no ".." segments.' },
       }, ['id', 'target']),
       args => service.planRestore(args.id, { target: args.target })),
   ]

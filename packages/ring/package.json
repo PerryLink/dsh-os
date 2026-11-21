@@ -1,6 +1,6 @@
 {
   "name": "dsh-ring",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Approval SLA and escalation receipts for DeepSeek Harness: ack, escalate, audit and opt-in webhook/ntfy delivery.",
   "type": "module",
   "main": "index.js",
@@ -58,7 +58,8 @@
         "ring_list",
         "ring_receipts",
         "ring_channels",
-        "ring_notify"
+        "ring_notify",
+        "ring_tick"
       ],
       "ui": null,
       "stability": "experimental",

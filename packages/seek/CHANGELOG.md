@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.3.0
+
+- Add `SeekService.resolve(ref, { signal, timeoutMs, cwd, agentKey, agent })`.
+  It validates `dsh://<source>/<id>` refs (`E_INVALID_ARGUMENT` otherwise),
+  routes by `<source>` to that provider's optional `resolve`, and returns
+  `{ ref, found, status, source, checkedAt, title?, freshness? }`. A missing
+  provider or a search-only provider returns `status: "unsupported"`; a
+  provider timeout/failure is isolated into `status: "timeout"`/`"error"`.
+- Add the read-only `seek_resolve` agent tool (`{ ref }`). It forwards the
+  caller's signal, cwd and `agentKey`, and is the first built-in way to verify a
+  Seek ref (`evals/BASELINE.md` evidence-chain gap).
+- `seek_search` hits now carry `resolvable: true` when the hit's source has a
+  `resolve` provider, false otherwise. The ref format was already validated
+  before the marker is set.
+- `locator` provider gains `resolve`: it rebuilds the locator-native
+  `ref://file?path=<absolute>` from the workspace-relative ref id and the
+  caller cwd, calls `locator_resolve` in `mode: "meta"`, and maps
+  `fresh|stale|missing|tombstoned|unknown`. Missing cwd refuses with
+  `E_UNAUTHORIZED`; a locator without `locator_resolve` reports
+  `E_UNAVAILABLE`; resolver errors map locator denials to `E_UNAUTHORIZED`.
+- `memento` provider gains `resolve`: it queries only `user-global` with the
+  caller `agentKey`, matches the ref id, and reports a found entry as
+  `found: true, status: "unknown"` (memory has no verifiable snapshot). A miss
+  is `status: "missing"`; no service/caller refuses closed.
+- `registerProvider` accepts an optional `resolve` function and rejects a
+  non-function value with `invalid_provider`.
+- Keep the entry small: plain-object tools moved to `lib/tools.js`, resolve
+  helpers to `lib/resolve.js` (no new runtime dependencies).
+- Tests cover resolve success/missing/tombstoned, bad refs, unsupported
+  sources, timeout/failure isolation, caller abort, the `seek_resolve` tool,
+  `resolvable` markers, locator native-ref rebuilding/status mapping/ACL
+  refusals, and memento lookup/visibility.
+
 ## 0.2.0
 
 - Add two real first-party providers, auto-registered at mount when their host

@@ -43,11 +43,11 @@ function provider(name, hits, calls = []) {
   }
 }
 
-test('apply provides ctx.evidence and registers all three tools', () => {
+test('apply provides ctx.evidence and registers all four tools', () => {
   const { ctx, service } = setup()
   assert.ok(service instanceof SeekService)
   assert.equal(ctx.get('evidence'), service)
-  assert.deepEqual([...ctx._tools.keys()], ['seek_search', 'seek_providers', 'seek_register_defaults'])
+  assert.deepEqual([...ctx._tools.keys()], ['seek_search', 'seek_resolve', 'seek_providers', 'seek_register_defaults'])
   assert.deepEqual(service.sources(), [
     { name: 'locator', status: 'unavailable', reason: 'locator_find is not registered (install/enable dsh-locator)' },
     { name: 'memento', status: 'unavailable', reason: 'memory service is not available (install/enable dsh-memento)' },
@@ -257,8 +257,9 @@ test('hits are normalized to the documented shape', async () => {
       snippet: 'snip',
       score: 1.5,
       freshness: 'fresh',
+      resolvable: false,
     },
-    { ref: 'dsh://alpha/bare', source: 'alpha', title: '', snippet: '' },
+    { ref: 'dsh://alpha/bare', source: 'alpha', title: '', snippet: '', resolvable: false },
   ])
 })
 
@@ -394,5 +395,231 @@ test('seek_search forwards exec.signal to providers', async () => {
   await assert.rejects(
     ctx._tools.get('seek_search').execute({ query: 'x' }, { signal: { aborted: false } }),
     error => error.code === 'invalid_signal',
+  )
+})
+
+test('resolve routes by source and normalizes the provider answer', async () => {
+  const { service } = setup()
+  const calls = []
+  service.registerProvider({
+    name: 'alpha',
+    search: () => [],
+    async resolve(ref, options) {
+      calls.push({ ref, options })
+      return {
+        status: 'stale',
+        title: 'A',
+        freshness: { state: 'stale', observedAt: 9 },
+        checkedAt: 1234,
+      }
+    },
+  })
+
+  const result = await service.resolve('dsh://alpha/a', {
+    cwd: '/work',
+    agentKey: 'reviewer',
+    agent: { session: { id: 's1' } },
+  })
+  assert.deepEqual(result, {
+    ref: 'dsh://alpha/a',
+    found: true,
+    status: 'stale',
+    source: 'alpha',
+    checkedAt: 1234,
+    title: 'A',
+    freshness: { state: 'stale', observedAt: 9 },
+  })
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].ref, 'dsh://alpha/a')
+  assert.equal(calls[0].options.source, 'alpha')
+  assert.equal(calls[0].options.id, 'a')
+  assert.equal(calls[0].options.cwd, '/work')
+  assert.equal(calls[0].options.agentKey, 'reviewer')
+  assert.equal(calls[0].options.agent.session.id, 's1')
+  assert.ok(calls[0].options.signal instanceof AbortSignal)
+  assert.equal(calls[0].options.signal.aborted, false)
+})
+
+test('resolve reports missing and tombstoned refs as not found', async () => {
+  const { service } = setup()
+  service.registerProvider({
+    name: 'alpha',
+    search: () => [],
+    resolve: () => ({ status: 'missing', checkedAt: 7 }),
+  })
+  const missing = await service.resolve('dsh://alpha/gone')
+  assert.deepEqual(missing, {
+    ref: 'dsh://alpha/gone',
+    found: false,
+    status: 'missing',
+    source: 'alpha',
+    checkedAt: 7,
+  })
+
+  service.unregisterProvider('alpha')
+  service.registerProvider({
+    name: 'alpha',
+    search: () => [],
+    resolve: () => ({ found: false, status: 'tombstoned' }),
+  })
+  const tombstoned = await service.resolve('dsh://alpha/old')
+  assert.equal(tombstoned.found, false)
+  assert.equal(tombstoned.status, 'tombstoned')
+  assert.equal(typeof tombstoned.checkedAt, 'number')
+})
+
+test('resolve rejects malformed refs and options with E_INVALID_ARGUMENT', async () => {
+  const { service } = setup()
+  for (const bad of [
+    undefined,
+    null,
+    '',
+    'ref://locator/x',
+    'dsh:///x',
+    'dsh://Locator/x',
+    'dsh://locator/',
+    'dsh://locator/a b',
+    'dsh://locator/../secret',
+  ]) {
+    await assert.rejects(
+      service.resolve(bad),
+      error => error.code === 'E_INVALID_ARGUMENT',
+      `expected invalid ref: ${String(bad)}`,
+    )
+  }
+  await assert.rejects(
+    service.resolve('dsh://ghost/x', null),
+    error => error.code === 'E_INVALID_ARGUMENT',
+  )
+  await assert.rejects(
+    service.resolve('dsh://ghost/x', { timeoutMs: 0 }),
+    error => error.code === 'invalid_timeout',
+  )
+  await assert.rejects(
+    service.resolve('dsh://ghost/x', { signal: {} }),
+    error => error.code === 'invalid_signal',
+  )
+})
+
+test('resolve returns unsupported without a provider or a resolve function', async () => {
+  const { service } = setup()
+  const ghost = await service.resolve('dsh://ghost/x')
+  assert.equal(ghost.found, false)
+  assert.equal(ghost.status, 'unsupported')
+  assert.equal(ghost.source, 'ghost')
+  assert.equal(typeof ghost.checkedAt, 'number')
+
+  service.registerProvider({ name: 'plain', search: () => [] })
+  const plain = await service.resolve('dsh://plain/x')
+  assert.equal(plain.found, false)
+  assert.equal(plain.status, 'unsupported')
+  assert.equal(plain.source, 'plain')
+})
+
+test('resolve isolates provider timeout, failure and malformed answers', async () => {
+  const { service } = setup()
+  service.registerProvider({
+    name: 'slow',
+    search: () => [],
+    resolve: () => new Promise(() => {}),
+  })
+  const started = Date.now()
+  const timedOut = await service.resolve('dsh://slow/x', { timeoutMs: 25 })
+  assert.ok(Date.now() - started < 1000)
+  assert.equal(timedOut.found, false)
+  assert.equal(timedOut.status, 'timeout')
+  assert.equal(timedOut.source, 'slow')
+  assert.equal(timedOut.error.code, 'provider_timeout')
+
+  service.registerProvider({
+    name: 'broken',
+    search: () => [],
+    resolve: () => {
+      throw Object.assign(new Error('boom'), { code: 'E_UNAVAILABLE' })
+    },
+  })
+  const failed = await service.resolve('dsh://broken/x')
+  assert.equal(failed.status, 'error')
+  assert.deepEqual(failed.error, { code: 'E_UNAVAILABLE', message: 'boom' })
+
+  service.registerProvider({ name: 'weird', search: () => [], resolve: () => ({ status: 'fresh-ish' }) })
+  const malformed = await service.resolve('dsh://weird/x')
+  assert.equal(malformed.status, 'error')
+  assert.equal(malformed.error.code, 'E_STATE')
+})
+
+test('resolve forwards caller cancellation', async () => {
+  const { service } = setup()
+  service.registerProvider({
+    name: 'slow',
+    search: () => [],
+    resolve: (_ref, options) => new Promise((_resolve, reject) => {
+      options.signal.addEventListener('abort', () => reject(options.signal.reason), { once: true })
+    }),
+  })
+  const controller = new AbortController()
+  const pending = service.resolve('dsh://slow/x', { signal: controller.signal, timeoutMs: 5000 })
+  await new Promise(resolve => setImmediate(resolve))
+  controller.abort()
+  await assert.rejects(pending, error => error.code === 'aborted')
+})
+
+test('seek_search marks hits resolvable only when the source has resolve', async () => {
+  const { service } = setup()
+  service.registerProvider({
+    name: 'alpha',
+    search: () => [hit('dsh://alpha/a', 0.4)],
+    resolve: () => ({ status: 'fresh' }),
+  })
+  service.registerProvider(provider('beta', [hit('dsh://beta/b', 0.5)]))
+
+  const result = await service.search('x')
+  assert.deepEqual(result.hits.map(item => [item.ref, item.resolvable]), [
+    ['dsh://beta/b', false],
+    ['dsh://alpha/a', true],
+  ])
+})
+
+test('registerProvider rejects a non-function resolve', () => {
+  const { service } = setup()
+  assert.throws(
+    () => service.registerProvider({ name: 'alpha', search: () => [], resolve: true }),
+    error => error.code === 'invalid_provider',
+  )
+})
+
+test('seek_resolve tool calls the service and forwards the caller context', async () => {
+  const { ctx, service } = setup()
+  let seen
+  service.registerProvider({
+    name: 'alpha',
+    search: () => [],
+    async resolve(ref, options) {
+      seen = options
+      return { status: 'fresh', title: 'A', checkedAt: 5 }
+    },
+  })
+  const exec = {
+    agent: { session: { id: 's1', header: { cwd: '/work', agentPreset: 'reviewer' } } },
+    signal: new AbortController().signal,
+  }
+  const result = await ctx._tools.get('seek_resolve').execute({ ref: 'dsh://alpha/a' }, exec)
+  assert.deepEqual(result, {
+    ref: 'dsh://alpha/a',
+    found: true,
+    status: 'fresh',
+    source: 'alpha',
+    checkedAt: 5,
+    title: 'A',
+  })
+  assert.equal(seen.cwd, '/work')
+  assert.equal(seen.agentKey, 'reviewer')
+  assert.equal(seen.agent.session.id, 's1')
+  assert.ok(seen.signal instanceof AbortSignal)
+  assert.equal(seen.signal.aborted, false)
+
+  await assert.rejects(
+    ctx._tools.get('seek_resolve').execute({}),
+    error => error.code === 'E_INVALID_ARGUMENT',
   )
 })

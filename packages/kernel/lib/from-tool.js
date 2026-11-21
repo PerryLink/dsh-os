@@ -4,7 +4,7 @@
  */
 import { normalizeDescriptor } from './descriptor.js'
 
-const EXECUTE = ['exec', 'invoke', 'run', 'spawn', 'shell', 'fire', 'apply', 'move', 'resize', 'undo', 'capture', 'start', 'stop', 'trigger', 'kill']
+const EXECUTE = ['exec', 'execute', 'invoke', 'run', 'spawn', 'shell', 'fire', 'apply', 'move', 'resize', 'undo', 'capture', 'start', 'stop', 'trigger', 'kill']
 const WRITE = ['write', 'set', 'add', 'remove', 'delete', 'forget', 'clear', 'issue', 'revoke', 'send', 'raise', 'ack', 'escalate', 'register', 'import', 'restore', 'snapshot', 'budget', 'remember', 'open', 'close', 'create', 'update', 'save', 'put', 'notify', 'layout']
 
 const firstLine = text => String(text ?? '').trim().split(/\r?\n/)[0].trim()

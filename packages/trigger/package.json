@@ -1,6 +1,6 @@
 {
   "name": "dsh-trigger",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Event-to-action trigger fabric for DeepSeek Harness: condition DSL, cooldown, run ledger and real agent / fs / webhook event sources.",
   "type": "module",
   "main": "index.js",

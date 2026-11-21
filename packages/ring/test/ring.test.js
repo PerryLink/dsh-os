@@ -43,10 +43,10 @@ function mockFetch(handler) {
   return { calls, restore: () => { globalThis.fetch = original } }
 }
 
-test('apply provides ctx.ring and registers seven plain tool definitions', () => {
+test('apply provides ctx.ring and registers eight plain tool definitions', () => {
   const { ctx } = setup()
   assert.ok(ctx.get('ring') instanceof RingService)
-  assert.deepEqual([...ctx._tools.keys()], ['ring_raise', 'ring_ack', 'ring_escalate', 'ring_list', 'ring_receipts', 'ring_channels', 'ring_notify'])
+  assert.deepEqual([...ctx._tools.keys()], ['ring_raise', 'ring_ack', 'ring_escalate', 'ring_list', 'ring_receipts', 'ring_channels', 'ring_notify', 'ring_tick'])
   for (const tool of ctx._tools.values()) {
     assert.equal(tool.parameters.type, 'object')
     assert.equal(typeof tool.execute, 'function')
@@ -86,7 +86,7 @@ test('raise -> tick(t0) -> notified -> ack -> resolve, with receipts', async () 
 
   const receipts = service.receipts(raised.id)
   assert.deepEqual(receipts.map(receipt => receipt.kind), ['delivery', 'ack', 'decision'])
-  assert.deepEqual(receipts[0], { id: receipts[0].id, caseId: raised.id, kind: 'delivery', at: T0, channel: 'local', to: 't0' })
+  assert.deepEqual(receipts[0], { id: receipts[0].id, caseId: raised.id, kind: 'delivery', at: T0, channel: 'local', to: 't0', source: 'tick', delivered: false })
   assert.deepEqual(receipts[1], { id: receipts[1].id, caseId: raised.id, kind: 'ack', at: T0, by: 'alice' })
   for (const receipt of receipts) {
     assert.equal(typeof receipt.id, 'string')
@@ -330,6 +330,90 @@ test('a late page can target any level on a case that expired at t3', async () =
   assert.equal(late.state, 'escalated')
   assert.equal(late.level, 3)
   assert.equal(service.receipts(kase.id).at(-1).to, 't1')
+})
+
+test('ring_notify writes a delivery receipt on success and failure, and dedupes repeats', async () => {
+  const { service } = setup()
+  const lines = []
+  service.configureChannels({ console: { write: line => lines.push(line) } })
+  const kase = service.raise({ source: 'manual' })
+
+  const first = await service.notify(kase, { channel: 'console' })
+  assert.equal(first.delivery.ok, true)
+  assert.equal(first.delivery.channel, 'console')
+  assert.equal(first.delivery.dedupeKey, `${kase.id}:t0:console`)
+  assert.equal(lines.length, 1)
+
+  const again = await service.notify(kase, { channel: 'console' })
+  assert.equal(again.deduped, true)
+  assert.deepEqual(again.delivery, first.delivery)
+  assert.equal(lines.length, 1)
+  const receipts = service.receipts(kase.id)
+  assert.equal(receipts.length, 1)
+  assert.deepEqual(receipts[0], {
+    id: receipts[0].id,
+    caseId: kase.id,
+    kind: 'delivery',
+    at: 0,
+    channel: 'console',
+    ok: true,
+    error: null,
+    dedupeKey: first.delivery.dedupeKey,
+    source: 'notify',
+  })
+
+  await assert.rejects(service.notify(kase, { channel: 'webhook' }), { code: 'E_UNAVAILABLE' })
+  const failed = service.receipts(kase.id).at(-1)
+  assert.equal(failed.kind, 'delivery')
+  assert.equal(failed.source, 'notify')
+  assert.equal(failed.channel, 'webhook')
+  assert.equal(failed.ok, false)
+  assert.equal(failed.error, 'E_UNAVAILABLE')
+  assert.equal(failed.dedupeKey, `${kase.id}:t0:webhook`)
+  // A failure stays retryable: it is not added to the success dedupe set.
+  await assert.rejects(service.notify(kase, { channel: 'webhook' }), { code: 'E_UNAVAILABLE' })
+  assert.equal(service.receipts(kase.id).length, 3)
+  assert.equal(service.receipts(kase.id).at(-1).dedupeKey, failed.dedupeKey)
+})
+
+test('ring_tick tool advances the SLA and returns escalation and delivery results', async () => {
+  const { ctx, service } = setup()
+  const tools = ctx._tools
+  const raised = await tools.get('ring_raise').execute({ source: 'approval' })
+  const unconfigured = await tools.get('ring_tick').execute({ at: T1 })
+  assert.equal(unconfigured.now, T1)
+  assert.deepEqual(unconfigured.receipts.map(receipt => receipt.kind), ['delivery', 'escalation'])
+  assert.equal(unconfigured.receipts[0].source, 'tick')
+  assert.equal(unconfigured.receipts[0].delivered, false)
+  assert.deepEqual(unconfigured.deliveries, [])
+  assert.equal(unconfigured.cases[0].state, 'escalated')
+  assert.equal(unconfigured.cases[0].level, 1)
+
+  const lines = []
+  service.configureChannels({ console: { write: line => lines.push(line) } })
+  const other = await tools.get('ring_raise').execute({ source: 'manual' })
+  const ticked = await tools.get('ring_tick').execute({ at: T3 })
+  assert.equal(ticked.now, T3)
+  // The first case catches up to t3; the new case gets t0 plus a t3 escalation.
+  assert.deepEqual(ticked.receipts.map(receipt => receipt.kind), ['escalation', 'delivery', 'escalation'])
+  assert.equal(ticked.receipts[1].source, 'tick')
+  assert.equal(ticked.receipts[1].delivered, true)
+  assert.equal(ticked.receipts[1].ok, true)
+  assert.equal(ticked.deliveries.length, 1)
+  assert.equal(ticked.deliveries[0].channel, 'console')
+  assert.equal(ticked.deliveries[0].ok, true)
+  assert.equal(lines.length, 1)
+  assert.deepEqual(ticked.cases.map(item => item.id), [raised.case.id, other.case.id])
+  for (const item of ticked.cases) {
+    assert.equal(item.state, 'escalated')
+    assert.equal(item.level, 3)
+  }
+
+  const atClock = await tools.get('ring_tick').execute({})
+  assert.equal(atClock.now, 0)
+  assert.deepEqual(atClock.cases, [])
+  assert.deepEqual(atClock.deliveries, [])
+  await assert.rejects(tools.get('ring_tick').execute({ at: -1 }), { code: 'E_INPUT' })
 })
 
 test('channels are off by default and configureChannels validates every provider', async () => {

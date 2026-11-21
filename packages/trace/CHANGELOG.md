@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.3.0
+
+- `trace_remember` can now verify a `dsh://` source before storing it. When
+  `ctx.get('evidence').resolve` exists (dsh-seek 0.3.0), the tool resolves the
+  ref and refuses `found: false` with `E_REF_NOT_FOUND`; a verified write also
+  returns the `verification` block.
+- Add `apply(ctx, { verifyRefs, refVerifyMode, verifyTimeoutMs })`:
+  `verifyRefs` defaults to **true**, `refVerifyMode: "warn"` stores the record
+  with an `E_REF_NOT_FOUND` warning instead of rejecting it, and
+  `verifyTimeoutMs` (default 10000) bounds each resolve call.
+- Verification is skipped for non-`dsh://` sources and when no evidence
+  service with `resolve` is mounted, so Trace keeps working as a standalone
+  ledger; the evidence lookup is lazy and picks up a later-mounted Seek without
+  re-applying Trace.
+- Raise the provenance `source` cap from 256 to 2048 characters so a full
+  evidence ref fits.
+- Move the tool definitions to `lib/tools.js`, the verifier to `lib/verify.js`
+  and shared limits/enums to `lib/constants.js`; no new runtime dependencies.
+- Tests cover verified writes, not-found refusal (the fake-ref regression from
+  `evals/BASELINE.md`), timeout/error mapping, warn mode, `verifyRefs: false`,
+  non-dsh sources, missing evidence service and `verifyTimeoutMs` forwarding.
+
 ## 0.2.0
 
 - Add the `dsh-memory-protocol/v1` bridge to `dsh-memento` in `lib/memento.js`:

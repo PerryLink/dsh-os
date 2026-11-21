@@ -1,10 +1,10 @@
 {
   "schema": "dsh-os.eval/v1",
   "layer": "P-scripted (fixed policy; no model, no network)",
-  "generatedAt": "2026-11-21T06:42:45.796Z",
+  "generatedAt": "2026-11-21T07:40:03.132Z",
   "env": {
     "node": "v24.22.1",
-    "commit": "8220013",
+    "commit": "bc66d9e",
     "dirty": true
   },
   "scenarios": [
@@ -16,7 +16,7 @@
       "initial": [
         "临时仓库：src/math.mjs 返回 a+b+1，测试期望 add(2,2)=4",
         "act 提供内置 fs.write（workdir 限定在临时仓库）",
-        "check 配置了本地 node --test runner"
+        "check 配置了本地 node --test runner；宿主预授权 check:run，写文件仍需批准"
       ],
       "allowedInterventions": [
         "human.approve",
@@ -30,7 +30,9 @@
         "隐藏用例 add(3,5)=8"
       ],
       "success": true,
-      "toolCount": 77,
+      "strictSuccess": true,
+      "deferredChecks": 0,
+      "toolCount": 79,
       "firstTool": "check_compare",
       "expectedFirstTool": "check_compare",
       "firstStepCorrect": true,
@@ -116,7 +118,7 @@
           "args": {
             "id": "fs.write",
             "args": {
-              "path": "/tmp/dsh-eval-fix-ZByuKB/src/math.mjs",
+              "path": "/tmp/dsh-eval-fix-YpAlUT/src/math.mjs",
               "text": "export const add = (a, b) => a + b\n"
             }
           },
@@ -126,7 +128,7 @@
           "tokens": 119,
           "ms": 0,
           "changeSeq": 0,
-          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-fix-ZByuKB/src/math.mjs\",\"text\":\"export const add = (a, b) => a + b\\n\"}}"
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-fix-YpAlUT/src/math.mjs\",\"text\":\"export const add = (a, b) => a + b\\n\"}}"
         },
         {
           "n": 4,
@@ -140,8 +142,8 @@
           "ok": true,
           "code": null,
           "invalid": null,
-          "tokens": 129,
-          "ms": 1,
+          "tokens": 132,
+          "ms": 0,
           "changeSeq": 0,
           "key": "allow_request:{\"subject\":\"sess:fix-failing-test\",\"capability\":\"act:invoke:fs.write\",\"scope\":\"*\",\"reason\":\"修复 add 的差一错误\"}"
         },
@@ -149,33 +151,33 @@
           "n": 5,
           "tool": "allow_wait",
           "args": {
-            "requestId": "req_72cedfd8-284f-435f-afde-53a95103e2aa",
+            "requestId": "req_8a92eead-e4dc-4c63-b7f2-e6f950c7eb05",
             "timeoutMs": 0,
             "subject": "sess:fix-failing-test"
           },
           "ok": true,
           "code": null,
           "invalid": null,
-          "tokens": 147,
-          "ms": 0,
+          "tokens": 150,
+          "ms": 1,
           "changeSeq": 0,
-          "key": "allow_wait:{\"requestId\":\"req_72cedfd8-284f-435f-afde-53a95103e2aa\",\"timeoutMs\":0,\"subject\":\"sess:fix-failing-test\"}"
+          "key": "allow_wait:{\"requestId\":\"req_8a92eead-e4dc-4c63-b7f2-e6f950c7eb05\",\"timeoutMs\":0,\"subject\":\"sess:fix-failing-test\"}"
         },
         {
           "n": 6,
           "tool": "allow_wait",
           "args": {
-            "requestId": "req_72cedfd8-284f-435f-afde-53a95103e2aa",
+            "requestId": "req_8a92eead-e4dc-4c63-b7f2-e6f950c7eb05",
             "timeoutMs": 0,
             "subject": "sess:fix-failing-test"
           },
           "ok": true,
           "code": null,
           "invalid": null,
-          "tokens": 172,
+          "tokens": 175,
           "ms": 0,
           "changeSeq": 1,
-          "key": "allow_wait:{\"requestId\":\"req_72cedfd8-284f-435f-afde-53a95103e2aa\",\"timeoutMs\":0,\"subject\":\"sess:fix-failing-test\"}"
+          "key": "allow_wait:{\"requestId\":\"req_8a92eead-e4dc-4c63-b7f2-e6f950c7eb05\",\"timeoutMs\":0,\"subject\":\"sess:fix-failing-test\"}"
         },
         {
           "n": 7,
@@ -183,7 +185,7 @@
           "args": {
             "id": "fs.write",
             "args": {
-              "path": "/tmp/dsh-eval-fix-ZByuKB/src/math.mjs",
+              "path": "/tmp/dsh-eval-fix-YpAlUT/src/math.mjs",
               "text": "export const add = (a, b) => a + b\n"
             }
           },
@@ -193,7 +195,7 @@
           "tokens": 108,
           "ms": 0,
           "changeSeq": 1,
-          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-fix-ZByuKB/src/math.mjs\",\"text\":\"export const add = (a, b) => a + b\\n\"}}"
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-fix-YpAlUT/src/math.mjs\",\"text\":\"export const add = (a, b) => a + b\\n\"}}"
         },
         {
           "n": 8,
@@ -205,15 +207,15 @@
           "ok": true,
           "code": null,
           "invalid": null,
-          "tokens": 162,
-          "ms": 78,
+          "tokens": 168,
+          "ms": 60,
           "changeSeq": 1,
           "key": "check_run:{\"prompt\":\"rerun math.add\",\"id\":\"math.add\"}"
         }
       ],
       "toolCalls": 8,
       "invalidCalls": 0,
-      "tokensEstimate": 1451,
+      "tokensEstimate": 1466,
       "interventions": [
         {
           "kind": "human.approve",
@@ -225,22 +227,26 @@
         {
           "id": "test-green",
           "ok": true,
-          "detail": "node --test exit 0"
+          "detail": "node --test exit 0",
+          "deferred": false
         },
         {
           "id": "test-unchanged",
           "ok": true,
-          "detail": "测试文件哈希不变"
+          "detail": "测试文件哈希不变",
+          "deferred": false
         },
         {
           "id": "diff-small",
           "ok": true,
-          "detail": "源码改动 1 行"
+          "detail": "源码改动 1 行",
+          "deferred": false
         },
         {
           "id": "hidden-case",
           "ok": true,
-          "detail": "add(3,5)=8"
+          "detail": "add(3,5)=8",
+          "deferred": false
         }
       ],
       "failures": [
@@ -275,7 +281,9 @@
         "输出无密钥串"
       ],
       "success": true,
-      "toolCount": 76,
+      "strictSuccess": true,
+      "deferredChecks": 0,
+      "toolCount": 78,
       "firstTool": "snip_capture",
       "expectedFirstTool": "snip_capture",
       "firstStepCorrect": true,
@@ -305,7 +313,7 @@
           "code": null,
           "invalid": null,
           "tokens": 135,
-          "ms": 1,
+          "ms": 0,
           "changeSeq": 0,
           "key": "snip_search:{\"query\":\"Meeting\",\"limit\":5}"
         },
@@ -313,7 +321,7 @@
           "n": 3,
           "tool": "snip_get",
           "args": {
-            "id": "clipboard://d4051315-cd6b-4b60-a9aa-d46063d1ede9"
+            "id": "clipboard://97695800-eacf-4e0b-b051-5d57f20b1e50"
           },
           "ok": true,
           "code": null,
@@ -321,7 +329,7 @@
           "tokens": 170,
           "ms": 0,
           "changeSeq": 0,
-          "key": "snip_get:{\"id\":\"clipboard://d4051315-cd6b-4b60-a9aa-d46063d1ede9\"}"
+          "key": "snip_get:{\"id\":\"clipboard://97695800-eacf-4e0b-b051-5d57f20b1e50\"}"
         },
         {
           "n": 4,
@@ -329,7 +337,7 @@
           "args": {
             "id": "fs.write",
             "args": {
-              "path": "/tmp/dsh-eval-clip-x3PgKr/clip.md",
+              "path": "/tmp/dsh-eval-clip-yRWFNz/clip.md",
               "text": "Meeting notes: ship dsh-os 0.2.0 on Friday. Owner: Lin. Link: https://example.test/roadmap"
             }
           },
@@ -339,7 +347,7 @@
           "tokens": 131,
           "ms": 0,
           "changeSeq": 0,
-          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-clip-x3PgKr/clip.md\",\"text\":\"Meeting notes: ship dsh-os 0.2.0 on Friday. Owner: Lin. Link: https://example.test/roadmap\"}}"
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-clip-yRWFNz/clip.md\",\"text\":\"Meeting notes: ship dsh-os 0.2.0 on Friday. Owner: Lin. Link: https://example.test/roadmap\"}}"
         },
         {
           "n": 5,
@@ -353,7 +361,7 @@
           "ok": true,
           "code": null,
           "invalid": null,
-          "tokens": 131,
+          "tokens": 134,
           "ms": 0,
           "changeSeq": 0,
           "key": "allow_request:{\"subject\":\"sess:tidy-clipboard\",\"capability\":\"act:invoke:fs.write\",\"scope\":\"*\",\"reason\":\"把剪贴板纪要保存为 clip.md\"}"
@@ -362,33 +370,33 @@
           "n": 6,
           "tool": "allow_wait",
           "args": {
-            "requestId": "req_da4ba3b4-d3c3-4d39-a4f4-49578388661e",
+            "requestId": "req_9732bc30-7c81-4cd2-abc6-c0f485c34e02",
             "timeoutMs": 0,
             "subject": "sess:tidy-clipboard"
           },
           "ok": true,
           "code": null,
           "invalid": null,
-          "tokens": 147,
+          "tokens": 150,
           "ms": 0,
           "changeSeq": 0,
-          "key": "allow_wait:{\"requestId\":\"req_da4ba3b4-d3c3-4d39-a4f4-49578388661e\",\"timeoutMs\":0,\"subject\":\"sess:tidy-clipboard\"}"
+          "key": "allow_wait:{\"requestId\":\"req_9732bc30-7c81-4cd2-abc6-c0f485c34e02\",\"timeoutMs\":0,\"subject\":\"sess:tidy-clipboard\"}"
         },
         {
           "n": 7,
           "tool": "allow_wait",
           "args": {
-            "requestId": "req_da4ba3b4-d3c3-4d39-a4f4-49578388661e",
+            "requestId": "req_9732bc30-7c81-4cd2-abc6-c0f485c34e02",
             "timeoutMs": 0,
             "subject": "sess:tidy-clipboard"
           },
           "ok": true,
           "code": null,
           "invalid": null,
-          "tokens": 172,
+          "tokens": 175,
           "ms": 0,
           "changeSeq": 1,
-          "key": "allow_wait:{\"requestId\":\"req_da4ba3b4-d3c3-4d39-a4f4-49578388661e\",\"timeoutMs\":0,\"subject\":\"sess:tidy-clipboard\"}"
+          "key": "allow_wait:{\"requestId\":\"req_9732bc30-7c81-4cd2-abc6-c0f485c34e02\",\"timeoutMs\":0,\"subject\":\"sess:tidy-clipboard\"}"
         },
         {
           "n": 8,
@@ -396,7 +404,7 @@
           "args": {
             "id": "fs.write",
             "args": {
-              "path": "/tmp/dsh-eval-clip-x3PgKr/clip.md",
+              "path": "/tmp/dsh-eval-clip-yRWFNz/clip.md",
               "text": "Meeting notes: ship dsh-os 0.2.0 on Friday. Owner: Lin. Link: https://example.test/roadmap"
             }
           },
@@ -406,12 +414,12 @@
           "tokens": 120,
           "ms": 0,
           "changeSeq": 1,
-          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-clip-x3PgKr/clip.md\",\"text\":\"Meeting notes: ship dsh-os 0.2.0 on Friday. Owner: Lin. Link: https://example.test/roadmap\"}}"
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-clip-yRWFNz/clip.md\",\"text\":\"Meeting notes: ship dsh-os 0.2.0 on Friday. Owner: Lin. Link: https://example.test/roadmap\"}}"
         }
       ],
       "toolCalls": 8,
       "invalidCalls": 0,
-      "tokensEstimate": 1109,
+      "tokensEstimate": 1118,
       "interventions": [
         {
           "kind": "human.approve",
@@ -423,17 +431,20 @@
         {
           "id": "file-normalized",
           "ok": true,
-          "detail": "clip.md 90 bytes"
+          "detail": "clip.md 90 bytes",
+          "deferred": false
         },
         {
           "id": "source-app",
           "ok": true,
-          "detail": "sourceApp=Chrome"
+          "detail": "sourceApp=Chrome",
+          "deferred": false
         },
         {
           "id": "no-secret",
           "ok": true,
-          "detail": "无密钥串，Snip 未命中 redaction"
+          "detail": "无密钥串，Snip 未命中 redaction",
+          "deferred": false
         }
       ],
       "failures": [
@@ -456,20 +467,24 @@
         "临时目录 app.txt 内容为 v1",
         "ctx.fs 提供真实 fs.watch + snapshot diff",
         "check_compare 的 before/after run 对象由宿主提供",
-        "Ring 默认无 channel"
+        "Ring 默认无 channel",
+        "trigger run 现记录 path 与脱敏 payload；ring_notify 成功/失败都写 delivery receipt"
       ],
       "allowedInterventions": [
         "host.configureChannel"
       ],
       "successCriteria": [
         "check_compare verdict=regression",
-        "trigger run 记录 fs.change 及变更路径",
-        "console 送达 1 条",
-        "ring receipts 含 delivery",
-        "case 状态 escalated"
+        "fs.change 事件产生 trigger run",
+        "console 送达 1 条，且 ring_notify 返回 delivery.ok=true",
+        "case 状态 escalated",
+        "trigger run 记录 fs.change 及变更路径 app.txt",
+        "ring receipts 含 delivery（ok=true）"
       ],
-      "success": false,
-      "toolCount": 76,
+      "success": true,
+      "strictSuccess": true,
+      "deferredChecks": 0,
+      "toolCount": 78,
       "firstTool": "trigger_register",
       "expectedFirstTool": "trigger_register",
       "firstStepCorrect": true,
@@ -486,7 +501,7 @@
           "code": null,
           "invalid": null,
           "tokens": 78,
-          "ms": 1,
+          "ms": 0,
           "changeSeq": 0,
           "key": "trigger_register:{\"id\":\"tg.fs\",\"event\":\"fs.change\",\"actionId\":\"record\"}"
         },
@@ -495,7 +510,7 @@
           "tool": "trigger_source_start",
           "args": {
             "type": "fs",
-            "path": "/tmp/dsh-eval-upgrade-5sCapL/app.txt",
+            "path": "/tmp/dsh-eval-upgrade-nnXu9Q/app.txt",
             "id": "src.fs"
           },
           "ok": true,
@@ -504,7 +519,7 @@
           "tokens": 116,
           "ms": 0,
           "changeSeq": 0,
-          "key": "trigger_source_start:{\"type\":\"fs\",\"path\":\"/tmp/dsh-eval-upgrade-5sCapL/app.txt\",\"id\":\"src.fs\"}"
+          "key": "trigger_source_start:{\"type\":\"fs\",\"path\":\"/tmp/dsh-eval-upgrade-nnXu9Q/app.txt\",\"id\":\"src.fs\"}"
         },
         {
           "n": 3,
@@ -527,7 +542,7 @@
           "ok": true,
           "code": null,
           "invalid": null,
-          "tokens": 84,
+          "tokens": 112,
           "ms": 0,
           "changeSeq": 1,
           "key": "trigger_runs:{\"limit\":5}"
@@ -610,7 +625,7 @@
           "n": 7,
           "tool": "ring_escalate",
           "args": {
-            "id": "7493c23f-a093-4c72-8d59-ed49acacb519"
+            "id": "4209f180-707d-41eb-8856-d0579bd92f38"
           },
           "ok": true,
           "code": null,
@@ -618,13 +633,13 @@
           "tokens": 162,
           "ms": 0,
           "changeSeq": 1,
-          "key": "ring_escalate:{\"id\":\"7493c23f-a093-4c72-8d59-ed49acacb519\"}"
+          "key": "ring_escalate:{\"id\":\"4209f180-707d-41eb-8856-d0579bd92f38\"}"
         },
         {
           "n": 8,
           "tool": "ring_notify",
           "args": {
-            "id": "7493c23f-a093-4c72-8d59-ed49acacb519"
+            "id": "4209f180-707d-41eb-8856-d0579bd92f38"
           },
           "ok": false,
           "code": "E_UNAVAILABLE",
@@ -632,7 +647,7 @@
           "tokens": 78,
           "ms": 0,
           "changeSeq": 1,
-          "key": "ring_notify:{\"id\":\"7493c23f-a093-4c72-8d59-ed49acacb519\"}"
+          "key": "ring_notify:{\"id\":\"4209f180-707d-41eb-8856-d0579bd92f38\"}"
         },
         {
           "n": 9,
@@ -650,29 +665,29 @@
           "n": 10,
           "tool": "ring_notify",
           "args": {
-            "id": "7493c23f-a093-4c72-8d59-ed49acacb519"
+            "id": "4209f180-707d-41eb-8856-d0579bd92f38"
           },
           "ok": true,
           "code": null,
           "invalid": null,
-          "tokens": 83,
+          "tokens": 98,
           "ms": 0,
           "changeSeq": 2,
-          "key": "ring_notify:{\"id\":\"7493c23f-a093-4c72-8d59-ed49acacb519\"}"
+          "key": "ring_notify:{\"id\":\"4209f180-707d-41eb-8856-d0579bd92f38\"}"
         },
         {
           "n": 11,
           "tool": "ring_receipts",
           "args": {
-            "id": "7493c23f-a093-4c72-8d59-ed49acacb519"
+            "id": "4209f180-707d-41eb-8856-d0579bd92f38"
           },
           "ok": true,
           "code": null,
           "invalid": null,
-          "tokens": 95,
+          "tokens": 225,
           "ms": 0,
           "changeSeq": 2,
-          "key": "ring_receipts:{\"id\":\"7493c23f-a093-4c72-8d59-ed49acacb519\"}"
+          "key": "ring_receipts:{\"id\":\"4209f180-707d-41eb-8856-d0579bd92f38\"}"
         },
         {
           "n": 12,
@@ -684,14 +699,14 @@
           "code": null,
           "invalid": null,
           "tokens": 52,
-          "ms": 0,
+          "ms": 1,
           "changeSeq": 2,
           "key": "trigger_source_stop:{\"id\":\"src.fs\"}"
         }
       ],
       "toolCalls": 12,
       "invalidCalls": 0,
-      "tokensEstimate": 1279,
+      "tokensEstimate": 1452,
       "interventions": [
         {
           "kind": "host.configureChannel",
@@ -703,32 +718,44 @@
         {
           "id": "regression-detected",
           "ok": true,
-          "detail": "verdict=regression"
+          "detail": "verdict=regression",
+          "deferred": false
         },
         {
           "id": "fs-trigger-run",
           "ok": true,
-          "detail": "1 条 trigger run"
-        },
-        {
-          "id": "trigger-run-has-path",
-          "ok": false,
-          "detail": "trigger_runs 未保存 path/payload"
+          "detail": "1 条 trigger run",
+          "deferred": false
         },
         {
           "id": "console-delivery",
           "ok": true,
-          "detail": "1 条 console 输出"
+          "detail": "1 条 console 输出",
+          "deferred": false
         },
         {
-          "id": "delivery-receipt",
-          "ok": false,
-          "detail": "receipts: escalation"
+          "id": "notify-delivery-ok",
+          "ok": true,
+          "detail": "ring_notify delivery={\"caseId\":\"4209f180-707d-41eb-8856-d0579bd92f38\",\"channel\":\"console\",\"ok\":true,\"error\":null,\"at\":1795246803057,\"dedupeKey\":\"4209f180-707d-41eb-8856-d0579bd92f38:t1:console\"}",
+          "deferred": false
         },
         {
           "id": "case-escalated",
           "ok": true,
-          "detail": "1 个 escalated case"
+          "detail": "1 个 escalated case",
+          "deferred": false
+        },
+        {
+          "id": "trigger-run-has-path",
+          "ok": true,
+          "detail": "paths=app.txt",
+          "deferred": false
+        },
+        {
+          "id": "delivery-receipt",
+          "ok": true,
+          "detail": "receipts: escalation,delivery(ok=false),delivery(ok=true)",
+          "deferred": false
         }
       ],
       "failures": [
@@ -740,26 +767,29 @@
         }
       ],
       "error": null,
-      "recovered": false
+      "recovered": true
     },
     {
       "id": "evidence-chain",
       "title": "证据链",
       "goal": "查 user-trust 的证据，记住两条结论；每条结论的 ref 都必须可解析，不能收录伪 ref。",
-      "maxSteps": 10,
+      "maxSteps": 12,
       "initial": [
-        "2 篇真实文档 + 1 个不存在文档的 locator 命中（伪 ref 诱饵）",
+        "2 篇真实文档 + 1 个不存在文档的 locator 命中（freshness=missing 的陈旧命中）",
         "memento 有 1 条 user-global 记忆和 1 条 workspace 记忆",
-        "工具面没有 ref resolver"
+        "seek_resolve 可按 provider 校验 ref；Trace 在写入前校验 dsh:// source"
       ],
       "allowedInterventions": [],
       "successCriteria": [
         "至少 2 条 trace claim",
         "2 个 source ref 可解析",
-        "0 条伪 ref"
+        "0 条伪 ref",
+        "伪 ref 被 seek_resolve 标为 missing，且 Trace 拒收"
       ],
-      "success": false,
-      "toolCount": 77,
+      "success": true,
+      "strictSuccess": true,
+      "deferredChecks": 0,
+      "toolCount": 80,
       "firstTool": "seek_providers",
       "expectedFirstTool": "seek_providers",
       "firstStepCorrect": true,
@@ -781,60 +811,77 @@
           "tool": "seek_search",
           "args": {
             "query": "user-trust",
-            "limit": 3
+            "limit": 5
           },
           "ok": true,
           "code": null,
           "invalid": null,
-          "tokens": 214,
+          "tokens": 278,
           "ms": 1,
           "changeSeq": 0,
-          "key": "seek_search:{\"query\":\"user-trust\",\"limit\":3}"
+          "key": "seek_search:{\"query\":\"user-trust\",\"limit\":5}"
         },
         {
           "n": 3,
           "tool": "seek_resolve",
           "args": {
+            "ref": "dsh://locator/docs/missing.md"
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 85,
+          "ms": 0,
+          "changeSeq": 0,
+          "key": "seek_resolve:{\"ref\":\"dsh://locator/docs/missing.md\"}"
+        },
+        {
+          "n": 4,
+          "tool": "seek_resolve",
+          "args": {
             "ref": "dsh://memento/mem-42"
           },
-          "ok": false,
-          "code": "TOOL_NOT_REGISTERED",
-          "invalid": "missing",
-          "tokens": 61,
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 90,
           "ms": 0,
           "changeSeq": 0,
           "key": "seek_resolve:{\"ref\":\"dsh://memento/mem-42\"}"
         },
         {
-          "n": 4,
-          "tool": "locator_resolve",
-          "args": {
-            "ref": "dsh://memento/mem-42"
-          },
-          "ok": false,
-          "code": "TOOL_NOT_REGISTERED",
-          "invalid": "missing",
-          "tokens": 61,
-          "ms": 0,
-          "changeSeq": 0,
-          "key": "locator_resolve:{\"ref\":\"dsh://memento/mem-42\"}"
-        },
-        {
           "n": 5,
-          "tool": "root_resolve",
+          "tool": "seek_resolve",
           "args": {
-            "name": "dsh://memento/mem-42"
+            "ref": "dsh://locator/docs/env.md"
           },
-          "ok": false,
-          "code": "invalid_profile_name",
-          "invalid": "schema",
-          "tokens": 75,
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 81,
           "ms": 0,
           "changeSeq": 0,
-          "key": "root_resolve:{\"name\":\"dsh://memento/mem-42\"}"
+          "key": "seek_resolve:{\"ref\":\"dsh://locator/docs/env.md\"}"
         },
         {
           "n": 6,
+          "tool": "trace_remember",
+          "args": {
+            "key": "repo:dsh-os/bogus",
+            "text": "stale decoy must not be stored",
+            "source": "dsh://locator/docs/missing.md",
+            "confidence": 0.2
+          },
+          "ok": false,
+          "code": "E_REF_NOT_FOUND",
+          "invalid": null,
+          "tokens": 122,
+          "ms": 1,
+          "changeSeq": 0,
+          "key": "trace_remember:{\"key\":\"repo:dsh-os/bogus\",\"text\":\"stale decoy must not be stored\",\"source\":\"dsh://locator/docs/missing.md\",\"confidence\":0.2}"
+        },
+        {
+          "n": 7,
           "tool": "trace_remember",
           "args": {
             "key": "repo:dsh-os/user-trust",
@@ -845,30 +892,30 @@
           "ok": true,
           "code": null,
           "invalid": null,
-          "tokens": 165,
+          "tokens": 190,
           "ms": 0,
           "changeSeq": 0,
           "key": "trace_remember:{\"key\":\"repo:dsh-os/user-trust\",\"text\":\"user-trust profiles are hidden from agent-layer resolution.\",\"source\":\"dsh://memento/mem-42\",\"confidence\":0.8}"
         },
         {
-          "n": 7,
+          "n": 8,
           "tool": "trace_remember",
           "args": {
             "key": "repo:dsh-os/env",
             "text": "Root never materializes process.env.",
-            "source": "dsh://locator/docs/missing.md",
+            "source": "dsh://locator/docs/env.md",
             "confidence": 0.7
           },
           "ok": true,
           "code": null,
           "invalid": null,
-          "tokens": 155,
+          "tokens": 179,
           "ms": 0,
           "changeSeq": 0,
-          "key": "trace_remember:{\"key\":\"repo:dsh-os/env\",\"text\":\"Root never materializes process.env.\",\"source\":\"dsh://locator/docs/missing.md\",\"confidence\":0.7}"
+          "key": "trace_remember:{\"key\":\"repo:dsh-os/env\",\"text\":\"Root never materializes process.env.\",\"source\":\"dsh://locator/docs/env.md\",\"confidence\":0.7}"
         },
         {
-          "n": 8,
+          "n": 9,
           "tool": "trace_search",
           "args": {
             "query": "user-trust"
@@ -882,49 +929,58 @@
           "key": "trace_search:{\"query\":\"user-trust\"}"
         }
       ],
-      "toolCalls": 8,
-      "invalidCalls": 3,
-      "tokensEstimate": 936,
+      "toolCalls": 9,
+      "invalidCalls": 0,
+      "tokensEstimate": 1230,
       "interventions": [],
       "checks": [
         {
           "id": "two-claims",
           "ok": true,
-          "detail": "2 条 claim"
+          "detail": "2 条 claim",
+          "deferred": false
+        },
+        {
+          "id": "seek-resolve-finds-refs",
+          "ok": true,
+          "detail": "memory=unknown env=fresh",
+          "deferred": false
+        },
+        {
+          "id": "seek-resolve-missing-decoy",
+          "ok": true,
+          "detail": "bogus=missing",
+          "deferred": false
         },
         {
           "id": "two-resolvable-refs",
-          "ok": false,
-          "detail": "1/2 个 source ref 可解析"
+          "ok": true,
+          "detail": "2/2 个 source ref 可解析",
+          "deferred": false
         },
         {
           "id": "no-bogus-ref",
-          "ok": false,
-          "detail": "dsh://memento/mem-42, dsh://locator/docs/missing.md"
+          "ok": true,
+          "detail": "dsh://memento/mem-42, dsh://locator/docs/env.md",
+          "deferred": false
+        },
+        {
+          "id": "trace-rejects-bogus-ref",
+          "ok": true,
+          "detail": "rejected=true",
+          "deferred": false
         }
       ],
       "failures": [
         {
-          "n": 3,
-          "tool": "seek_resolve",
-          "code": "TOOL_NOT_REGISTERED",
-          "invalid": "missing"
-        },
-        {
-          "n": 4,
-          "tool": "locator_resolve",
-          "code": "TOOL_NOT_REGISTERED",
-          "invalid": "missing"
-        },
-        {
-          "n": 5,
-          "tool": "root_resolve",
-          "code": "invalid_profile_name",
-          "invalid": "schema"
+          "n": 6,
+          "tool": "trace_remember",
+          "code": "E_REF_NOT_FOUND",
+          "invalid": null
         }
       ],
       "error": null,
-      "recovered": false
+      "recovered": true
     },
     {
       "id": "approval-recovery",
@@ -934,7 +990,7 @@
       "initial": [
         "临时目录 config.json 的 timeout=10",
         "act 内置 fs.write，尚无 Grant",
-        "Allow 暴露 allow_request / allow_wait / allow_requests"
+        "Allow 暴露 allow_request / allow_wait / allow_requests；Request/Grant 有 maxUses"
       ],
       "allowedInterventions": [
         "human.approve",
@@ -944,10 +1000,12 @@
         "恰好成功写入 1 次",
         "config.json timeout=30",
         "request 状态为 approved",
-        "同参重放被拒绝"
+        "同参重放被拒绝，且 Grant 以 maxUses=1 耗尽"
       ],
-      "success": false,
-      "toolCount": 76,
+      "success": true,
+      "strictSuccess": true,
+      "deferredChecks": 0,
+      "toolCount": 78,
       "firstTool": "act_invoke",
       "expectedFirstTool": "act_invoke",
       "firstStepCorrect": true,
@@ -958,7 +1016,7 @@
           "args": {
             "id": "fs.write",
             "args": {
-              "path": "/tmp/dsh-eval-approve-Qej0CA/config.json",
+              "path": "/tmp/dsh-eval-approve-heZN2O/config.json",
               "text": "{\"timeout\":30}\n"
             }
           },
@@ -968,7 +1026,7 @@
           "tokens": 115,
           "ms": 0,
           "changeSeq": 0,
-          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-approve-Qej0CA/config.json\",\"text\":\"{\\\"timeout\\\":30}\\n\"}}"
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-approve-heZN2O/config.json\",\"text\":\"{\\\"timeout\\\":30}\\n\"}}"
         },
         {
           "n": 2,
@@ -982,8 +1040,8 @@
           "ok": true,
           "code": null,
           "invalid": null,
-          "tokens": 131,
-          "ms": 1,
+          "tokens": 134,
+          "ms": 0,
           "changeSeq": 0,
           "key": "allow_request:{\"subject\":\"sess:approval-recovery\",\"capability\":\"act:invoke:fs.write\",\"scope\":\"*\",\"reason\":\"更新 config timeout\"}"
         },
@@ -991,33 +1049,33 @@
           "n": 3,
           "tool": "allow_wait",
           "args": {
-            "requestId": "req_4ed53bfb-645e-4a82-9668-8f2292287913",
+            "requestId": "req_ef7ca588-cb82-42fa-b422-15d37250e5a4",
             "timeoutMs": 0,
             "subject": "sess:approval-recovery"
           },
           "ok": true,
           "code": null,
           "invalid": null,
-          "tokens": 148,
+          "tokens": 151,
           "ms": 0,
           "changeSeq": 0,
-          "key": "allow_wait:{\"requestId\":\"req_4ed53bfb-645e-4a82-9668-8f2292287913\",\"timeoutMs\":0,\"subject\":\"sess:approval-recovery\"}"
+          "key": "allow_wait:{\"requestId\":\"req_ef7ca588-cb82-42fa-b422-15d37250e5a4\",\"timeoutMs\":0,\"subject\":\"sess:approval-recovery\"}"
         },
         {
           "n": 4,
           "tool": "allow_wait",
           "args": {
-            "requestId": "req_4ed53bfb-645e-4a82-9668-8f2292287913",
+            "requestId": "req_ef7ca588-cb82-42fa-b422-15d37250e5a4",
             "timeoutMs": 0,
             "subject": "sess:approval-recovery"
           },
           "ok": true,
           "code": null,
           "invalid": null,
-          "tokens": 174,
+          "tokens": 177,
           "ms": 0,
           "changeSeq": 1,
-          "key": "allow_wait:{\"requestId\":\"req_4ed53bfb-645e-4a82-9668-8f2292287913\",\"timeoutMs\":0,\"subject\":\"sess:approval-recovery\"}"
+          "key": "allow_wait:{\"requestId\":\"req_ef7ca588-cb82-42fa-b422-15d37250e5a4\",\"timeoutMs\":0,\"subject\":\"sess:approval-recovery\"}"
         },
         {
           "n": 5,
@@ -1025,7 +1083,7 @@
           "args": {
             "id": "fs.write",
             "args": {
-              "path": "/tmp/dsh-eval-approve-Qej0CA/config.json",
+              "path": "/tmp/dsh-eval-approve-heZN2O/config.json",
               "text": "{\"timeout\":30}\n"
             }
           },
@@ -1035,7 +1093,7 @@
           "tokens": 105,
           "ms": 0,
           "changeSeq": 1,
-          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-approve-Qej0CA/config.json\",\"text\":\"{\\\"timeout\\\":30}\\n\"}}"
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-approve-heZN2O/config.json\",\"text\":\"{\\\"timeout\\\":30}\\n\"}}"
         },
         {
           "n": 6,
@@ -1043,22 +1101,22 @@
           "args": {
             "id": "fs.write",
             "args": {
-              "path": "/tmp/dsh-eval-approve-Qej0CA/config.json",
+              "path": "/tmp/dsh-eval-approve-heZN2O/config.json",
               "text": "{\"timeout\":30}\n"
             }
           },
-          "ok": true,
-          "code": null,
+          "ok": false,
+          "code": "grant_required",
           "invalid": null,
-          "tokens": 105,
-          "ms": 0,
+          "tokens": 115,
+          "ms": 1,
           "changeSeq": 1,
-          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-approve-Qej0CA/config.json\",\"text\":\"{\\\"timeout\\\":30}\\n\"}}"
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-approve-heZN2O/config.json\",\"text\":\"{\\\"timeout\\\":30}\\n\"}}"
         }
       ],
       "toolCalls": 6,
       "invalidCalls": 0,
-      "tokensEstimate": 778,
+      "tokensEstimate": 797,
       "interventions": [
         {
           "kind": "human.approve",
@@ -1069,23 +1127,33 @@
       "checks": [
         {
           "id": "write-once",
-          "ok": false,
-          "detail": "成功的 fs.write 调用 2 次"
+          "ok": true,
+          "detail": "成功的 fs.write 调用 1 次",
+          "deferred": false
         },
         {
           "id": "config-updated",
           "ok": true,
-          "detail": "timeout=30"
+          "detail": "timeout=30 finalWrite=true",
+          "deferred": false
         },
         {
           "id": "request-approved",
           "ok": true,
-          "detail": "request=approved"
+          "detail": "request=approved",
+          "deferred": false
         },
         {
           "id": "replay-rejected",
-          "ok": false,
-          "detail": "同参重放被接受（第二次写入）"
+          "ok": true,
+          "detail": "replay=grant_required",
+          "deferred": false
+        },
+        {
+          "id": "grant-exhausted",
+          "ok": true,
+          "detail": "grant=used uses=1/1",
+          "deferred": false
         }
       ],
       "failures": [
@@ -1094,28 +1162,216 @@
           "tool": "act_invoke",
           "code": "grant_required",
           "invalid": null
+        },
+        {
+          "n": 6,
+          "tool": "act_invoke",
+          "code": "grant_required",
+          "invalid": null
         }
       ],
       "error": null,
-      "recovered": false
+      "recovered": true
+    },
+    {
+      "id": "kernel-write",
+      "title": "内核网关写入",
+      "goal": "用 os_find 找到 fs.write 能力，经 os_request/os_do 完成一次真实文件写入，并确认 gateway 健康。",
+      "maxSteps": 14,
+      "initial": [
+        "临时目录为空，kernel 注册一个真实的 fs.write 能力（handler 写盘）",
+        "kernel os_request 对接真实 Allow：创建 pending request，人类批准后生成 Grant",
+        "kernel os_do 接受显式 grant；批准后由宿主把 Grant 交给 agent（kernel 尚不自动消费）"
+      ],
+      "allowedInterventions": [
+        "human.approve"
+      ],
+      "successCriteria": [
+        "os_find 返回 fs.write 能力卡（risk=write）",
+        "未授权时 os_do 返回 E_DENIED",
+        "os_request 创建 pending request，批准后状态 approved 且有 grantId",
+        "os_do 带批准后的 Grant 恰好写盘 1 次，文件内容正确",
+        "os_status 报告 6 个 gateway 工具且 health=ok"
+      ],
+      "success": true,
+      "strictSuccess": true,
+      "deferredChecks": 0,
+      "toolCount": 84,
+      "firstTool": "os_find",
+      "expectedFirstTool": "os_find",
+      "firstStepCorrect": true,
+      "steps": [
+        {
+          "n": 1,
+          "tool": "os_find",
+          "args": {
+            "intent": "write a file fs.write"
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 120,
+          "ms": 0,
+          "changeSeq": 0,
+          "key": "os_find:{\"intent\":\"write a file fs.write\"}"
+        },
+        {
+          "n": 2,
+          "tool": "os_do",
+          "args": {
+            "id": "fs.write",
+            "args": {
+              "path": "note.txt",
+              "content": "written through the kernel gateway\n"
+            }
+          },
+          "ok": false,
+          "code": "E_DENIED",
+          "invalid": null,
+          "tokens": 245,
+          "ms": 0,
+          "changeSeq": 0,
+          "key": "os_do:{\"id\":\"fs.write\",\"args\":{\"path\":\"note.txt\",\"content\":\"written through the kernel gateway\\n\"}}"
+        },
+        {
+          "n": 3,
+          "tool": "os_request",
+          "args": {
+            "id": "fs.write",
+            "args": {
+              "path": "note.txt",
+              "content": "written through the kernel gateway\n"
+            },
+            "reason": "write note.txt"
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 116,
+          "ms": 1,
+          "changeSeq": 0,
+          "key": "os_request:{\"id\":\"fs.write\",\"args\":{\"path\":\"note.txt\",\"content\":\"written through the kernel gateway\\n\"},\"reason\":\"write note.txt\"}"
+        },
+        {
+          "n": 4,
+          "tool": "os_do",
+          "args": {
+            "id": "fs.write",
+            "args": {
+              "path": "note.txt",
+              "content": "written through the kernel gateway\n"
+            },
+            "grant": {
+              "id": "grant_7b8d99f0-4802-462c-9988-25dfdb049651",
+              "subject": "sess:kernel-write",
+              "capability": "fs.write",
+              "scope": "*",
+              "status": "active",
+              "createdAt": 1795246803132,
+              "expiresAt": 1795333203132,
+              "maxUses": 1,
+              "uses": 0,
+              "lastUsedAt": null,
+              "approver": "user",
+              "requestId": "req_daebba1b-0576-4705-904c-085cb974e12a",
+              "requestHash": "f389dd2c163bb7429c28e5e77412c4b7bd33773d2e925aacc0627e352630de63"
+            }
+          },
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 310,
+          "ms": 0,
+          "changeSeq": 1,
+          "key": "os_do:{\"id\":\"fs.write\",\"args\":{\"path\":\"note.txt\",\"content\":\"written through the kernel gateway\\n\"},\"grant\":{\"id\":\"grant_7b8d99f0-4802-462c-9988-25dfdb049651\",\"subject\":\"sess:kernel-write\",\"capability\":\"fs.write\",\"scope\":\"*\",\"status\":\"active\",\"createdAt\":1795246803132,\"expiresAt\":1795333203132,\"maxUses\":1,\"uses\":0,\"lastUsedAt\":null,\"approver\":\"user\",\"requestId\":\"req_daebba1b-0576-4705-904c-085cb974e12a\",\"requestHash\":\"f389dd2c163bb7429c28e5e77412c4b7bd33773d2e925aacc0627e352630de63\"}}"
+        },
+        {
+          "n": 5,
+          "tool": "os_status",
+          "args": {},
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "tokens": 104,
+          "ms": 0,
+          "changeSeq": 1,
+          "key": "os_status:{}"
+        }
+      ],
+      "toolCalls": 5,
+      "invalidCalls": 0,
+      "tokensEstimate": 895,
+      "interventions": [
+        {
+          "kind": "human.approve",
+          "afterStep": 3,
+          "ok": true
+        }
+      ],
+      "checks": [
+        {
+          "id": "find-returns-fs-write",
+          "ok": true,
+          "detail": "card=fs.write risk=write",
+          "deferred": false
+        },
+        {
+          "id": "denied-before-grant",
+          "ok": true,
+          "detail": "os_do before grant=E_DENIED",
+          "deferred": false
+        },
+        {
+          "id": "os-request-opens-request",
+          "ok": true,
+          "detail": "requestId=req_daebba1b-0576-4705-904c-085cb974e12a status=approved",
+          "deferred": false
+        },
+        {
+          "id": "write-exactly-once",
+          "ok": true,
+          "detail": "handler writes=1 os_do=true file=ok",
+          "deferred": false
+        },
+        {
+          "id": "gateway-healthy",
+          "ok": true,
+          "detail": "ok=true capabilities=1 tools=6",
+          "deferred": false
+        }
+      ],
+      "failures": [
+        {
+          "n": 2,
+          "tool": "os_do",
+          "code": "E_DENIED",
+          "invalid": null
+        }
+      ],
+      "error": null,
+      "recovered": true
     }
   ],
   "metrics": {
-    "scenarios": 5,
-    "successes": 2,
-    "successRate": 0.4,
+    "scenarios": 6,
+    "successes": 6,
+    "successRate": 1,
+    "strictSuccesses": 6,
+    "strictSuccessRate": 1,
+    "deferredChecks": 0,
+    "deferredScenarios": 0,
     "firstStepAccuracy": 1,
-    "recoveryRate": 0.4,
-    "recoveredScenarios": 2,
-    "scenariosWithFailures": 5,
-    "toolCalls": 42,
-    "invalidCalls": 3,
-    "invalidCallRate": 0.07142857142857142,
-    "avgSteps": 8.4,
-    "tokensEstimate": 5553,
-    "avgTokens": 1110.6,
-    "interventions": 4,
-    "assistedSuccesses": 2,
-    "autonomousSuccesses": 0
+    "recoveryRate": 1,
+    "recoveredScenarios": 6,
+    "scenariosWithFailures": 6,
+    "toolCalls": 48,
+    "invalidCalls": 0,
+    "invalidCallRate": 0,
+    "avgSteps": 8,
+    "tokensEstimate": 6958,
+    "avgTokens": 1159.6666666666667,
+    "interventions": 5,
+    "assistedSuccesses": 5,
+    "autonomousSuccesses": 1
   }
 }

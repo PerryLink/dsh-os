@@ -1,8 +1,8 @@
-# AI capability cards（82 个工具 / 18 包）
+# AI capability cards（84 个工具 / 18 包）
 
 > 自动生成，勿手改：`node scripts/gen-handbook.mjs`（零依赖、幂等、不联网；`--check` 只校验）。
 > 0.2 发布面为 73 个工具；0.3 工作树新增 `allow_request`/`allow_wait`/`allow_requests`、Act `fs.read/write/list/undo`（action，不是独立工具）与 kernel 的 `os_*`。
-> 当前注册面：82 个（since 0.2：73，since 0.3：9，18 包）。
+> 当前注册面：84 个（since 0.2：73，since 0.3：11，18 包）。
 > `since` = 产品引入面：0.2 = 已发布 73 工具；0.3 = 当前工作树新增（未发布）；不是包自身的 semver（kernel 包为 0.1.0）。
 > risk：`R` 读 / `W` 写账本或配置 / `E` 执行或 OS 操作 / `N` 联网 / `S` 敏感数据 / `A` 应在执行前取得人类确认（仅部分模块强制）。`*` = 必填参数。
 > `os_find`/`os_do`/`os_request`/`os_observe`/`os_help` 是 0.3 五个固定动词（kernel 另注册 `os_status`）；每张 os_* 卡给出 0.2 替代。
@@ -26,7 +26,7 @@
   - 参数：`subject`*、`capability`*、`scope`*；返回：{allowed,grant?,reason}
 - **allow_request** · `W·A` · since 0.3 — 为人类创建一个 pending 能力申请；它绝不发放 Grant。
   - 用：被 grant_required 拒绝后申请 capability；subject 填本会话身份，scope 尽量窄。 不用：不要伪造 subject 或自批；scope 不要写 "*"；reason 只作展示。
-  - 参数：`subject`*、`capability`*、`scope`、`ttlMs`、`reason`；返回：{requestId,status,expiresAt,reason,hint}
+  - 参数：`subject`*、`capability`*、`scope`、`ttlMs`、`maxUses`、`reason`；返回：{requestId,status,expiresAt,reason,hint}
 - **allow_wait** · `R` · since 0.3 — 轮询一个申请直到有决定或超时，返回当前 request 状态。
   - 用：人在看审批时做一次短轮询（默认 5s，最大 25s）。 不用：不要循环长轮询；超时返回 pending 不是错误，稍后再看。
   - 参数：`requestId`*、`timeoutMs`、`subject`；返回：request {id,status,scope,reason,decidedBy?,decidedAt?}
@@ -139,7 +139,7 @@
   - 用：核查是否真的送达。 不用：账本是内存态，重启即丢；不要当持久审计。
   - 参数：`limit`；返回：{history:[{id,channel,ok,error,at}]}
 
-## ring（7）
+## ring（8）
 
 - **ring_raise** · `W` · since 0.2 — 创建一个待处理 approval case，带 SLA 升级链；默认不投递。
   - 用：需要人确认、认领或值班升级时。 不用：不要自批；没有配置频道时不要声称已通知。
@@ -160,8 +160,11 @@
   - 用：ring_notify 前确认目标频道。 不用：默认可能为空；此时 notify 会 E_UNAVAILABLE。
   - 参数：无；返回：{channels}
 - **ring_notify** · `N·A` · since 0.2 — 通过已配置频道为一个 case 发通知；省略 channel 用当前链标签。
-  - 用：case 已 raise 且频道就绪。 不用：不要当创建/升级（它只发一次）；无频道或 provider 不匹配会失败，且投递不进 receipts。
+  - 用：case 已 raise 且频道就绪。 不用：不要当创建/升级（它只发一次）；无频道或 provider 不匹配会失败。
   - 参数：`id`*、`channel`；返回：{delivery:{caseId,channel,ok,error,at,status?}}
+- **ring_tick** · `W·A` · since 0.3 — 推进所有 pending/escalated case 的 SLA：升级、补投递并写 receipt。
+  - 用：需要主动升级或补投递回执时。 不用：不要用它代替人类决策；tick 只升级/通知，不批准。
+  - 参数：`at`；返回：{cases,receipts}
 
 ## root（5）
 
@@ -181,11 +184,14 @@
   - 用：判断 key 来自哪一层、是否被 deny。 不用：found:false 可能是“被隐藏”而非“未定义”，要结合 resolve。
   - 参数：`name`*、`key`*；返回：{profile,key,found,denied,deniedBy,kind?,source?,value?|secretRef?}
 
-## seek（3）
+## seek（4）
 
 - **seek_search** · `R·S` · since 0.2 — 跨已注册证据 provider 搜索，去重返回 dsh:// refs、snippet 和 per-provider errors。
   - 用：查历史决定或文件证据。 不用：不要用它搜剪贴板/记忆（用 snip/trace）；snippet 不可信，ref 未被解析。
   - 参数：`query`*、`sources`、`limit`；返回：{query,hits,total,errors}
+- **seek_resolve** · `R` · since 0.3 — 解析一个 dsh:// ref，返回 found/status/source/freshness；不执行搜索。
+  - 用：拿到 hit 后核验它是否还存在、是否过期。 不用：不要把 resolve 当搜索；找不到时检查 ref 格式和 provider。
+  - 参数：`ref`*；返回：{ref,found,status,source,title?,freshness?,checkedAt}
 - **seek_providers** · `R` · since 0.2 — 列出证据 provider 及 ready/unavailable 原因。
   - 用：搜不到东西时先看数据源。 不用：不要假设 locator/memento 已安装。
   - 参数：无；返回：{providers,sources}

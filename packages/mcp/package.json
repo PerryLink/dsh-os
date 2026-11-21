@@ -1,7 +1,7 @@
 {
   "name": "@perrylink/dsh-os-mcp",
-  "version": "0.1.0",
-  "description": "Read-only stdio MCP server prototype for the dsh-os capability catalog: zero dependencies, no DSH connection.",
+  "version": "0.2.0",
+  "description": "Stdio MCP server for the dsh-os capability catalog: zero dependencies, read-only by default, approval-token write path, no DSH connection.",
   "type": "module",
   "bin": {
     "dsh-os-mcp": "bin/dsh-os-mcp.js"
@@ -15,6 +15,7 @@
     "bin",
     "lib",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "keywords": [
@@ -25,7 +26,9 @@
     "model-context-protocol",
     "stdio",
     "read-only",
-    "agent-os"
+    "agent-os",
+    "approval",
+    "write"
   ],
   "license": "MIT",
   "author": "PerryLink contributors",

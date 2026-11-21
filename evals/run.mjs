@@ -27,9 +27,19 @@ function makeCtx({ tools: extraTools = {}, services: extraServices = {} } = {}) 
   }
 }
 
-async function createSurface(configs, extra) {
+async function createSurface(configs, extra = {}) {
   const ctx = makeCtx(extra)
-  for (const name of MODULES) (await import(new URL(`../packages/${name}/index.js`, import.meta.url))).apply(ctx, configs[name] ?? {})
+  const configOf = value => (typeof value === 'function' ? value(ctx) : value)
+  for (const name of MODULES) {
+    (await import(new URL(`../packages/${name}/index.js`, import.meta.url))).apply(ctx, configOf(configs[name] ?? {}))
+  }
+  // Extra modules stay opt-in so the classic-17 surface is unchanged for the
+  // regression scenarios; a scenario may mount e.g. the experimental kernel.
+  for (const mount of extra.mounts ?? []) {
+    const name = typeof mount === 'string' ? mount : mount.name
+    const config = typeof mount === 'string' ? {} : configOf(mount.config ?? {})
+    ;(await import(new URL(`../packages/${name}/index.js`, import.meta.url))).apply(ctx, config)
+  }
   return ctx
 }
 
@@ -73,7 +83,7 @@ export async function runScenario(scenario) {
       return env.ctx
     },
   }
-  const exec = () => ({ agent: { id: `agent:${env.subject}`, session: { id: env.subject, header: { cwd: env.cwd, agentPreset: 'web' } } } })
+  const exec = () => ({ subject: env.subject, agent: { id: `agent:${env.subject}`, session: { id: env.subject, header: { cwd: env.cwd, agentPreset: 'web' } } } })
 
   async function call(tool, args = {}) {
     if (steps.length >= scenario.maxSteps) throw Object.assign(new Error(`step budget exhausted (${scenario.maxSteps})`), { code: 'EVAL_STEP_LIMIT' })
@@ -83,7 +93,8 @@ export async function runScenario(scenario) {
     const raw = missing ? { ok: false, error: { code: 'TOOL_NOT_REGISTERED' } }
       : thrown ? { ok: false, error: { code: thrown.code ?? 'E_TOOL', message: thrown.message } } : result
     const ok = !missing && thrown === null && !(result && result.ok === false)
-    const code = missing ? 'TOOL_NOT_REGISTERED' : thrown ? thrown.code ?? 'E_TOOL' : result?.ok === false ? result.code ?? 'TOOL_FAILED' : null
+    const code = missing ? 'TOOL_NOT_REGISTERED' : thrown ? thrown.code ?? 'E_TOOL'
+      : result?.ok === false ? (result.error?.code ?? result.code ?? 'TOOL_FAILED') : null
     let invalid = missing ? 'missing'
       : thrown && /invalid|schema|argument|required|must|path/i.test(`${thrown.code ?? ''} ${thrown.message ?? ''}`) ? 'schema' : null
     if (invalid === null && Array.isArray(scenario.allowedTools) && !scenario.allowedTools.includes(tool)) invalid = 'off-route'
@@ -99,7 +110,16 @@ export async function runScenario(scenario) {
     if (interventions.some(item => item.kind === kind)) throw new Error(`intervention already used: ${kind}`)
     const allow = () => env.ctx.get('allow')
     const implementations = {
-      'human.approve': () => { const pending = allow().requests({ subject: env.subject }).filter(request => request.status === 'pending'); const request = pending.find(item => item.id === env.state.requestId) ?? pending.at(-1); if (!request) throw new Error('no pending request'); env.state.requestId = request.id; allow().approve({ id: request.id, by: 'user' }) },
+      'human.approve': () => {
+        const pending = allow().requests({ subject: env.subject }).filter(request => request.status === 'pending')
+        const request = pending.find(item => item.id === env.state.requestId) ?? pending.at(-1)
+        if (!request) throw new Error('no pending request')
+        env.state.requestId = request.id
+        allow().approve({ id: request.id, by: 'user' })
+        // The kernel's os_observe does not refresh from Allow, so the harness
+        // (playing the host approval seam) hands back the real Grant object.
+        env.state.approvedGrant = allow().list({ subject: env.subject, capability: request.capability, status: 'active' }).at(-1)
+      },
       'human.grant': () => allow().issue({ subject: env.subject, capability: env.state.pendingCapability, scope: '*', approver: 'user', ttlMs: 300000 }),
       'host.registerAction': () => env.registerFsAction(),
       'host.configureChannel': () => env.ctx.get('ring').configureChannels({ console: { write: line => consoleLines.push(line) } }),
@@ -127,13 +147,21 @@ export async function runScenario(scenario) {
   } else {
     checks = [{ id: 'setup-error', ok: false, detail: setupError.message }]
   }
-  checks = (Array.isArray(checks) ? checks : []).map(check => ({ ...check, ok: check.ok === true }))
+  checks = (Array.isArray(checks) ? checks : []).map(check => ({
+    ...check, ok: check.ok === true, deferred: check.deferred === true,
+  }))
+  // A deferred check is a criterion the current API cannot satisfy. It stays in
+  // the report as an explicit gap and never counts as a pass (ok must be false
+  // or it is simply a normal check); it also does not gate scenario success.
+  const gating = checks.filter(check => check.deferred !== true)
   const failures = steps.filter(step => !step.ok)
-  const success = !setupError && !policyError && interventions.every(item => item.ok) && checks.length > 0 && checks.every(check => check.ok)
+  const success = !setupError && !policyError && interventions.every(item => item.ok)
+    && gating.length > 0 && gating.every(check => check.ok)
+  const deferredChecks = checks.filter(check => check.deferred === true).length
   const run = {
     id: scenario.id, title: scenario.title, goal: scenario.goal, maxSteps: scenario.maxSteps,
     initial: scenario.initial, allowedInterventions: scenario.allowedInterventions, successCriteria: scenario.success,
-    success, toolCount: env.ctx?._tools.size ?? 0,
+    success, strictSuccess: success && deferredChecks === 0, deferredChecks, toolCount: env.ctx?._tools.size ?? 0,
     firstTool: steps[0]?.tool ?? null, expectedFirstTool: scenario.expectedFirstTool, firstStepCorrect: steps[0]?.tool === scenario.expectedFirstTool,
     steps, toolCalls: steps.length, invalidCalls: steps.filter(step => step.invalid).length,
     tokensEstimate: steps.reduce((sum, step) => sum + step.tokens, 0), interventions, checks,
@@ -168,25 +196,31 @@ export function renderMarkdown(report) {
     `- 环境：Node ${report.env.node} · commit ${report.env.commit ?? 'unknown'}${report.env.dirty ? '（工作树有未提交改动）' : ''}`,
     '', '## 总览', '', '| 指标 | 值 |', '|---|---|',
     `| 成功率 | ${m.successes}/${m.scenarios}（${pct(m.successRate)}） |`,
+    `| 严格成功率（0 延后判据） | ${m.strictSuccesses}/${m.scenarios}（${pct(m.strictSuccessRate)}） |`,
+    `| 延后判据 | ${m.deferredChecks} 条，覆盖 ${m.deferredScenarios} 个场景（不计为通过，详见下文） |`,
     `| 首步选择准确率 | ${pct(m.firstStepAccuracy)} |`,
     `| 恢复率 | ${pct(m.recoveryRate)}（${m.recoveredScenarios}/${m.scenariosWithFailures} 个有失败场景最终通过） |`,
     `| 无效调用率 | ${pct(m.invalidCallRate)}（${m.invalidCalls}/${m.toolCalls}） |`,
     `| 平均步数 | ${m.avgSteps.toFixed(1)} |`,
     `| tokens 估算 | 总 ${m.tokensEstimate} · 均 ${m.avgTokens.toFixed(0)} |`,
     `| 人类介入 | ${m.interventions} 次（自主成功 ${m.autonomousSuccesses}，辅助成功 ${m.assistedSuccesses}） |`,
-    '', '## 场景', '', '| 场景 | 成功 | 步数 | 无效 | 介入 | tokens | 首个失败判据 |', '|---|---:|---:|---:|---:|---:|---|',
+    '', '## 场景', '', '| 场景 | 成功 | 步数 | 无效 | 介入 | 延后 | tokens | 首个失败判据 |', '|---|---:|---:|---:|---:|---:|---:|---|',
     ...report.scenarios.map(run => {
-      const failed = run.checks.find(check => !check.ok)
-      return `| ${run.id} ${run.title} | ${run.success ? '✅' : '❌'} | ${run.toolCalls} | ${run.invalidCalls} | ${run.interventions.length} | ${run.tokensEstimate} | ${failed ? failed.id : '—'} |`
+      const failed = run.checks.find(check => !check.ok && check.deferred !== true)
+      return `| ${run.id} ${run.title} | ${run.success ? '✅' : '❌'} | ${run.toolCalls} | ${run.invalidCalls} | ${run.interventions.length} | ${run.deferredChecks ?? 0} | ${run.tokensEstimate} | ${failed ? failed.id : '—'} |`
     }),
     '', '## 判据与失败点', '',
   ]
   for (const run of report.scenarios) {
-    const failed = run.checks.filter(check => !check.ok)
-    lines.push(`- **${run.id}** ${run.success ? '✅' : '❌'} · 首步 \`${run.firstTool ?? '—'}\` · 介入 ${run.interventions.length} · ${failed.length ? failed.map(check => `\`${check.id}\`: ${check.detail}`).join('；') : '全部判据通过'}`)
+    const failed = run.checks.filter(check => !check.ok && check.deferred !== true)
+    const deferred = run.checks.filter(check => check.deferred === true)
+    const verdict = failed.length ? failed.map(check => `\`${check.id}\`: ${check.detail}`).join('；') : '全部有效判据通过'
+    lines.push(`- **${run.id}** ${run.success ? '✅' : '❌'} · 首步 \`${run.firstTool ?? '—'}\` · 介入 ${run.interventions.length} · ${verdict}${deferred.length ? ` · ${deferred.length} 条延后` : ''}`)
+    for (const check of deferred) lines.push(`  - ⏸ \`${check.id}\`（延后，不计通过）：${check.detail}`)
     if (run.error) lines.push(`  - 策略错误：\`${run.error.code}\` ${run.error.message}`)
   }
-  lines.push('', '> P 层脚本策略，不是真实模型的 AUS；成功只读外部状态，模型自述不计分。', '')
+  lines.push('', '> P 层脚本策略，不是真实模型的 AUS；成功只读外部状态，模型自述不计分。')
+  lines.push('> ⏸ 延后判据 = 当前 packages API 无法满足、但未伪造通过的判据；它们仍计入 `successCriteria` 并在每次报告中保留。', '')
   return lines.join('\n')
 }
 

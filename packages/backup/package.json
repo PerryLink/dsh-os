@@ -1,7 +1,7 @@
 {
   "name": "@perrylink/dsh-backup",
-  "version": "0.1.0",
-  "description": "Read-only filesystem snapshot manifests and restore plans for DeepSeek Harness: inventory only, no copying and no deleting.",
+  "version": "0.2.0",
+  "description": "Read-only, allowlisted filesystem snapshot manifests and restore plans for DeepSeek Harness: metadata inventory with sensitive-path exclusions and hard caps, no copying and no deleting.",
   "type": "module",
   "main": "index.js",
   "exports": {

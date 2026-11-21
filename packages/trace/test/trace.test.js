@@ -15,9 +15,9 @@ function fakeContext() {
   }
 }
 
-function setup() {
+function setup(config) {
   const ctx = fakeContext()
-  const service = apply(ctx)
+  const service = apply(ctx, config)
   return { ctx, service }
 }
 
@@ -205,4 +205,166 @@ test('restore preserves createdAt/expiresAt and never forces a higher-confidence
     () => service.restore({ key: 'x', text: 'x', createdAt: 10, expiresAt: 10 }),
     coded('invalid_expires_at'),
   )
+})
+
+test('trace_remember verifies a dsh:// source through ctx.evidence before storing', async () => {
+  const { ctx } = setup()
+  const calls = []
+  const signal = new AbortController().signal
+  ctx._services.set('evidence', {
+    async resolve(ref, options) {
+      calls.push({ ref, options })
+      return { found: true, status: 'fresh', checkedAt: 11 }
+    },
+  })
+  const exec = {
+    agent: { session: { id: 's1', header: { cwd: '/work', agentPreset: 'reviewer' } } },
+    signal,
+  }
+  const result = await ctx._tools.get('trace_remember').execute(
+    { key: 'repo:dsh', text: 'Verified claim.', source: 'dsh://locator/src/a.ts' },
+    exec,
+  )
+  assert.equal(result.record.provenance.source, 'dsh://locator/src/a.ts')
+  assert.deepEqual(result.verification, {
+    ok: true,
+    status: 'fresh',
+    ref: 'dsh://locator/src/a.ts',
+    checkedAt: 11,
+  })
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].ref, 'dsh://locator/src/a.ts')
+  assert.equal(calls[0].options.signal, signal)
+  assert.equal(calls[0].options.cwd, '/work')
+  assert.equal(calls[0].options.agentKey, 'reviewer')
+  assert.equal(calls[0].options.timeoutMs, 10_000)
+})
+
+test('trace_remember rejects a not-found dsh:// ref by default', async () => {
+  const { ctx, service } = setup()
+  ctx._services.set('evidence', {
+    async resolve() {
+      return { found: false, status: 'missing', checkedAt: 5 }
+    },
+  })
+  const result = await ctx._tools.get('trace_remember').execute({
+    key: 'repo:fake',
+    text: 'Forged source.',
+    source: 'dsh://locator/docs/missing.md',
+  })
+  assert.equal(result.ok, false)
+  assert.equal(result.code, 'E_REF_NOT_FOUND')
+  assert.equal(result.status, 'missing')
+  assert.equal(result.ref, 'dsh://locator/docs/missing.md')
+  assert.equal(result.checkedAt, 5)
+  assert.deepEqual(service.list(), [])
+})
+
+test('trace_remember rejects timeout and resolve errors as E_REF_NOT_FOUND', async () => {
+  const timeout = setup()
+  timeout.ctx._services.set('evidence', {
+    async resolve() {
+      return { found: false, status: 'timeout', error: { code: 'provider_timeout', message: 'slow' } }
+    },
+  })
+  const timedOut = await timeout.ctx._tools.get('trace_remember').execute({
+    key: 'k',
+    text: 't',
+    source: 'dsh://locator/slow.ts',
+  })
+  assert.equal(timedOut.ok, false)
+  assert.equal(timedOut.code, 'E_REF_NOT_FOUND')
+  assert.equal(timedOut.status, 'timeout')
+  assert.equal(timedOut.error.code, 'provider_timeout')
+
+  const broken = setup()
+  broken.ctx._services.set('evidence', {
+    async resolve() {
+      throw Object.assign(new Error('bad ref'), { code: 'E_INVALID_ARGUMENT' })
+    },
+  })
+  const invalid = await broken.ctx._tools.get('trace_remember').execute({
+    key: 'k',
+    text: 't',
+    source: 'dsh://',
+  })
+  assert.equal(invalid.ok, false)
+  assert.equal(invalid.code, 'E_REF_NOT_FOUND')
+  assert.equal(invalid.status, 'error')
+  assert.equal(invalid.error.code, 'E_INVALID_ARGUMENT')
+})
+
+test('trace_remember stores a not-found ref with a warning in warn mode', async () => {
+  const { ctx, service } = setup({ refVerifyMode: 'warn' })
+  ctx._services.set('evidence', {
+    async resolve() {
+      return { found: false, status: 'missing' }
+    },
+  })
+  const result = await ctx._tools.get('trace_remember').execute({
+    key: 'repo:warned',
+    text: 'Stored with a warning.',
+    source: 'dsh://locator/gone.md',
+  })
+  assert.equal(result.record.key, 'repo:warned')
+  assert.equal(result.warning.code, 'E_REF_NOT_FOUND')
+  assert.equal(result.warning.status, 'missing')
+  assert.equal(service.list().length, 1)
+})
+
+test('verifyRefs:false skips resolution and keeps the 0.2 free-text behaviour', async () => {
+  const { ctx, service } = setup({ verifyRefs: false })
+  let calls = 0
+  ctx._services.set('evidence', { async resolve() { calls += 1; return { found: false, status: 'missing' } } })
+  const result = await ctx._tools.get('trace_remember').execute({
+    key: 'repo:unchecked',
+    text: 'Not verified.',
+    source: 'dsh://locator/missing.md',
+  })
+  assert.equal(result.record.key, 'repo:unchecked')
+  assert.equal(result.verification, undefined)
+  assert.equal(result.warning, undefined)
+  assert.equal(calls, 0)
+  assert.equal(service.list().length, 1)
+})
+
+test('non-dsh sources and a missing evidence service are not verified', async () => {
+  const { ctx, service } = setup()
+  let calls = 0
+  ctx._services.set('evidence', { async resolve() { calls += 1; return { found: false, status: 'missing' } } })
+  const freeText = await ctx._tools.get('trace_remember').execute({
+    key: 'repo:check',
+    text: 'from a check',
+    source: 'check_compare',
+  })
+  assert.equal(freeText.record.key, 'repo:check')
+  assert.equal(freeText.verification, undefined)
+  assert.equal(calls, 0)
+
+  const standalone = setup()
+  const stored = await standalone.ctx._tools.get('trace_remember').execute({
+    key: 'repo:standalone',
+    text: 'no seek installed',
+    source: 'dsh://locator/src/a.ts',
+  })
+  assert.equal(stored.record.key, 'repo:standalone')
+  assert.equal(stored.verification, undefined)
+  assert.equal(service.list().length, 1)
+})
+
+test('verifyTimeoutMs bounds the evidence resolve call', async () => {
+  const { ctx } = setup({ verifyTimeoutMs: 25 })
+  let seen
+  ctx._services.set('evidence', {
+    async resolve(_ref, options) {
+      seen = options
+      return { found: true, status: 'fresh' }
+    },
+  })
+  await ctx._tools.get('trace_remember').execute({
+    key: 'k',
+    text: 't',
+    source: 'dsh://locator/src/a.ts',
+  })
+  assert.equal(seen.timeoutMs, 25)
 })

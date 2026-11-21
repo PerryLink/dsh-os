@@ -3,13 +3,15 @@
  *
  * `ctx.evidence` fans one query out to named providers, normalizes and
  * deduplicates their hits, and returns a partial result plus per-provider
- * errors. 0.2.0 ships two optional first-party providers: `locator` (through
- * dsh-locator's `locator_find` tool) and `memento` (through `ctx.memory`).
+ * errors. It also routes one `dsh://` ref to the matching provider's optional
+ * `resolve` (0.3.0). 0.2.0 ships two optional first-party providers: `locator`
+ * (through dsh-locator's `locator_find`) and `memento` (through `ctx.memory`).
  * @module dsh-seek
  */
 
-import { agentKeyOf } from './lib/providers/util.js'
 import { registerDefaultProviders } from './lib/providers/index.js'
+import { askResolve, normalizeResolution, resolutionError } from './lib/resolve.js'
+import { createTools } from './lib/tools.js'
 
 /** Cordis plugin name. */
 export const name = 'dsh-seek'
@@ -151,11 +153,18 @@ export class SeekService {
     if (typeof provider.search !== 'function') {
       throw fail('invalid_provider', `seek: provider "${provider.name}" requires a search function`)
     }
+    if (provider.resolve !== undefined && typeof provider.resolve !== 'function') {
+      throw fail('invalid_provider', `seek: provider "${provider.name}" resolve must be a function`)
+    }
     if (this.#providers.has(provider.name)) {
       throw fail('provider_exists', `seek: provider "${provider.name}" is already registered`)
     }
 
-    const entry = Object.freeze({ name: provider.name, search: provider.search.bind(provider) })
+    const entry = Object.freeze({
+      name: provider.name,
+      search: provider.search.bind(provider),
+      ...(typeof provider.resolve === 'function' ? { resolve: provider.resolve.bind(provider) } : {}),
+    })
     this.#providers.set(entry.name, entry)
     this.#unavailable.delete(entry.name)
     return () => (this.#providers.get(entry.name) === entry ? this.#providers.delete(entry.name) : false)
@@ -260,6 +269,7 @@ export class SeekService {
           invalid += 1
           continue
         }
+        hit.resolvable = this.#canResolve(hit.source)
         const current = byRef.get(hit.ref)
         if (current === undefined || scoreOf(hit) > scoreOf(current)) byRef.set(hit.ref, hit)
       }
@@ -278,6 +288,70 @@ export class SeekService {
     return { query: text, hits, total: hits.length, errors }
   }
 
+  /**
+   * Resolve one `dsh://<source>/<id>` ref through its provider.
+   *
+   * A malformed ref or invalid options throw `E_INVALID_ARGUMENT`. A source
+   * with no provider, or with a provider that has no `resolve`, returns
+   * `{ found: false, status: "unsupported" }` instead of fabricating evidence.
+   * Provider timeouts and failures are isolated into `status: "timeout"` or
+   * `status: "error"` (with an `error` block); only caller cancellation is
+   * rethrown. Successful results are
+   * `{ ref, found, status, source, checkedAt, title?, freshness? }`.
+   *
+   * @param {string} ref - `dsh://<source>/<id>` ref.
+   * @param {{ signal?: AbortSignal, timeoutMs?: number, cwd?: string,
+   *   agentKey?: string, agent?: object }} [options]
+   */
+  async resolve(ref, options = {}) {
+    const parsed = parseRef(ref)
+    if (parsed === undefined) {
+      throw fail('E_INVALID_ARGUMENT', `seek: invalid ref: ${String(ref).slice(0, 80)}`)
+    }
+    if (!plainObject(options)) {
+      throw fail('E_INVALID_ARGUMENT', 'seek: resolve options must be an object')
+    }
+    const timeoutMs = timeoutOf(options.timeoutMs)
+    const signal = signalOf(options.signal)
+    if (signal !== undefined && signal.aborted) throw abortedError()
+
+    const unsupported = {
+      ref,
+      found: false,
+      status: 'unsupported',
+      source: parsed.source,
+      checkedAt: Date.now(),
+    }
+    const provider = this.#providers.get(parsed.source)
+    if (provider === undefined || typeof provider.resolve !== 'function') return unsupported
+
+    try {
+      const value = await askResolve(provider, ref, {
+        timeoutMs,
+        signal,
+        source: parsed.source,
+        id: parsed.id,
+        cwd: typeof options.cwd === 'string' && options.cwd !== '' ? options.cwd : undefined,
+        agentKey: typeof options.agentKey === 'string' ? options.agentKey : undefined,
+        agent: options.agent,
+      })
+      return normalizeResolution(ref, parsed.source, value)
+    } catch (error) {
+      if (signal !== undefined && signal.aborted) throw abortedError()
+      const failure = resolutionError(error)
+      return {
+        ...unsupported,
+        status: failure.code === 'provider_timeout' ? 'timeout' : 'error',
+        error: failure,
+      }
+    }
+  }
+
+  /** True when the source has a provider that implements `resolve`. */
+  #canResolve(source) {
+    return typeof this.#providers.get(source)?.resolve === 'function'
+  }
+
   /** Snapshot the providers selected by `sources` (all when omitted). */
   #select(sources) {
     const providers = [...this.#providers.values()]
@@ -290,100 +364,19 @@ export class SeekService {
   }
 }
 
-/** Build a plain-object tool definition accepted by the host. */
-function tool(name, description, parameters, execute) {
-  return {
-    name,
-    description,
-    parameters,
-    output: {
-      schema: { type: 'object', additionalProperties: true },
-      render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
-    },
-    execute,
-  }
-}
-
-/** `seek_search` tool: one query across all or selected providers. */
-function searchTool(service) {
-  return tool(
-    'seek_search',
-    'Search registered evidence providers and return deduplicated hits with dsh:// refs and per-provider errors.',
-    {
-      type: 'object',
-      additionalProperties: false,
-      required: ['query'],
-      properties: {
-        query: { type: 'string', description: 'Text to search for.' },
-        sources: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Provider names to query; defaults to every registered provider.',
-        },
-        limit: {
-          type: 'integer',
-          minimum: 1,
-          maximum: MAX_LIMIT,
-          description: 'Maximum hits to return (default 10).',
-        },
-      },
-    },
-    async (args, exec) => {
-      const session = exec?.agent?.session
-      return service.search(args?.query, {
-        sources: args?.sources,
-        limit: args?.limit,
-        signal: exec?.signal,
-        agent: exec?.agent,
-        cwd: session?.header?.cwd,
-        agentKey: session === undefined ? undefined : agentKeyOf(session.header?.agentPreset),
-      })
-    },
-  )
-}
-
-/** Compact provider/source report shared by `seek_providers` and `seek_register_defaults`. */
-function providerReport(service) {
-  return { providers: service.providers(), sources: service.sources() }
-}
-
-/** `seek_providers` tool: provider discovery, including unavailable reasons. */
-function providersTool(service) {
-  return tool(
-    'seek_providers',
-    'List Seek evidence providers and whether each first-party source is ready or unavailable, with the reason.',
-    { type: 'object', additionalProperties: false, properties: {} },
-    async () => providerReport(service),
-  )
-}
-
-/** `seek_register_defaults` tool: retry first-party registration after plugins mount. */
-function registerDefaultsTool(ctx, service) {
-  return tool(
-    'seek_register_defaults',
-    'Register the first-party locator and memento providers when their host services are available. Safe to call repeatedly; missing dependencies are reported in sources, not thrown.',
-    { type: 'object', additionalProperties: false, properties: {} },
-    async () => {
-      registerDefaultProviders(ctx, service)
-      return providerReport(service)
-    },
-  )
-}
-
 /**
  * Mount dsh-seek: provide `ctx.evidence`, auto-register available first-party
  * providers (missing optional plugins are reported, not fatal), and register
- * the three agent tools.
+ * the agent tools (`seek_search`, `seek_resolve`, `seek_providers`,
+ * `seek_register_defaults`).
  * @param {object} ctx - Cordis context with `provide` and `tools.register`.
- * @param {object} [_config] - Reserved; unused in 0.2.0.
+ * @param {object} [_config] - Reserved; no Seek config in 0.3.0.
  */
 export function apply(ctx, _config = {}) {
   const service = new SeekService()
   ctx.provide('evidence', service)
   registerDefaultProviders(ctx, service)
-  ctx.tools.register(searchTool(service))
-  ctx.tools.register(providersTool(service))
-  ctx.tools.register(registerDefaultsTool(ctx, service))
+  for (const definition of createTools(ctx, service)) ctx.tools.register(definition)
   return service
 }
 

@@ -107,7 +107,7 @@ test('the model cannot pass privileged fields or approve/deny through default to
   assert.equal(tools.get('allow_issue'), undefined)
 
   const created = await tools.get('allow_request').execute({ subject: 'agent:model', capability: 'fs.write', scope: 'repo:src', reason: 'x' })
-  assert.deepEqual(Object.keys(created).sort(), ['expiresAt', 'hint', 'reason', 'requestId', 'status'])
+  assert.deepEqual(Object.keys(created).sort(), ['expiresAt', 'hint', 'maxUses', 'reason', 'requestId', 'status'])
   assert.match(created.hint, new RegExp(created.requestId))
   await assert.rejects(tools.get('allow_request').execute({ subject: 'agent:model', capability: 'fs.write', approver: 'alice' }), { code: 'E_PRIVILEGED' })
 

@@ -5,7 +5,9 @@
  * diff dimensions (result, trajectory, cost, approvals) and returns failures as
  * values instead of throwing. It has no dependencies and never calls a model
  * itself. Timeout and cancellation are owned here because headless DSH has no
- * `--timeout`: SIGINT first, then SIGKILL after a grace period.
+ * `--timeout`: SIGINT first, then SIGKILL after a grace period. The child
+ * environment is allowlisted so host API keys are not inherited, and captured
+ * stdout is capped at 2 MiB.
  * @module @perrylink/dsh-check/runner
  */
 import { spawn as nodeSpawn } from 'node:child_process'
@@ -13,20 +15,64 @@ import { resolve } from 'node:path'
 
 export const DEFAULT_TIMEOUT_MS = 600_000
 export const DEFAULT_KILL_GRACE_MS = 5_000
+export const MAX_OUTPUT_BYTES = 2 * 1024 * 1024
 const HARD_SETTLE_MS = 1_000
-const MAX_STDOUT_BYTES = 16 * 1024 * 1024
 const MAX_STDERR_BYTES = 64 * 1024
+/** Inherited env: `PATH`/`HOME` plus `DSH_*`/`NODE_*`; API keys are dropped. */
+const ENV_KEEP = new Set(['PATH', 'HOME'])
+const ENV_KEEP_PREFIXES = ['DSH_', 'NODE_']
+const ENV_DROP = new Set(['NODE_OPTIONS'])
 const APPROVAL_REJECTIONS = new Set(['SANDBOX_ESCALATION_REJECTED', 'APPROVAL_REJECTED'])
 
 const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value)
 const has = (object, key) => isObject(object) && Object.hasOwn(object, key)
 const count = value => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0)
 const invalid = (code, message) => Object.assign(new Error(message), { code })
-const append = (text, chunk, max) => (text.length >= max ? text : text + String(chunk).slice(0, max - text.length))
+
+/**
+ * Build the child environment from an allowlist: `PATH`, `HOME`, `DSH_*` and
+ * `NODE_*`. Provider keys such as `OPENAI_API_KEY` are not inherited. Also
+ * drops `NODE_OPTIONS`, which can `--require` arbitrary code.
+ * @param {Record<string, string|undefined>} [source]
+ * @returns {Record<string, string>}
+ */
+export function sanitizeEnv(source = process.env) {
+  const env = {}
+  if (!isObject(source)) return env
+  for (const [name, value] of Object.entries(source)) {
+    if (typeof value !== 'string') continue
+    const key = name.toUpperCase()
+    if (ENV_DROP.has(key)) continue
+    if (ENV_KEEP.has(key) || ENV_KEEP_PREFIXES.some(prefix => key.startsWith(prefix))) env[name] = value
+  }
+  return env
+}
+
+/** Append a chunk to a byte-capped capture; `truncated` records lost output. */
+function capture(state, chunk, max) {
+  if (state.bytes >= max) {
+    state.truncated = true
+    return
+  }
+  const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk))
+  const room = max - state.bytes
+  if (buffer.length > room) state.truncated = true
+  state.text += buffer.subarray(0, room).toString('utf8')
+  state.bytes += Math.min(buffer.length, room)
+}
 
 function defaultDshBin(cwd) {
   const fromEnv = typeof process.env.DSH_BIN === 'string' ? process.env.DSH_BIN.trim() : ''
   return fromEnv || resolve(cwd, 'node_modules', '.bin', 'dsh')
+}
+
+/** Optional dshBin allowlist; paths are resolved against the runner cwd. */
+function binAllowlist(value, cwd) {
+  if (value === undefined || value === null) return null
+  if (!Array.isArray(value) || value.some(item => typeof item !== 'string' || item.trim() === '')) {
+    throw invalid('invalid_options', 'allowedDshBins must be an array of non-empty strings')
+  }
+  return value.map(item => resolve(cwd, item))
 }
 
 /** Map DSH token usage; `null` means the step has no usable usage fields. */
@@ -180,6 +226,7 @@ function earlyFailure(code, taskId, raw = {}) {
       events: 0,
       parseErrors: 0,
       stdoutBytes: 0,
+      stdoutTruncated: false,
       stderr: '',
       timedOut: false,
       aborted: false,
@@ -214,6 +261,10 @@ export class CheckRunner {
     if (typeof this.dshBin !== 'string' || this.dshBin.trim() === '') {
       throw invalid('invalid_options', 'dshBin must be a non-empty string')
     }
+    this.allowedDshBins = binAllowlist(options.allowedDshBins, this.cwd)
+    if (this.allowedDshBins !== null && !this.allowedDshBins.includes(resolve(this.cwd, this.dshBin))) {
+      throw invalid('E_DENIED', `dshBin "${this.dshBin}" is not in allowedDshBins`)
+    }
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
     if (typeof this.timeoutMs !== 'number' || !Number.isFinite(this.timeoutMs) || this.timeoutMs <= 0) {
       throw invalid('invalid_options', 'timeoutMs must be a positive finite number')
@@ -245,7 +296,9 @@ export class CheckRunner {
       ? options.timeoutMs
       : this.timeoutMs
     const cwd = typeof task.cwd === 'string' && task.cwd ? resolve(this.cwd, task.cwd) : this.cwd
-    const env = { ...process.env, ...this.env, ...(isObject(task.env) ? task.env : {}) }
+    // Inherited variables are allowlisted; `env`/`task.env` are explicit host
+    // config (never model input) and are merged last.
+    const env = { ...sanitizeEnv(process.env), ...this.env, ...(isObject(task.env) ? task.env : {}) }
 
     let child
     try {
@@ -262,8 +315,8 @@ export class CheckRunner {
     }
 
     return await new Promise(resolvePromise => {
-      let stdout = ''
-      let stderr = ''
+      const out = { text: '', bytes: 0, truncated: false }
+      const err = { text: '', bytes: 0, truncated: false }
       let settled = false
       let timedOut = false
       let aborted = false
@@ -302,7 +355,7 @@ export class CheckRunner {
         clearTimers()
         signal?.removeEventListener?.('abort', onAbort)
         const code = typeof exitCode === 'number' ? exitCode : null
-        const parsed = parseOutput(stdout)
+        const parsed = parseOutput(out.text)
         const summary = summarizeEvents(parsed.events, parsed.parseErrors)
         let failure = null
         if (timedOut) failure = 'timeout'
@@ -319,8 +372,9 @@ export class CheckRunner {
           finalReason: summary.finalReason,
           events: summary.events,
           parseErrors: summary.parseErrors,
-          stdoutBytes: Buffer.byteLength(stdout),
-          stderr: stderr.slice(0, MAX_STDERR_BYTES),
+          stdoutBytes: out.bytes,
+          stdoutTruncated: out.truncated,
+          stderr: err.text,
           timedOut,
           aborted,
           durationMs: Date.now() - started,
@@ -345,8 +399,8 @@ export class CheckRunner {
         })
       }
 
-      child.stdout?.on?.('data', chunk => { stdout = append(stdout, chunk, MAX_STDOUT_BYTES) })
-      child.stderr?.on?.('data', chunk => { stderr = append(stderr, chunk, MAX_STDERR_BYTES) })
+      child.stdout?.on?.('data', chunk => capture(out, chunk, MAX_OUTPUT_BYTES))
+      child.stderr?.on?.('data', chunk => capture(err, chunk, MAX_STDERR_BYTES))
       child.on('error', error => done(null, null, error))
       child.on('close', (code, signalName) => done(code, signalName, null))
       timeoutTimer = setTimeout(() => interrupt('timeout'), timeoutMs)

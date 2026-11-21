@@ -1,15 +1,20 @@
 /**
  * dsh-trace — auditable long-term memory governance for DeepSeek Harness.
  *
- * 0.2.0: Host service `ctx.trace` with remember / search / forget / list /
+ * 0.3.0: Host service `ctx.trace` with remember / search / forget / list /
  * export, provenance, TTL expiry, confidence-aware supersede chains and secret
  * redaction, plus the `dsh-memory-protocol/v1` bridge to `dsh-memento`
- * (read-only import, data-only export, adapter availability). Seven plain-object
- * agent tools. Plain ESM, Node.js 22+, no runtime dependencies, no network.
+ * (read-only import, data-only export, adapter availability). `trace_remember`
+ * optionally verifies a `dsh://` source through `ctx.evidence.resolve`
+ * (`verifyRefs`, default true). Seven plain-object agent tools. Plain ESM,
+ * Node.js 22+, no runtime dependencies, no network.
  * @module dsh-trace
  */
 import { randomUUID } from 'node:crypto'
+import { DEFAULT_LIMIT, MAX_LIMIT, MAX_SOURCE_LENGTH, SCOPES, SENSITIVITIES } from './lib/constants.js'
 import { createMementoBridge } from './lib/memento.js'
+import { createTools } from './lib/tools.js'
+import { createRefVerifier } from './lib/verify.js'
 
 /** Cordis plugin name. */
 export const name = 'dsh-trace'
@@ -25,17 +30,12 @@ export const EXPORT_FORMAT = 'trace-export-v1'
 /** Text stored for records whose sensitivity is `secret`. */
 export const REDACTED = '[redacted]'
 
-const SCOPES = ['user', 'workspace', 'preset', 'team']
-const SENSITIVITIES = ['normal', 'public', 'internal', 'private', 'secret']
 const REMEMBER_FIELDS = new Set([
   'key', 'text', 'source', 'scope', 'confidence', 'ttlMs', 'sensitivity', 'force',
 ])
 const RESTORE_FIELDS = new Set([
   'key', 'text', 'source', 'scope', 'confidence', 'sensitivity', 'createdAt', 'expiresAt',
 ])
-const DEFAULT_LIMIT = 20
-const MAX_LIMIT = 100
-
 const clone = value => structuredClone(value)
 const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value)
 const byUpdatedDesc = (a, b) => b.provenance.updatedAt - a.provenance.updatedAt
@@ -69,8 +69,8 @@ function normalizeDraft(input) {
     fail('invalid_text', 'text must be a non-empty string')
   }
   const source = input.source ?? 'user'
-  if (typeof source !== 'string' || source.trim() === '' || source.length > 256) {
-    fail('invalid_source', 'source must be a non-empty string of at most 256 characters')
+  if (typeof source !== 'string' || source.trim() === '' || source.length > MAX_SOURCE_LENGTH) {
+    fail('invalid_source', `source must be a non-empty string of at most ${MAX_SOURCE_LENGTH} characters`)
   }
   const scope = input.scope ?? 'workspace'
   if (!SCOPES.includes(scope)) fail('invalid_scope', `scope must be one of ${SCOPES.join(', ')}`)
@@ -308,125 +308,26 @@ export class TraceService {
   }
 }
 
-const OUTPUT = {
-  schema: { type: 'object', additionalProperties: true },
-  render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
-}
-
-const argsSchema = (properties, required) => ({
-  type: 'object',
-  additionalProperties: false,
-  properties,
-  ...(required === undefined ? {} : { required }),
-})
-
-function tool(name, description, parameters, execute) {
-  return { name, description, parameters, output: OUTPUT, execute }
-}
-
-/** Plain ToolDefinition objects; no dependency on `@deepseek-ai/dsh-tools`. */
-export function createTools(service, memento) {
-  const bridge = async operation => {
-    try {
-      return { ok: true, ...operation() }
-    } catch (error) {
-      if (error?.code !== 'E_UNAVAILABLE') throw error
-      return { ok: false, code: error.code, message: error.message }
-    }
-  }
-  return [
-    tool(
-      'trace_remember',
-      'Remember one auditable claim under a key. A newer claim supersedes the old one; '
-        + 'lower confidence is refused unless force is true. sensitivity "secret" stores only [redacted].',
-      argsSchema({
-        key: { type: 'string', description: 'Normalized subject key, e.g. "repo:dsh/pkg".' },
-        text: { type: 'string', description: 'One self-contained claim.' },
-        source: { type: 'string', description: 'Provenance label; defaults to "user".' },
-        scope: { type: 'string', enum: SCOPES, description: 'Defaults to "workspace".' },
-        confidence: { type: 'number', minimum: 0, maximum: 1, description: 'Defaults to 0.5.' },
-        ttlMs: { type: 'number', exclusiveMinimum: 0, description: 'Optional lifetime in milliseconds.' },
-        sensitivity: { type: 'string', enum: SENSITIVITIES, description: 'Defaults to "normal".' },
-        force: { type: 'boolean', description: 'Replace even a higher-confidence record.' },
-      }, ['key', 'text']),
-      async args => {
-        try {
-          return { record: service.remember(args) }
-        } catch (error) {
-          if (error?.code !== 'trace_confidence_too_low') throw error
-          return { ok: false, code: error.code, message: error.message, current: error.current }
-        }
-      },
-    ),
-    tool(
-      'trace_search',
-      'Search active Trace records by case-insensitive substring over key and text.',
-      argsSchema({
-        query: { type: 'string', description: 'Substring; empty returns all active records.' },
-        limit: { type: 'integer', minimum: 1, maximum: MAX_LIMIT, description: 'Defaults to 20.' },
-      }, ['query']),
-      async args => ({ results: service.search(args?.query, { limit: args?.limit }) }),
-    ),
-    tool(
-      'trace_forget',
-      'Forget every version of a Trace key and leave a text-free audit tombstone.',
-      argsSchema({ key: { type: 'string' } }, ['key']),
-      async args => ({ forgotten: service.forget(args?.key) }),
-    ),
-    tool(
-      'trace_list',
-      'List active Trace records, most recently updated first.',
-      argsSchema({
-        limit: { type: 'integer', minimum: 1, maximum: MAX_LIMIT, description: 'Defaults to 20.' },
-      }),
-      async args => ({ records: service.list({ limit: args?.limit }) }),
-    ),
-    tool(
-      'trace_import_memento',
-      'Import memories from a mounted dsh-memento (read-only on the memento side) into Trace. '
-        + 'Existing higher-confidence records are never overwritten; such entries are reported as skipped.',
-      argsSchema({
-        scope: {
-          type: 'string',
-          enum: ['user', 'workspace'],
-          description: 'Memento layer: user (user-global, default) or workspace (warned: no workspaceKey filter).',
-        },
-        agentKey: { type: 'string', description: 'Optional memento agentKey visibility filter.' },
-        limit: { type: 'integer', minimum: 1, maximum: MAX_LIMIT, description: 'Defaults to 20.' },
-      }),
-      async args => bridge(() => memento.importFromMemento(args ?? {})),
-    ),
-    tool(
-      'trace_export_memento',
-      'Export active Trace records as trace-memento-v1 JSON for dsh-memento import. '
-        + 'Pure data conversion; nothing is written to memento and its approval gate is not bypassed.',
-      argsSchema({
-        scope: { type: 'string', enum: SCOPES, description: 'Optional Trace scope filter.' },
-      }),
-      async args => bridge(() => memento.exportToMemento(args ?? {})),
-    ),
-    tool(
-      'trace_adapter_status',
-      'Report whether dsh-memento services are available and whether the opt-in Trace adapter is registered.',
-      argsSchema({}),
-      async () => memento.status(),
-    ),
-  ]
-}
-
 /**
  * Mount dsh-trace: provide `ctx.trace`, probe memento without requiring it,
- * and register the seven agent tools.
+ * and register the seven agent tools. `config.verifyRefs` (default true) lets
+ * `trace_remember` verify `dsh://` source labels through `ctx.evidence.resolve`
+ * before storing them; `refVerifyMode: "warn"` records the claim with a warning
+ * instead of rejecting it, and `verifyTimeoutMs` bounds the resolve call.
  * @param {object} ctx - Cordis context.
- * @param {object} [_config] - Reserved; the ledger is in-memory in 0.2.0.
+ * @param {{ verifyRefs?: boolean, refVerifyMode?: 'enforce'|'warn',
+ *   verifyTimeoutMs?: number }} [config]
  */
-export function apply(ctx, _config = {}) {
+export function apply(ctx, config = {}) {
   const service = new TraceService()
   ctx.provide('trace', service)
   const memento = createMementoBridge(ctx, service)
   service.memento = memento
   if (ctx.tools && typeof ctx.tools.register === 'function') {
-    for (const tool of createTools(service, memento)) ctx.tools.register(tool)
+    const verifier = createRefVerifier(ctx, config)
+    for (const tool of createTools(service, memento, verifier)) ctx.tools.register(tool)
   }
   return service
 }
+
+export { createTools }

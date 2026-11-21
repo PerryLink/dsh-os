@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.3.0
+
+- `notify()` now writes a `delivery` receipt for **both** outcomes, so an agent
+  can audit what it sent: `{ caseId, channel, ok, error, at, dedupeKey,
+  source: 'notify' }` (plus `status` when the provider reports one). A missing
+  or failing channel still rejects with `E_UNAVAILABLE`, but only after the
+  failed receipt is recorded.
+- Successful deliveries are idempotent per case + channel + level: repeating
+  `notify()` returns `{ delivery, deduped: true }` with the original
+  `dedupeKey` and does not send again or append a second receipt. Failed
+  attempts stay retryable and carry the same `dedupeKey` for correlation.
+- Add the `ring_tick` tool (`{ at? }`): advances every open case to `at`
+  (default: the service clock) and returns `{ now, receipts, cases,
+  deliveries }`, so a model can drive SLA escalation instead of relying on a
+  human to call the service. Ring now exposes eight tools.
+- Distinguish receipt origins: tick receipts carry `source: 'tick'` and are the
+  only ones that use SLA labels (`local`, `webhook`, `voice`); `notify`
+  receipts carry `source: 'notify'` and the provider name. The t0 tick receipt
+  reports `delivered` and, when a channel was attempted, `ok`/`error`.
+- Ticks reuse the same delivery dedupe set, so a manual page already sent for a
+  level is not repeated by a later tick at that level.
+- Extract the tool surface (`lib/tools.js`) and protocol defaults
+  (`lib/constants.js`); the entry point stays under the 450-line cap.
+- Add `node --test` coverage for success/failure delivery receipts, dedupe and
+  the `ring_tick` tool.
+
 ## 0.2.0
 
 - Add opt-in notification channels under `lib/channels/`: `webhook`, `ntfy`

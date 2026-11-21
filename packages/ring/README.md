@@ -3,14 +3,15 @@
 > **Approval SLA, not a notification app.** Raise a blocking approval, page on a
 > fixed t0–t3 schedule, stop on ack, record every step as a local receipt.
 
-**Status: 0.2.0 — opt-in notification channels.** Cases advance only through
-explicit `tick(now)` calls. By default every step is a local receipt and
-**nothing leaves the process**: no channel is enabled, no URL is configured and
-no network socket is opened. When a human calls
-`ctx.ring.configureChannels({ webhook, ntfy, console })`, `tick()` and
-`notify()` may POST through those channels. **v0 still does not approve
-remotely** — ack is not approval, `ring_notify` only alerts, and the final
-decision still comes from the Web/host approval seam.
+**Status: 0.3.0 — delivery is auditable.** Cases advance only through explicit
+`tick(now)` calls, and now also through the model-facing `ring_tick` tool. By
+default every step is a local receipt and **nothing leaves the process**: no
+channel is enabled, no URL is configured and no network socket is opened. When a
+human calls `ctx.ring.configureChannels({ webhook, ntfy, console })`, `tick()`
+and `notify()` may POST through those channels, and every attempt — success or
+failure — writes a `delivery` receipt with a `dedupeKey`. **v0 still does not
+approve remotely** — ack is not approval, `ring_notify` only alerts, and the
+final decision still comes from the Web/host approval seam.
 
 This is the approval-paging package, not the unrelated zero-star `dsh-ring`
 sound-effect plugin that may occupy the same npm name. A `@perrylink/dsh-ring`
@@ -54,8 +55,8 @@ const receipts = ctx.ring.receipts(kase.id)
 | `raise({ source, risk = 'write', ttlMs?, escalationChain? })` | Create a `pending` case. `source` is free-form (`approval`, `job`, `hook`, `act`, `manual`, …). `ttlMs` defaults to 60 minutes. |
 | `configureChannels({ webhook?, ntfy?, console? })` | Replace the configured channels and return `{ channels }`. Omitted entries are disabled; `{}` clears all. Configuration alone does no network I/O. |
 | `channels()` | Configured provider names in registry order. Empty by default. |
-| `notify(caseOrId, { channel? })` | Deliver one notification through a configured channel and resolve `{ delivery }`. Omit `channel` to use the case's current chain label. A missing provider or failed request rejects with `E_UNAVAILABLE`. |
-| `tick(now?)` | Async. Advance every open case to `now`; returns a Promise of `{ now, receipts, cases, deliveries }`. At most one catch-up escalation per case per call. Configured channels are called best-effort. |
+| `notify(caseOrId, { channel? })` | Deliver one notification through a configured channel and resolve `{ delivery, deduped? }`. Omit `channel` to use the case's current chain label. Success **and** failure append a `delivery` receipt; a repeated successful case+channel+level returns `deduped: true` without sending or writing another receipt, while a failure rejects with `E_UNAVAILABLE` after its receipt is recorded. |
+| `tick(now?)` | Async. Advance every open case to `now`; returns a Promise of `{ now, receipts, cases, deliveries }`. At most one catch-up escalation per case per call. Configured channels are called best-effort and share the notify dedupe set. |
 | `ack(id, { by })` | Claim the case (`acked`), stop escalation, keep a receipt. |
 | `escalate(id, { to? })` | Move to `escalated` at a chain level (`1`, `"t2"`) or record a free-form target label. Omit `to` to advance one level. |
 | `resolve(id, { decision })` | Record the human outcome (`resolved`). An expired case must be re-paged first; a decision recorded after expiry is marked `late`. |
@@ -90,9 +91,10 @@ ctx.ring.configureChannels({
 Escalation labels map to providers: `local` → `console`, `webhook` → `webhook`,
 `voice` → `ntfy`. A tick step whose provider is not configured is receipt-only;
 it does not fall back to an unrelated channel. `tick().deliveries` contains one
-safe record per attempted send (`{ caseId, channel, ok, error?, status?, at }`)
-and a failed send never rolls back the case state. `notify()` is the explicit
-operator/model path and throws `E_UNAVAILABLE` on failure.
+safe record per attempted send (`{ caseId, channel, ok, error?, status?, at,
+dedupeKey }`) and a failed send never rolls back the case state. `notify()` is
+the explicit operator/model path; it records a `delivery` receipt and throws
+`E_UNAVAILABLE` on failure.
 
 No channel is a remote approval path: payloads contain the case id, source,
 risk, state, level and a short generated body. They carry no reason text, tool
@@ -130,14 +132,25 @@ any open state --expiresAt--> expired --escalate(to)--> escalated --decision--> 
 ## Receipts
 
 ```js
-{ id, caseId, kind, at, channel?, by?, to? }
+{ id, caseId, kind, at, channel?, by?, to?, source?, ok?, error?, dedupeKey?, status? }
 ```
 
-`kind` is one of `delivery` (t0), `escalation` (t1–t3), `ack`, `decision` or
-`expiry`. `channel` is the recorded SLA label; `by` is the acknowledging
-principal; `to` is the SLA level or explicit escalation target. Receipts record
-the state machine, not a remote service's acceptance: HTTP results are returned
-by `notify().delivery` and `tick().deliveries`.
+`kind` is one of `delivery`, `escalation` (t1–t3), `ack`, `decision` or
+`expiry`. `source` separates the notify path from the SLA state machine:
+
+| `kind` / `source` | Written by | Fields |
+|---|---|---|
+| `delivery` / `notify` | `notify()` / `ring_notify`, **success or failure** | `caseId`, `channel` (provider name), `ok`, `error`, `at`, `dedupeKey`, and `status` when the provider reports one |
+| `delivery` / `tick` | `tick()` / `ring_tick` t0 state step | `channel` (SLA label), `to`, `delivered`, plus `ok`/`error`/`dedupeKey` when a send was attempted |
+| `escalation` / `tick` | `tick()` / `ring_escalate` | `channel` (SLA label), `to`; a manual escalate has no `source` |
+
+`channel` is the recorded SLA label on tick/escalation receipts and the
+provider name on notify receipts; `by` is the acknowledging principal; `to` is
+the SLA level or explicit escalation target. `dedupeKey` is
+`<caseId>:t<level>:<channel>` and is stable across repeated attempts at one
+level/channel. Receipts record what happened, including an HTTP failure; the
+send result itself is also returned by `notify().delivery` and
+`tick().deliveries`.
 
 Receipts are immutable, append-only evidence: stored entries are frozen and
 never rewritten, and every read (and every `tick()` result) returns defensive
@@ -154,13 +167,16 @@ copies, so mutating a returned receipt cannot change the ledger.
 | `ring_receipts` | `id` |
 | `ring_channels` | — |
 | `ring_notify` | `id`, optional `channel` |
+| `ring_tick` | optional `at` (epoch ms; default: service clock) |
 
 Tools are plain `ToolDefinition` objects and return `{ case }`, `{ cases }`,
-`{ receipts }`, `{ channels }` or `{ delivery }`. `ring_notify` can only send
-through channels that a human already configured; it cannot approve, deny or
-ack. There is deliberately no model-facing `ring_resolve`: the model can raise,
-list, page and acknowledge, but only the human/approval seam records the
-decision.
+`{ receipts }`, `{ channels }`, `{ delivery }` or the tick result
+`{ now, receipts, cases, deliveries }`. `ring_notify` writes a receipt for
+success and failure; `ring_tick` lets an agent advance the SLA itself, but
+neither can approve, deny or ack. `ring_notify` can only send through channels
+that a human already configured. There is deliberately no model-facing
+`ring_resolve`: the model can raise, list, page and acknowledge, but only the
+human/approval seam records the decision.
 
 ## Errors
 
@@ -175,7 +191,8 @@ decision.
 
 ## Scope
 
-0.2.0 adds opt-in webhook, ntfy and console delivery. It remains an SLA ledger:
+0.3.0 adds delivery receipts, per-case/channel dedupe and the `ring_tick` tool.
+0.2.0 added opt-in webhook, ntfy and console delivery. It remains an SLA ledger:
 no persistence, no telemetry, no inbound web server, no remote approval and no
 automatic network access. The `net` capability is declared in the manifest but
 is inert until `configureChannels()` receives a channel. Handler failures are

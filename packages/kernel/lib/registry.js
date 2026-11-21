@@ -239,7 +239,7 @@ export class CapabilityRegistry {
         if (decision === false || decision?.allowed === false) return { ok: false, code: 'E_DENIED', message: `not authorized to invoke ${descriptor.id}` }
       } catch (error) { return { ok: false, code: typeof error?.code === 'string' ? error.code : 'E_INTERNAL', message: error?.message ?? String(error) } }
     }
-    const exec = { subject: options.subject ?? null, signal: options.signal, requestId: options.requestId, grant: options.grant, ctx: options.ctx ?? this.ctx }
+    const exec = { subject: options.subject ?? null, agent: options.agent ?? null, signal: options.signal, requestId: options.requestId, grant: options.grant, ctx: options.ctx ?? this.ctx }
     try {
       const value = await descriptor.handler(input, exec.ctx, exec)
       if (value === undefined) return { ok: false, code: 'E_STATE', message: `${descriptor.id} handler returned undefined` }

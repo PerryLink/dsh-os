@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.3.0
+
+- Every run recorded by `fire()` now keeps the event payload and a display
+  path, closing the WF3 gap: `{ id, triggerId, event, payload, path, ok, error,
+  startedAt, durationMs }`. `path` is relative to `process.cwd()` when the
+  event path is inside it, otherwise the final segment; the full value stays in
+  `payload.path`. `trigger_runs` therefore tells an agent which file changed.
+- Payloads are projected, never stored raw: `sk-…`, `ghp_…`/other `gh*` tokens,
+  `AKIA…`, `Bearer …` and PEM private-key blocks are redacted, credential-named
+  fields become `[REDACTED]`, each string is shortened, and the JSON form is
+  capped at **2 KiB** (`MAX_PAYLOAD_BYTES`). Oversized payloads degrade to a
+  redacted `{ truncated, bytes, preview }`. The projection is deep-frozen, so
+  readers and late actions cannot rewrite the ledger; the live payload passed
+  to conditions and actions is never mutated.
+- Add `lib/payload.js` with `sanitizePayload`, `redactText`, `truncateText`,
+  `displayPath` and `runFields`; the entry point stays under the 450-line
+  conformance cap.
+- Add `node --test` coverage for path visibility, tool visibility
+  (`trigger_runs`), secret redaction, the 2 KiB cap and payload immutability.
+- Manifest: version 0.3.0. No new tools (still seven).
+
 ## 0.2.0
 
 - Add three real event sources on top of the existing registry:

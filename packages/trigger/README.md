@@ -4,12 +4,15 @@
 > holds, run Z and keep a receipt.** This is an event-trigger fabric, not a
 > `dsh-hooks`-style lifecycle hook.
 
-**Status: 0.2.0 ships three real event sources** — agent (`session/event`),
-fs (`ctx.fs.watch` invalidation + snapshot diff) and webhook (loopback HTTP
-when `ctx.webServer` exists). It still keeps the 0.1.0 seam (`ctx.triggers`), the
-condition DSL, per-trigger cooldown and the in-memory run ledger. Everything is
-in memory: a restart loses triggers, runs and dedupe state. Delivery is
-at-least-once with a bounded dedupe window, **not** exactly-once.
+**Status: 0.3.0 — the event chain is auditable.** Runs now keep a redacted,
+2 KiB-bounded `payload` and a display `path`, so `trigger_runs` answers "which
+file changed, and with what event data" without trusting an action's own
+output. 0.2.0 shipped the three real event sources — agent (`session/event`),
+fs (`ctx.fs.watch` invalidation + snapshot diff) and webhook (loopback HTTP when
+`ctx.webServer` exists); 0.3.0 keeps the same seam (`ctx.triggers`), condition
+DSL, per-trigger cooldown and in-memory ledger. Everything is in memory: a
+restart loses triggers, runs and dedupe state. Delivery is at-least-once with a
+bounded dedupe window, **not** exactly-once.
 
 **Not affiliated with DeepSeek.** DeepSeek and DeepSeek Harness are trademarks
 of their respective owners.
@@ -181,9 +184,22 @@ service.list(); service.unregister(id); service.runs(limit)
   `neq`, `in`, `nin`, `exists`, `gt`, `gte`, `lt`, `lte`, `contains`,
   `startsWith`. Fields are dotted payload paths; no expression evaluation.
 - `runs(limit?)` returns the newest entries (default cap 1,000 in memory).
+  Every run is `{ id, triggerId, event, payload, path, ok, error, startedAt,
+  durationMs }`. `payload` is a **projection**, not the live object: known
+  credentials (`sk-…`, `ghp_…`, `AKIA…`, `Bearer …`, PEM private keys) and
+  credential-named fields are redacted, strings and collections are shortened,
+  and the JSON form is capped at 2 KiB. Oversized payloads become
+  `{ truncated: true, bytes, preview }` (the preview is redacted too). `path`
+  is the event's `payload.path` relative to `process.cwd()` when it is inside
+  it, otherwise the final segment; the full path remains in `payload.path`.
+  The projection is deep-frozen, so a reader cannot rewrite the ledger, and
+  actions still receive the untouched payload.
 
 ## Limits and 0.3.0
 
+- 0.3.0 closes the WF3 "trigger loses the payload" gap: runs carry a redacted,
+  2 KiB-capped payload and a display path, and `trigger_runs` exposes both.
+  Nothing is logged, and the raw payload is never persisted.
 - In-memory only: restart loses definitions, the ledger and dedupe windows; there
   is no JSONL persistence, retry/backoff, dead-letter ring or replay yet.
 - No fs recursion, no fs watcher re-arm after a provider error (the error is

@@ -20,10 +20,15 @@ export const MAX_REQUEST_TTL_MS = 30 * 60 * 1000
 export const DEFAULT_WAIT_MS = 5 * 1000
 export const MAX_WAIT_MS = 25 * 1000
 export const MAX_REASON_LENGTH = 280
+/** A request asks for one use by default; both request and approval cap at 100. */
+export const DEFAULT_MAX_USES = 1
+export const MAX_USES = 100
 export const REQUEST_STATES = ['pending', 'approved', 'denied', 'expired']
+export const GRANT_STATES = ['active', 'revoked', 'expired', 'used']
+// On-disk version stays 2 so the approvals CLI keeps reading it; use counters are additive.
 const STATE_VERSION = 2
 /** The only fields a model may ask for; identity, state and hashes are derived. */
-const REQUEST_FIELDS = new Set(['subject', 'capability', 'scope', 'ttlMs', 'reason'])
+const REQUEST_FIELDS = new Set(['subject', 'capability', 'scope', 'ttlMs', 'reason', 'maxUses'])
 
 const CHECK_EVENTS = new Set(['allowed', 'denied'])
 const isCheck = event => CHECK_EVENTS.has(event)
@@ -97,6 +102,15 @@ function resolveWait(timeoutMs) {
   return Math.min(timeoutMs, MAX_WAIT_MS)
 }
 
+/** Server-side use budget: an integer in 1..100; `fallback` is used when omitted. */
+function resolveMaxUses(value, fallback = DEFAULT_MAX_USES) {
+  if (value === undefined) return fallback
+  if (!Number.isInteger(value) || value < 1 || value > MAX_USES) {
+    fail('E_MAX_USES', `maxUses must be an integer between 1 and ${MAX_USES}`)
+  }
+  return value
+}
+
 function cleanReason(value) {
   if (value === undefined) return ''
   if (typeof value !== 'string') fail('E_REASON', 'reason must be a string')
@@ -114,15 +128,23 @@ function canonical(value) {
   return JSON.stringify(value)
 }
 
-/** Binds an approval to the exact ask: scope, capability, subject, TTL and reason. */
+/**
+ * Binds an approval to the exact ask: scope, capability, subject, TTL and reason.
+ * `maxUses` is bound only when it differs from the default one; this keeps 0.3
+ * request hashes (and the standalone approvals CLI, which hashes the same five
+ * fields) able to verify a default ask, while a raised budget cannot be edited
+ * unnoticed.
+ */
 function hashRequest(request) {
-  return createHash('sha256').update(canonical({
+  const ask = {
     subject: request.subject,
     capability: request.capability,
     scope: request.scope,
     ttlMs: request.ttlMs,
     reason: request.reason,
-  })).digest('hex')
+  }
+  if (request.maxUses !== undefined && request.maxUses !== DEFAULT_MAX_USES) ask.maxUses = request.maxUses
+  return createHash('sha256').update(canonical(ask)).digest('hex')
 }
 
 function validRequest(request) {
@@ -133,6 +155,7 @@ function validRequest(request) {
   if (![request.createdAt, request.expiresAt, request.ttlMs].every(Number.isFinite) || request.ttlMs <= 0) return false
   if (!(typeof request.scope === 'string'
     || (Array.isArray(request.scope) && request.scope.length > 0 && request.scope.every(item => typeof item === 'string')))) return false
+  if (request.maxUses !== undefined && (!Number.isInteger(request.maxUses) || request.maxUses < 1 || request.maxUses > MAX_USES)) return false
   if (request.grantId !== undefined && (typeof request.grantId !== 'string' || request.grantId === '')) return false
   return true
 }
@@ -152,10 +175,28 @@ function cloneEvidence(evidence) {
 function validGrant(grant) {
   if (!grant || typeof grant !== 'object') return false
   if (![grant.id, grant.subject, grant.capability, grant.approver].every(value => typeof value === 'string' && value !== '')) return false
-  if (!['active', 'revoked', 'expired'].includes(grant.status)) return false
+  if (!GRANT_STATES.includes(grant.status)) return false
   if (!Number.isFinite(grant.createdAt) || (grant.expiresAt !== null && !Number.isFinite(grant.expiresAt))) return false
+  if (grant.maxUses !== undefined && grant.maxUses !== null
+    && (!Number.isInteger(grant.maxUses) || grant.maxUses < 1 || grant.maxUses > MAX_USES)) return false
+  if (grant.uses !== undefined && (!Number.isInteger(grant.uses) || grant.uses < 0)) return false
+  if (grant.lastUsedAt !== undefined && grant.lastUsedAt !== null && !Number.isFinite(grant.lastUsedAt)) return false
   return typeof grant.scope === 'string'
     || (Array.isArray(grant.scope) && grant.scope.length > 0 && grant.scope.every(scope => typeof scope === 'string'))
+}
+
+/**
+ * Add the 0.4 use counters to a validated grant. A missing `maxUses` means the
+ * grant was written by 0.3 (or by the standalone approvals CLI), when grants
+ * were unlimited; Infinity preserves that behavior instead of retroactively
+ * making it one-shot. `null` is the JSON form of Infinity.
+ */
+function normalizeGrant(grant) {
+  if (grant.uses === undefined) grant.uses = 0
+  if (grant.maxUses === undefined || grant.maxUses === null) grant.maxUses = Infinity
+  if (grant.lastUsedAt === undefined) grant.lastUsedAt = grant.usedAt ?? null
+  if (grant.maxUses !== Infinity && grant.status === 'active' && grant.uses >= grant.maxUses) grant.status = 'used'
+  return grant
 }
 
 /** Persisted counters are advisory; when absent or malformed, derive them from the log. */
@@ -205,11 +246,23 @@ export class GrantStore {
     if (raw.version !== 1 && raw.version !== STATE_VERSION) fail('E_STATE', `unsupported state version ${String(raw.version)} in ${this.stateFile}`)
     // Unknown fields are tolerated; records that cannot be evaluated safely are
     // dropped so a corrupted file cannot create a permanent grant.
-    for (const grant of raw.grants) if (validGrant(grant)) this.grants.set(grant.id, grant)
+    for (const grant of raw.grants) if (validGrant(grant)) this.grants.set(grant.id, normalizeGrant(grant))
     for (const request of Array.isArray(raw.requests) ? raw.requests : []) {
       if (!validRequest(request) || hashRequest(request) !== request.requestHash) continue
       if (request.status === 'approved' && !this.grants.has(request.grantId)) continue
       this.requests.set(request.id, request)
+    }
+    // The standalone approvals CLI copies no maxUses onto its Grant. Adopt the
+    // finite budget of the originating request so a one-use ask stays one-use
+    // no matter which approver wrote the file; 0.3 requests have no maxUses and
+    // therefore keep the legacy unlimited default.
+    for (const grant of this.grants.values()) {
+      if (grant.maxUses !== Infinity || typeof grant.requestId !== 'string') continue
+      const request = this.requests.get(grant.requestId)
+      if (request && Number.isInteger(request.maxUses)) {
+        grant.maxUses = request.maxUses
+        normalizeGrant(grant)
+      }
     }
     this.auditLog = raw.audit.slice(-MAX_AUDIT_ENTRIES)
     this.counts = loadCounts(raw.counts, this.auditLog)
@@ -230,7 +283,8 @@ export class GrantStore {
     const body = JSON.stringify({
       version: STATE_VERSION,
       counts: this.counts,
-      grants: [...this.grants.values()],
+      // JSON has no Infinity; null is the persisted form of "unlimited".
+      grants: [...this.grants.values()].map(grant => (grant.maxUses === Infinity ? { ...grant, maxUses: null } : grant)),
       requests: [...this.requests.values()],
       audit: this.auditLog,
     }, null, 2) + '\n'
@@ -302,18 +356,19 @@ function defineTool(name, description, properties, required, execute) {
 export function createTools(service, options = {}) {
   const tools = [
     defineTool('allow_issue',
-      'Issue a revocable capability grant and return it. Grants expire (default 24h, max 30 days).',
+      'Issue a revocable capability grant and return it. Grants expire (default 24h, max 30 days) and are unlimited by default.',
       {
         subject: { type: 'string', description: 'Who receives the grant, e.g. "agent:planner" or "plugin:dsh-act".' },
         capability: { type: 'string', description: 'Capability name, e.g. "fs.write" or "tool.invoke".' },
         scope: SCOPE_SCHEMA,
         ttlMs: { type: 'number', minimum: 1, maximum: MAX_TTL_MS, description: 'Lifetime in milliseconds (default 24h, max 30 days).' },
+        maxUses: { type: 'integer', minimum: 1, maximum: MAX_USES, description: 'Successful checks allowed (1-100). Omit for the legacy unlimited grant.' },
         approver: { type: 'string', description: 'Who approved it (default "user").' },
       },
       ['subject', 'capability'],
       async args => service.issue(args)),
     defineTool('allow_check',
-      'Check whether an active grant covers subject + capability + scope. Does not throw when denied.',
+      'Check whether an active grant covers subject + capability + scope and consume one use. Does not throw when denied.',
       {
         subject: { type: 'string' },
         capability: { type: 'string' },
@@ -328,13 +383,15 @@ export function createTools(service, options = {}) {
         capability: { type: 'string', description: 'Capability name, e.g. "fs.write".' },
         scope: SCOPE_SCHEMA,
         ttlMs: { type: 'number', minimum: 1, maximum: MAX_REQUEST_TTL_MS, description: 'How long the request stays pending (default 10m, max 30m).' },
+        maxUses: { type: 'integer', minimum: 1, maximum: MAX_USES, description: 'Successful uses requested (default 1, max 100).' },
         reason: { type: 'string', maxLength: MAX_REASON_LENGTH, description: 'Why you need it; untrusted self-report, never used for a decision.' },
       },
       ['subject', 'capability'],
       async args => {
         const request = service.request(args)
         return {
-          requestId: request.id, status: request.status, expiresAt: request.expiresAt, reason: request.reason,
+          requestId: request.id, status: request.status, expiresAt: request.expiresAt,
+          maxUses: request.maxUses, reason: request.reason,
           hint: `Ask a human to run: dsh-os approvals approve ${request.id} --by <name> --state <file>`,
         }
       }),
@@ -372,7 +429,7 @@ export function createTools(service, options = {}) {
       {
         subject: { type: 'string', description: 'Exact subject whose grants are returned.' },
         capability: { type: 'string' },
-        status: { type: 'string', enum: ['active', 'revoked', 'expired'] },
+        status: { type: 'string', enum: ['active', 'revoked', 'expired', 'used'] },
         approver: { type: 'string' },
       },
       ['subject'],
@@ -380,11 +437,12 @@ export function createTools(service, options = {}) {
         grants: service.list({ ...args, subject: text(args.subject, 'subject', 'E_SUBJECT', MAX_SUBJECT_LENGTH) }),
       })),
     defineTool('allow_approve',
-      'Human-only: approve a pending request and create its Grant in the same transaction. Scope may only narrow the request.',
+      'Human-only: approve a pending request and create its Grant in the same transaction. Scope may only narrow the request; maxUses defaults to 1 and may not exceed the request.',
       {
         id: { type: 'string', description: 'Request id returned by allow_request.' },
         by: { type: 'string', description: 'Human approver name recorded on the Grant.' },
         scope: SCOPE_SCHEMA,
+        maxUses: { type: 'integer', minimum: 1, maximum: MAX_USES, description: 'Uses to grant (default 1; may not exceed the request maxUses).' },
       },
       ['id', 'by'],
       async args => service.approve(args)),
@@ -411,6 +469,6 @@ export function createTools(service, options = {}) {
 
 export {
   fail, text, objectInput, normalizeScope, scopeCovers, narrowScope,
-  resolveTtl, resolveRequestTtl, resolveWait, cleanReason, canonical,
-  hashRequest, validRequest, clone, cloneEvidence, validGrant, loadCounts, isCheck, REQUEST_FIELDS,
+  resolveTtl, resolveRequestTtl, resolveWait, resolveMaxUses, cleanReason, canonical,
+  hashRequest, validRequest, clone, cloneEvidence, validGrant, normalizeGrant, loadCounts, isCheck, REQUEST_FIELDS,
 }

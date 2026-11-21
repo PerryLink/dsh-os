@@ -47,6 +47,14 @@ function toHit(raw, index, agentKey) {
   }
 }
 
+/** Extract the ref id, preferring the id the Seek service already parsed. */
+function idOf(ref, options) {
+  if (typeof options.id === 'string') return options.id
+  const prefix = 'dsh://memento/'
+  if (typeof ref === 'string' && ref.startsWith(prefix)) return ref.slice(prefix.length)
+  return undefined
+}
+
 /** First-party memento adapter. */
 export function createMementoProvider(ctx) {
   return {
@@ -66,6 +74,46 @@ export function createMementoProvider(ctx) {
       }, { agentKey })
       if (!Array.isArray(result?.entries)) throw fail('E_STATE', 'seek: memory.query returned no entries array')
       return result.entries.map((entry, index) => toHit(entry, index, agentKey)).filter(Boolean)
+    },
+
+    /**
+     * Look one entry up by id. dsh-memento has no get-by-id API, so the query is
+     * narrowed before returning (user-global + caller agentKey) and only then
+     * matched by id; it never falls back to a workspace or all-agent query.
+     * Found entries have no verifiable snapshot, so status stays `unknown`.
+     */
+    async resolve(ref, options = {}) {
+      const probe = probeMemento(ctx)
+      if (!probe.ok) throw fail('E_UNAVAILABLE', `seek: ${probe.reason}`)
+      if (typeof options.agentKey !== 'string' && options.agent === undefined) {
+        throw fail('E_UNAUTHORIZED', 'seek: memento resolve requires a caller agent (agentKey)')
+      }
+      const id = idOf(ref, options)
+      if (typeof id !== 'string' || id === '') {
+        throw fail('E_INVALID_ARGUMENT', 'seek: memento resolve requires a ref id')
+      }
+      let rawId
+      try {
+        rawId = decodeURIComponent(id)
+      } catch {
+        throw fail('E_INVALID_ARGUMENT', 'seek: memento ref id is not valid percent-encoding')
+      }
+      throwIfAborted(options.signal)
+      const agentKey = typeof options.agentKey === 'string' ? options.agentKey : ''
+      const result = await probe.memory.query({ scope: 'user-global', limit: 1000 }, { agentKey })
+      if (!Array.isArray(result?.entries)) throw fail('E_STATE', 'seek: memory.query returned no entries array')
+      const entry = result.entries.find(raw => raw !== null && typeof raw === 'object'
+        && raw.id === rawId
+        && raw.scope === 'user-global'
+        && (typeof raw.agentKey !== 'string' || raw.agentKey === '' || raw.agentKey === agentKey))
+      if (entry === undefined) return { found: false, status: 'missing', checkedAt: Date.now() }
+      return {
+        found: true,
+        status: 'unknown',
+        title: firstLine(entry.title ?? entry.text, 300) || `Memory ${rawId}`,
+        freshness: { state: 'unknown' },
+        checkedAt: Date.now(),
+      }
     },
   }
 }

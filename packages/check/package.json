@@ -1,6 +1,6 @@
 {
   "name": "@perrylink/dsh-check",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Paired-environment regression canary for DeepSeek Harness upgrades, model changes and plugin updates.",
   "type": "module",
   "main": "index.js",

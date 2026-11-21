@@ -3,19 +3,21 @@
 > Auditable long-term memory governance for DeepSeek Harness: provenance, expiry,
 > conflict, forget, and a read-only `dsh-memento` bridge.
 
-**Status: 0.2.0 adds the `dsh-memory-protocol/v1` memento bridge on top of the
-0.1.0 governance ledger.**
+**Status: 0.3.0 adds optional `dsh://` ref verification to `trace_remember` on
+top of the 0.2.0 memento bridge and the 0.1.0 governance ledger.**
 
 **memento 是前代 / 可迁移源；Trace 是治理层。** memento is the predecessor and
 migration source; Trace is the governance layer on the same protocol. Trace
 imports memento memories read-only, exports a memento-consumable payload, and
 never writes into memento or bypasses its approval gate.
 
-0.2.0 ships an in-memory, dependency-free governance ledger with the
+0.3.0 ships an in-memory, dependency-free governance ledger with the
 `trace_remember` / `trace_search` / `trace_forget` / `trace_list` tools, plus
 `trace_import_memento` / `trace_export_memento` / `trace_adapter_status`.
-Records are process-local and disappear when the host restarts. There is no
-SQLite, vector database or network access.
+When `dsh-seek` is mounted, a `dsh://` source passed to `trace_remember` is
+resolved through `ctx.evidence.resolve` before the claim is stored
+(`verifyRefs`, enabled by default). Records are process-local and disappear
+when the host restarts. There is no SQLite, vector database or network access.
 
 **Not affiliated with DeepSeek.** DeepSeek and DeepSeek Harness are trademarks
 of their respective owners.
@@ -276,7 +278,7 @@ All seven tools are plain `ToolDefinition` objects (no
 
 | Tool | Arguments | Result |
 | --- | --- | --- |
-| `trace_remember` | `key`, `text`; optional `source`, `scope`, `confidence`, `ttlMs`, `sensitivity`, `force` | `{ record }`, or `{ ok: false, code: 'trace_confidence_too_low', message, current }` |
+| `trace_remember` | `key`, `text`; optional `source` (free text or `dsh://` ref), `scope`, `confidence`, `ttlMs`, `sensitivity`, `force` | `{ record, verification? }`, `{ record, warning? }` in warn mode, `{ ok: false, code: 'E_REF_NOT_FOUND', ... }` for an unverified ref, or `{ ok: false, code: 'trace_confidence_too_low', message, current }` |
 | `trace_search` | `query`; optional `limit` | `{ results }` |
 | `trace_forget` | `key` | `{ forgotten }` |
 | `trace_list` | optional `limit` | `{ records }` |
@@ -287,6 +289,32 @@ All seven tools are plain `ToolDefinition` objects (no
 `limit` defaults to 20 and is capped at 100. Search is a case-insensitive
 substring match over key and text; key matches rank above text matches, then
 confidence and recency break ties.
+
+### Ref verification (`verifyRefs`)
+
+`apply(ctx, { verifyRefs, refVerifyMode, verifyTimeoutMs })`:
+
+- `verifyRefs` (default **true**): before storing a record, a `source` that
+  starts with `dsh://` is passed to `ctx.get('evidence').resolve(ref, { signal,
+  timeoutMs, cwd, agentKey, agent })`. `found: false` (missing, tombstoned,
+  timeout, error or `unsupported`) refuses the write with
+  `E_REF_NOT_FOUND`; the tool returns `{ ok: false, code: 'E_REF_NOT_FOUND',
+  message, ref, status, checkedAt?, error? }`. A verified write returns
+  `{ record, verification: { ok: true, status, ref, checkedAt? } }`.
+- `refVerifyMode: 'warn'` stores the record anyway and returns
+  `{ record, warning: { code: 'E_REF_NOT_FOUND', ... } }`. Use it only when the
+  caller will re-verify later.
+- `verifyTimeoutMs` (default 10000) bounds each resolve call.
+- Verification is skipped when `verifyRefs` is false, when `source` is not a
+  `dsh://` string (ordinary provenance labels such as `user` or
+  `check_compare` are never resolved), or when no `evidence` service with
+  `resolve` is mounted. Trace therefore remains a standalone ledger without
+  `dsh-seek`; in that configuration a `dsh://` source is stored as free text,
+  as in 0.2.0.
+- The verifier is lazy: `ctx.get('evidence')` is read at call time, so a Seek
+  plugin mounted after Trace is picked up without re-applying Trace.
+- `service.remember()` called directly (not through the tool) is not verified;
+  the gate belongs to `trace_remember`.
 
 ## Test
 
@@ -303,7 +331,7 @@ idempotent re-import, export, adapter round-trip and the missing-service
 
 ## Scope and limitations
 
-0.2.0 is still a **governance contract**, not a storage engine: explicit
+0.3.0 is still a **governance contract**, not a storage engine: explicit
 writes only, no automatic capture, no embedding, no multi-tenant isolation and
 no persistence. The memento bridge is intentionally read-only and the adapter
 is opt-in. memento v1's workspace layer cannot be filtered by `workspaceKey`,

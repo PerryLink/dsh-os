@@ -1,5 +1,7 @@
 # dsh-os 长期架构：从 73 个工具到“一个能力面”
 
+> **实现进度（2026-11-21）**：0.3 完成 kernel/registry、权限 request/approve、Act fs 动作、Shell 审批/活动；0.4 完成 76 个旧工具接入、Trigger payload、Ring receipt/tick、Seek resolve、Trace ref 校验、Allow 一次性 Grant、Check/Backup 安全默认、MCP 写审批、84 张能力卡。脚本评测 6/6（100%，1/6 自主，5 次人类介入）；**不是真模型成绩**，真模型 AUS 仍是下一步。
+
 > 结论日期：2026-11-21
 > 输入：11 份架构研究（[`01-agent-surface`](01-agent-surface.md) … [`11-ecosystem`](11-ecosystem.md)）
 > 性质：**决策记录 + 目标架构 + 迁移路线**，不是又一个补丁清单。
@@ -192,8 +194,8 @@ validate → authorize(Request/Grant) → preview(optional) → execute(sandbox/
 - 人类介入次数
 - 安全违规数
 
-基线：**30/100**（0/5 无人通过；首步 1/5；自助恢复 0/9）。
-目标：0.3 **70** / 0.4 **85** / 1.0 **95**。
+基线：2026-11-20 旧 trace **30/100**；2026-11-21 脚本策略 **40% → 100%（6/6，1/6 自主，5 次人类介入）**。两者不可直接比较；真模型 AUS 仍未测。
+目标：真模型 0.3 **70** / 0.4 **85** / 1.0 **95**。
 
 ## 7. 迁移：12 个月，5 阶段
 

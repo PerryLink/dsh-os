@@ -1,16 +1,19 @@
 /**
  * dsh-check — paired-environment regression canary for DeepSeek Harness.
  *
- * 0.2.0 adds a real headless runner on top of the dependency-free
- * four-dimension diff engine (result, trajectory, cost, approvals): the
- * `ctx.check.run()` seam and the optional `check_run` agent tool. The runner
- * needs a DSH checkout/bin and a model key; the diff engine does not.
+ * 0.3.0 adds safety defaults to the real headless runner: `check_run` needs a
+ * Grant, a rolling-hour budget, an allowlisted env and a prompt-free audit.
  * @module dsh-check
  */
 import { isDeepStrictEqual } from 'node:util'
+import {
+  CAP_ACT_CHECK_RUN, CAP_CHECK_RUN, RunBudget, granted, meterFrom, refusal,
+} from './lib/guard.js'
 import { CheckRunner } from './lib/runner.js'
 
-export { CheckRunner, DEFAULT_TIMEOUT_MS, parseOutput, summarizeEvents } from './lib/runner.js'
+export {
+  CheckRunner, DEFAULT_TIMEOUT_MS, MAX_OUTPUT_BYTES, parseOutput, sanitizeEnv, summarizeEvents,
+} from './lib/runner.js'
 
 /** Cordis plugin name. */
 export const name = 'dsh-check'
@@ -19,6 +22,7 @@ export const name = 'dsh-check'
 export const inject = ['tools']
 
 const EPSILON = 1e-9
+const MAX_AUDIT_ENTRIES = 200
 const fail = (code, message) => Object.assign(new Error(message), { code })
 const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value)
 
@@ -200,15 +204,89 @@ const NO_RUNNER = task => ({
 
 /** Host seam exposed as `ctx.check`. */
 export class CheckService {
-  /**
-   * @param {object} [options]
-   * @param {object} [options.runner] Injected runner exposing `run(task, opts)`.
-   * @param {string} [options.dshBin] DSH CLI entry; lazily builds a CheckRunner.
-   */
+  /** @param {object} [options] `{ctx, runner, dshBin, maxRunsPerHour, maxCostUsd, costMeter, allowedDshBins}`. */
   constructor(options = {}) {
     this.options = isObject(options) ? options : {}
+    this.ctx = this.options.ctx ?? null
     this.runner = this.options.runner ?? null
     this.dshBin = this.options.dshBin
+    this.budget = new RunBudget({
+      ...this.options,
+      costMeter: this.options.costMeter ?? meterFrom(this.ctx),
+    })
+    this.auditLog = []
+    this.auditSeq = 0
+  }
+
+  /** Resolve the optional Allow service through `ctx.get('allow')` or `ctx.allow`. */
+  allow() {
+    if (typeof this.options.allow?.check === 'function') return this.options.allow
+    const ctx = this.ctx
+    if (ctx === null || ctx === undefined) return null
+    if (typeof ctx.get === 'function') {
+      try {
+        const service = ctx.get('allow')
+        if (service !== undefined && service !== null) return service
+      } catch {
+        // A throwing service is not a Grant.
+      }
+    }
+    return ctx.allow ?? null
+  }
+
+  /** Resolve `check:run` or `act:invoke:check.run`; `null` fails closed. */
+  async authorize(subject) {
+    const allow = this.allow()
+    if (typeof subject !== 'string' || subject === '' || typeof allow?.check !== 'function') return null
+    for (const capability of [CAP_CHECK_RUN, CAP_ACT_CHECK_RUN]) {
+      try {
+        if (granted(await allow.check({ subject, capability }))) return capability
+      } catch {
+        // Fail closed: a broken Allow service never authorizes a run.
+      }
+    }
+    return null
+  }
+
+  /** `E_DENIED` value for the agent tool, with an `allow_request` hint. */
+  denied(subject) {
+    const nextTools = [{
+      tool: 'allow_request',
+      args: {
+        ...(typeof subject === 'string' && subject !== '' ? { subject } : {}),
+        capability: CAP_CHECK_RUN,
+        reason: 'Run one headless DSH check task (spawns a model-backed child process).',
+      },
+      why: `request a Grant for ${CAP_CHECK_RUN}, then retry check_run`,
+    }]
+    return refusal('E_DENIED', `check_run requires a Grant for capability "${CAP_CHECK_RUN}".`, {
+      subcode: 'grant_required',
+      nextTools,
+      details: { capability: CAP_CHECK_RUN, ...(typeof subject === 'string' && subject ? { subject } : {}) },
+    })
+  }
+
+  /** In-memory audit trail (prompts are never recorded). */
+  audit() {
+    return this.auditLog.map(entry => ({ ...entry }))
+  }
+
+  /** Append one `{runId,taskId,profile,exitCode,durationMs,costUsd?}` entry. */
+  recordAudit(record, profile, started, runId) {
+    const usd = record?.cost?.usd
+    const rawDuration = record?.raw?.durationMs
+    const entry = {
+      runId,
+      taskId: typeof record?.taskId === 'string' ? record.taskId : null,
+      profile,
+      exitCode: Number.isInteger(record?.exitCode) ? record.exitCode : null,
+      durationMs: typeof rawDuration === 'number' && Number.isFinite(rawDuration) && rawDuration >= 0
+        ? rawDuration
+        : Date.now() - started,
+    }
+    if (typeof usd === 'number' && Number.isFinite(usd) && usd > 0) entry.costUsd = usd
+    this.auditLog.push(entry)
+    if (this.auditLog.length > MAX_AUDIT_ENTRIES) this.auditLog.shift()
   }
 
   /** @see compareRuns */
@@ -216,16 +294,30 @@ export class CheckService {
     return compareRuns(oldRun, newRun, options)
   }
 
-  /**
-   * Run one task through a real DSH headless process. A runner can be injected
-   * per call (`{ runner }`) or configured on the service; without either this
-   * resolves to `{ ok: false, code: 'no_runner' }` instead of throwing.
-   */
+  /** Run one task through the configured/injected runner; no runner -> no_runner. */
   async run(task, options = {}) {
     const { runner, ...runOptions } = isObject(options) ? options : {}
     const active = runner ?? this.runner ?? this.lazyRunner()
     if (!active) return NO_RUNNER(task)
-    return active.run(task, runOptions)
+    const admitted = await this.budget.admit()
+    if (!admitted.ok) {
+      return refusal('E_LIMIT', `check_run budget exhausted: ${admitted.reason}.`, {
+        subcode: 'quota_exceeded',
+        retryAfterMs: admitted.retryAfterMs,
+        details: {
+          reason: admitted.reason,
+          maxRunsPerHour: this.budget.maxRunsPerHour,
+          maxCostUsd: this.budget.maxCostUsd,
+          costMeter: this.budget.costMeter !== null,
+        },
+      })
+    }
+    const started = Date.now()
+    const record = await active.run(task, runOptions)
+    const runId = `run_${started.toString(36)}_${(this.auditSeq += 1).toString(36)}`
+    if (isObject(record)) record.runId = runId
+    this.recordAudit(record, active.profile ?? this.options.profile ?? 'headless', started, runId)
+    return record
   }
 
   lazyRunner() {
@@ -238,6 +330,8 @@ export class CheckService {
       cwd: this.options.cwd,
       timeoutMs: this.options.timeoutMs,
       env: this.options.env,
+      allowedDshBins: this.options.allowedDshBins,
+      killGraceMs: this.options.killGraceMs,
       spawn: this.options.spawn,
     })
     return this.runner
@@ -280,7 +374,8 @@ function runTool(check) {
   return {
     name: 'check_run',
     description: 'Run one task through the real DSH headless CLI (configured dshBin) and '
-      + 'return its four-dimension record. Requires a DSH checkout and a model key.',
+      + 'return its four-dimension record. Requires a Grant for capability "check:run", '
+      + 'a DSH checkout and a model key; budget-limited and audited.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -295,7 +390,7 @@ function runTool(check) {
       schema: { type: 'object', additionalProperties: true },
       render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
     },
-    async execute(args) {
+    async execute(args, exec) {
       if (!isObject(args) || typeof args.prompt !== 'string' || args.prompt.trim() === '') {
         throw fail('invalid_arguments', 'check_run requires a non-empty prompt')
       }
@@ -306,7 +401,12 @@ function runTool(check) {
         && (typeof args.timeoutMs !== 'number' || !Number.isFinite(args.timeoutMs) || args.timeoutMs <= 0)) {
         throw fail('invalid_arguments', 'check_run timeoutMs must be a positive finite number')
       }
-      return check.run({ id: args.id ?? 'task', prompt: args.prompt }, { timeoutMs: args.timeoutMs })
+      const subject = exec?.agent?.session?.id ?? exec?.agent?.id ?? exec?.subject
+      if ((await check.authorize(subject)) === null) return check.denied(subject)
+      return check.run(
+        { id: args.id ?? 'task', prompt: args.prompt },
+        { timeoutMs: args.timeoutMs, signal: exec?.signal },
+      )
     },
   }
 }
@@ -315,11 +415,13 @@ function runTool(check) {
  * Mount dsh-check: provide `ctx.check` and register `check_compare`; register
  * the optional `check_run` tool only when the host supplies `dshBin`/`runner`.
  * @param {object} ctx - Cordis context.
- * @param {object} [config] - `{runner, dshBin, profile, cwd, timeoutMs, env, spawn}`.
+ * @param {object} [config] - `{runner, dshBin, profile, cwd, timeoutMs, env,
+ * spawn, maxRunsPerHour, maxCostUsd, costMeter, allowedDshBins}`.
  */
 export function apply(ctx, config = {}) {
   const options = isObject(config) ? config : {}
   const check = new CheckService({
+    ctx,
     runner: options.runner,
     dshBin: options.dshBin ?? process.env.DSH_BIN,
     profile: options.profile,
@@ -327,6 +429,10 @@ export function apply(ctx, config = {}) {
     timeoutMs: options.timeoutMs,
     env: options.env,
     spawn: options.spawn,
+    maxRunsPerHour: options.maxRunsPerHour,
+    maxCostUsd: options.maxCostUsd,
+    costMeter: options.costMeter,
+    allowedDshBins: options.allowedDshBins,
   })
   ctx.provide('check', check)
   if (ctx.tools && typeof ctx.tools.register === 'function') {

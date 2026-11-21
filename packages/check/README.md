@@ -3,13 +3,13 @@
 > **Upgrade canary, not an update checker.** Compare two paired runs across
 > result, trajectory, cost and approvals, then fail CI only on a real regression.
 
-**Status: 0.2.0 — real headless runner + diff engine.** `dsh-check run`
+**Status: 0.3.0 — safety defaults on the real headless runner.** `dsh-check run`
 launches `dsh --profile headless --json "<task>"` once per task, maps the four
 dimensions, and writes one diffable `run-<id>.json` per task. A real runner
 needs a **DSH checkout (or installed CLI) and a model key**; CI should pin
-`--profile headless` (the default). Without those, keep using `diff` on run JSON
-files produced by any other harnessable run. The 0.1.1 diff engine is unchanged.
-（真 runner 需要 DSH checkout 与模型 key；CI 里用 `--profile headless`。）
+`--profile headless` (the default). The agent tool `check_run` now requires an
+Allow Grant, is budget-limited, gets a sanitized environment and is audited.
+（真 runner 需要 DSH checkout 与模型 key；`check_run` 需 Grant，有预算/审计。）
 
 **Not affiliated with DeepSeek.** DeepSeek and DeepSeek Harness are trademarks
 of their respective owners.
@@ -95,9 +95,15 @@ It captures stdout/stderr, parses the NDJSON event stream, and maps:
 | `approvals` | `--json` does not project approval events, so counts stay `0` (or `rejected` is inferred from `SANDBOX_ESCALATION_REJECTED` / `APPROVAL_REJECTED` tool results, with `raw.approvalsSource: "inferred"`) |
 
 Timeout is owned by the runner because headless `dsh` has no `--timeout`: on
-timeout it sends `SIGINT`, waits a 5 s grace period, then sends `SIGKILL`.
-`SIGTERM` is deliberately not used — a DSH process can exit `0` on `SIGTERM`,
-which would look like success.
+timeout (or an aborted `AbortSignal`) it sends `SIGINT`, waits a 5 s grace
+period, then sends `SIGKILL`. `SIGTERM` is deliberately not used — a DSH process
+can exit `0` on `SIGTERM`, which would look like success.
+
+Captured stdout is capped at **2 MiB** (`raw.stdoutBytes`,
+`raw.stdoutTruncated`); stderr at 64 KiB. The child environment is allowlisted
+to `PATH`, `HOME`, `DSH_*` and `NODE_*`; host API keys and `NODE_OPTIONS` are
+dropped. Explicit `env` config is trusted and merged last; `allowedDshBins` pins
+`dshBin`.
 
 Programmatic use:
 
@@ -119,12 +125,39 @@ const record = await runner.run({ id: 'repo-status', prompt: 'Report git status.
 `ok: true` and `code: null`. `raw` carries `sessionId`, `finalReason`, event
 counts, stderr, duration, `timedOut`, `usageComplete` and provenance flags.
 
-Known runner limits: the child inherits the host's `DSH_HOME`, cwd and
-credentials (no per-task isolation yet); no `--session-id` replay (it appends a
-new turn and bills again); no `--max-steps` (wrap the call in your own timeout);
-approvals are not in the `--json` stream; and DSH reports no USD price. Requires
+Known runner limits: the child inherits allowlisted `DSH_*`/`NODE_*` variables
+(including `DSH_HOME`) and the host cwd, with no per-task isolation yet; provider
+keys must come from DSH config or explicit `env` config. No `--session-id`
+replay (it appends a new turn and bills again); no `--max-steps` (wrap the call
+in your own timeout); approvals are not in the `--json` stream; and DSH reports
+no USD price. Requires
 `dsh >= 0.2.2-alpha.2` (the version this runner is tested against; `--json`
 itself landed in `0.2.0-rc.2`).
+
+## Safety defaults
+
+`check_run` is an agent tool that spends money and starts a child process, so
+0.3.0 gates it:
+
+- **Grant first.** The tool resolves the calling subject
+  (`exec.agent.session.id`) and asks Allow for capability `check:run` (or the
+  Act alias `act:invoke:check.run`). A missing service, subject or active Grant
+  fails closed with `E_DENIED` and `nextTools: [{tool: "allow_request", ...}]`;
+  nothing is spawned. The `ctx.check.run()` host seam is trusted code and is not
+  Grant-gated.
+- **Budget.** A rolling-hour `maxRunsPerHour` cap (default 10) always applies.
+  `maxCostUsd` (default 5) applies only when `costMeter` is configured, because
+  DSH reports tokens, not USD; without a meter only the run count is limited.
+  An exhausted budget returns `E_LIMIT` before spawning.
+- **Environment.** Only `PATH`, `HOME`, `DSH_*` and `NODE_*` are inherited;
+  API keys are not. `NODE_OPTIONS` is dropped. Explicit `env` config is trusted
+  and merged last, so a host can deliberately pass a key.
+- **Executable.** `allowedDshBins` (absolute or cwd-relative) must contain
+  `dshBin` when set. The CLI `--dsh-bin` flag and plugin `dshBin` config are
+  explicit host decisions.
+- **Audit.** Every run appends `{runId, taskId, profile, exitCode, durationMs,
+  costUsd?}` to `ctx.check.audit()` (last 200 entries). Prompts are never
+  recorded.
 
 ## Run JSON
 
@@ -156,7 +189,7 @@ top-level fields are ignored by the diff engine, so a `run-*.json` file can be
 passed straight to `diff`.
 
 - `tasks` is required and task ids must be unique and non-empty. `environment`
-  is optional metadata and does not affect the verdict in 0.2.0.
+  is optional metadata and does not affect the verdict.
 - `result` is any JSON value and is compared by deep equality. Object key order
   is ignored; an omitted result compares as missing. `run` omits `result` when
   no `final` event arrived.
@@ -274,13 +307,16 @@ can also be injected: `apply(ctx, { runner: myRunner })` or
 `run` resolves `{ ok: false, code: 'no_runner' }` and `check_run` is not
 registered.
 
+`check_run` requires a Grant for `check:run`; the tool result carries
+`E_DENIED` plus an `allow_request` hint when it is missing.
+
 ## Roadmap
 
 - **0.1.0 / 0.1.1:** four-dimension diff engine, CLI (`diff`, `init`, `list`),
   `ctx.check`, `check_compare`, exit codes.
-- **0.2.0 (this release):** real headless runner (`run`, `CheckRunner`,
-  `ctx.check.run`, optional `check_run`), NDJSON mapping, SIGINT → SIGKILL
-  timeout, per-task run files.
+- **0.2.0:** real headless runner (`run`, `CheckRunner`, `ctx.check.run`,
+  optional `check_run`), NDJSON mapping, SIGINT → SIGKILL timeout, per-task run
+  files.
 - **Next:** isolated `DSH_HOME`/overlay per task, approvals from the session
   log, optional pricing tables, Markdown/JUnit reports and a GitHub Action.
 
