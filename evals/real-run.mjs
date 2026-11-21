@@ -272,17 +272,17 @@ export function preflight({ dshBin, profile, keyPresent } = {}) {
   if (!key) return { ok: false, exitCode: 2, message: `未运行：${NEED_MESSAGE}。未检测到模型 key（${KEY_VARS.join('/')}）；设置 key 或 DSH_REAL_ALLOW_NO_KEY=1（仅用于接线测试）。` }
   return { ok: true, dshBin: resolved, profile: profile ?? process.env.DSH_PROFILE ?? 'headless', keyVar: keyPresent === true ? 'test' : hasModelKey() }
 }
-function spawnWithLimits({ dshBin, profile, scenario, cwd, env, timeoutMs, maxSteps, killGraceMs, spawnImpl }) {
+function spawnWithLimits({ dshBin, profile, scenario, cwd, env, timeoutMs, maxSteps, maxTokens, killGraceMs, spawnImpl }) {
   const args = [dshBin, '--profile', profile, '--json', ...(scenario.args ?? []), scenario.prompt]
   return new Promise(done => {
-    let child, stdout = '', stderr = '', stepStarts = 0, finished = false, terminating = false
-    let timedOut = false, stepLimitHit = false, outputLimitHit = false
+    let child, stdout = '', stderr = '', lineBuffer = '', stepStarts = 0, finished = false, terminating = false
+    let timedOut = false, stepLimitHit = false, outputLimitHit = false, tokenLimitHit = false, tokensUsed = 0
     const started = Date.now(), timers = []
     const finish = (exitCode, signal, spawnError = null) => {
       if (finished) return
       finished = true
       for (const timer of timers) clearTimeout(timer)
-      done({ args, cwd, env, stdout, stderr, exitCode, signal, spawnError, timedOut, stepLimitHit, outputLimitHit, durationMs: Date.now() - started })
+      done({ args, cwd, env, stdout, stderr, exitCode, signal, spawnError, timedOut, stepLimitHit, outputLimitHit, tokenLimitHit, tokensUsed, durationMs: Date.now() - started })
     }
     const send = signal => {
       try { if (process.platform !== 'win32' && child.pid) process.kill(-child.pid, signal); else child.kill(signal) } catch { try { child.kill(signal) } catch {} }
@@ -292,6 +292,7 @@ function spawnWithLimits({ dshBin, profile, scenario, cwd, env, timeoutMs, maxSt
       if (reason === 'timeout') timedOut = true
       if (reason === 'steps') stepLimitHit = true
       if (reason === 'output') outputLimitHit = true
+      if (reason === 'tokens') tokenLimitHit = true
       if (terminating) return
       terminating = true
       send('SIGINT')
@@ -312,7 +313,20 @@ function spawnWithLimits({ dshBin, profile, scenario, cwd, env, timeoutMs, maxSt
     child.stdout?.on('data', chunk => {
       stdout += chunk
       stepStarts += (String(chunk).match(/"phase"\s*:\s*"step_start"/g) ?? []).length
+      lineBuffer += chunk
+      const lines = String(lineBuffer).split(/\r?\n/)
+      lineBuffer = lines.pop() ?? ''
+      for (const line of lines) {
+        if (!maxTokens || !line.trim()) continue
+        try {
+          const event = JSON.parse(line)
+          if (event?.type === 'status' && event.phase === 'step_end' && event.usage) {
+            tokensUsed += event.usage.totalTokens ?? ((event.usage.inputTokens ?? 0) + (event.usage.outputTokens ?? 0))
+          }
+        } catch {}
+      }
       if (maxSteps && stepStarts > maxSteps) terminate('steps')
+      if (maxTokens && tokensUsed > maxTokens) terminate('tokens')
       if (Buffer.byteLength(stdout) > MAX_OUTPUT_BYTES) terminate('output')
     })
     child.stderr?.on('data', chunk => { stderr += chunk })
@@ -343,7 +357,7 @@ export async function runScenario(scenario, options = {}) {
     for (const key of ['DSH_SESSION_ID', 'DSH_PROFILE', 'DSH_PROFILE_DIR', 'DSH_WEB_URL']) delete env[key]
     const exec = await spawnWithLimits({
       dshBin: isAbsolute(dshBin) ? dshBin : resolve(process.cwd(), dshBin), profile, scenario, cwd: sandbox, env,
-      timeoutMs: options.timeoutMs ?? scenario.timeoutMs, maxSteps: options.maxSteps ?? scenario.maxSteps,
+      timeoutMs: options.timeoutMs ?? scenario.timeoutMs, maxSteps: options.maxSteps ?? scenario.maxSteps, maxTokens: options.maxTokens ?? scenario.maxTokens ?? 300_000,
       killGraceMs: options.killGraceMs, spawnImpl: options.spawn ?? nodeSpawn,
     })
     const parsed = parseNdjson(exec.stdout)
@@ -367,7 +381,7 @@ export async function runScenario(scenario, options = {}) {
     }))
     const expectedFirst = scenario.expectedFirstTool === undefined ? [] : toArray(scenario.expectedFirstTool)
     const firstTool = stream.steps[0]?.tool ?? null
-    const success = !exec.timedOut && !exec.stepLimitHit && !exec.spawnError
+    const success = !exec.timedOut && !exec.stepLimitHit && !exec.tokenLimitHit && !exec.spawnError
       && checks.length > 0 && checks.every(check => check.ok)
     run = {
       id: scenario.id, title: scenario.title, goal: scenario.goal, initial: scenario.initial ?? [], prompt: scenario.prompt,
@@ -382,7 +396,7 @@ export async function runScenario(scenario, options = {}) {
       checks, failures: failures.map(step => ({ n: step.n, tool: step.tool, code: step.code, invalid: step.invalid })),
       approvals, finalReason: stream.final?.reason ?? null, finalText: truncate(stream.final?.text ?? '', 2000),
       sessionId: stream.session?.sessionId ?? null, exitCode: exec.exitCode, timedOut: exec.timedOut,
-      stepLimitHit: exec.stepLimitHit, outputLimitHit: exec.outputLimitHit,
+      stepLimitHit: exec.stepLimitHit, tokenLimitHit: exec.tokenLimitHit, tokensUsed: exec.tokensUsed, outputLimitHit: exec.outputLimitHit,
       protocolOk: exec.exitCode === 0 && stream.final?.reason?.kind === 'completed',
       parseErrors: parsed.parseErrors, badLines: parsed.badLines, usageComplete: stream.usageComplete,
       tokensSource: tokensEstimate === stream.tokens && stream.tokens > 0 ? 'usage' : 'heuristic',
@@ -397,7 +411,7 @@ export async function runScenario(scenario, options = {}) {
       interventions: [], firstTool: null, expectedFirstTool: toArray(scenario.expectedFirstTool), firstStepCorrect: false,
       steps: [], checks: [{ id: 'runner-error', ok: false, detail: error.message }], failures: [], approvals: { asked: 0, decided: 0, rejected: 0, outcomes: {}, source: 'none' },
       finalReason: null, finalText: '', sessionId: null, exitCode: null, timedOut: false, stepLimitHit: false,
-      outputLimitHit: false, protocolOk: false, parseErrors: 0, badLines: [], usageComplete: false, tokensSource: 'heuristic',
+      outputLimitHit: false, tokenLimitHit: false, tokensUsed: 0, protocolOk: false, parseErrors: 0, badLines: [], usageComplete: false, tokensSource: 'heuristic',
       durationMs: 0, stdoutBytes: 0, stderr: '', profile, dshBin: dshBin ?? null,
       error: { code: error.code ?? 'E_RUNNER', message: error.message },
     }

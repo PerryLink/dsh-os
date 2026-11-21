@@ -39,9 +39,9 @@ const base = {
 
 test('scenario JSONs load and cover the required kinds', () => {
   const scenarios = loadScenarios()
-  assert.equal(scenarios.length, 5)
+  assert.equal(scenarios.length, 6)
   const ids = scenarios.map(scenario => scenario.id)
-  for (const id of ['fix-failing-test', 'approval-recovery', 'seek-evidence']) assert.ok(ids.includes(id), id)
+  for (const id of ['fix-failing-test', 'approval-recovery', 'seek-evidence', 'kernel-discovery']) assert.ok(ids.includes(id), id)
   for (const scenario of scenarios) {
     assert.ok(scenario.goal && scenario.prompt && scenario.initial.length > 0, scenario.id)
     assert.ok(scenario.checks.length > 0, scenario.id)
@@ -223,4 +223,17 @@ test('reports are timestamped JSON + Markdown and never overwrite', () => {
     assert.match(readFileSync(paths.md, 'utf8'), /真模型评测报告/)
     assert.throws(() => writeReports(report, dir))
   } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+test('mock token budget terminates the run before it burns more tokens', async () => {
+  const spawn = fakeSpawn(({ child }) => {
+    emit(child, { type: 'status', phase: 'step_start' })
+    emit(child, { type: 'status', phase: 'step_end', usage: { inputTokens: 40, outputTokens: 20, totalTokens: 60 } })
+    emit(child, { type: 'status', phase: 'step_start' })
+  })
+  const scenario = { ...base, id: 'tokens', prompt: 'x', checks: [{ id: 'ok', kind: 'file', path: 'nope', exists: false }] }
+  const run = await runScenario(scenario, { spawn, dshBin: base.dshBin, profile: 'headless', maxTokens: 50, killGraceMs: 20 })
+  assert.equal(run.tokenLimitHit, true)
+  assert.equal(run.success, false)
+  assert.ok(run.tokensUsed >= 60)
 })

@@ -62,6 +62,14 @@ so it can coexist with a globally mounted kernel: the preset gets its own
 still hides every inherited non-`os_*` tool. Without that isolation a second
 kernel mount would fail with "service kernel has been registered".
 
+## Headless is not a valid test surface
+
+The `headless` bundle does not compose the preset registry and refuses to adopt a
+session with `agentPreset` (`packages/bundle/headless/src/index.ts`). Test this
+preset in `web`/`tui` or a custom bundle that mounts
+`@deepseek-ai/dsh-agent-preset-registry`; `dsh --profile headless` cannot prove
+that only six tools are visible.
+
 ## Verify
 
 ```sh

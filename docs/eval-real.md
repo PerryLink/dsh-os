@@ -105,7 +105,7 @@ evals/real/reports/<ISO 时间戳>.md     # 同内容的人类可读报告
 | `kernel-discovery` | ✅ | 5 | 91,385 | 7.0s | 0 | — |
 | `regression-triage` | ✅ | 6 | 107,733 | 9.3s | 0 | — |
 | `fix-failing-test` | ✅ | 17 | 272,707 | 77.3s | 1（unavailable） | — |
-| `seek-evidence` | ❌ | 59 | 1,283,692 | 105.3s | 1（unavailable） | `evidence.json` 不存在 |
+| `seek-evidence` | ❌ | 52–59 | 0.77–1.28M | 105s | 1（unavailable） | `evidence.json` 不存在；已加 300k token 预算 |
 
 **可用的真实结论：**
 
@@ -114,12 +114,13 @@ evals/real/reports/<ISO 时间戳>.md     # 同内容的人类可读报告
 - 真模型能修测试（`fix-failing-test`），但花了 **17 步 / 272k tokens / 77s**，且触发 1 次不可用审批。
 - `seek-evidence` 失败：模型在 59 步内反复读文件、没有写 `evidence.json`，吃掉 **1.28M tokens** 后触发 step limit/exit 130。这不是“架构通过”，是真实失败，保留。
 
-**gateway-only preset 真机测试失败：**
+**gateway-only preset 真机测试失败（headless 根本不加载 preset）：**
 
 - 建了 `eval-gw` 副本，加 `docs/presets/os-gateway.cordis.yml` 和 `@deepseek-ai/dsh-agent-preset-registry`。
 - registry 导入失败（缺 `@deepseek-ai/cordis` 等 peer），`preset-os-gateway` 一直 `pending (waiting for service: agentPresets)`。
 - 结果：模型仍然看到并可调用 `read` / `glob`；`os_status` 只报告 kernel 自己的 6 个工具，不代表全局 tool surface。
-- **所以“模型只看到 5 个动词”尚未在真机成立**，只是代码路径和 preset 文档存在。
+- headless bundle 的源码明确写着“不组合 preset registry”，并拒绝 `agentPreset` 会话（`packages/bundle/headless/src/index.ts:203-224`）；所以 headless 永远无法验证 gateway-only。
+- **所以“模型只看到 5 个动词”尚未在真机成立**；需要在 web/tui 或自定义 bundle 中验证，不是修 peer 就能解决。
 
 **复现：**
 
