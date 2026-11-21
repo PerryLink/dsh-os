@@ -1,4 +1,24 @@
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/dsh-os-hero-en-dark.webp">
+  <img src="docs/assets/dsh-os-hero-en-light.webp" width="100%" alt="dsh-os: a real dsh-os list catalog — Act 0.1.1, Allow 0.1.2 and Check 0.2.0, scoped where npm requires it — with the 6/6 grant-gate demo and the green 20-package conformance on the right">
+</picture>
+
 # dsh-os
+
+**OS-level primitives for DeepSeek Harness — twenty small packages that stay independent.**
+
+*11 core modules + 5 optional + a contract, a React shell, a catalog CLI and a dependency-only kit; one Host service per module, zero runtime dependencies, and a write that never runs without a human Grant.*
+
+[简体中文](README-zh.md) · [Español](README-es.md) · [Português](README-pt.md) · [हिन्दी](README-hi.md)
+
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D22.19.0-brightgreen.svg)]()
+
+</div>
+
+---
 
 A family of **OS-level primitives for DeepSeek Harness**: 11 core modules
 (Act, Allow, Snip, Check, Nest, Trigger, Seek, Trace, Stage, Ring, Root), 5
@@ -56,6 +76,13 @@ needs only Node 22+; nothing is installed or published.
 and `Contract` use the `@perrylink/` scope where npm's name-similarity rules
 require it; the product names stay bare.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/dsh-os-flow-v5-dark.svg">
+  <img src="docs/assets/dsh-os-flow-v5-light.svg" width="100%" alt="dsh-os structure: packages/* becomes standalone DSH bundles, each with its own cordis.patch.yml layer, installed by dsh plugin add (or the dependency-only dsh-os-kit) and exposing one ctx service; test-all, conformance, pack-smoke, check-versions and examples-smoke are the local gates, and the dsh-check gate diffs two run JSON files to a REGRESSION">
+</picture>
+
+*Structure: package → patch layer → service → gate; `dsh-os-kit` installs Act + Allow + Snip + Check in one command, and the same gates run in CI and locally. The token labels inside the diagram are the real package, service and command names, so the same picture serves all five languages.*
+
 ## Install
 
 ```sh
@@ -109,6 +136,10 @@ adapter, Ring webhook/ntfy/console channels and the React shell.
 four-gate release check.
 
 ## Development
+
+![dsh-os real run: the zero-install demo walks deny → 30-minute Grant → allow → revoke → deny in 6/6 steps, the dsh-check gate reports a REGRESSION and exits 1, and conformance passes 20 packages with 0 errors](docs/assets/dsh-os-demo.gif)
+
+*Animated: the real stdout of `node examples/os-kit/demo.mjs`, `bash examples/os-kit/check-demo/run-check-demo.sh` and `node scripts/conformance.mjs` on 2026-11-21 (selected lines; Grant ids and `clipboard://` handles differ per run). Nothing is installed and no network is used.*
 
 ```sh
 node scripts/scaffold.mjs
