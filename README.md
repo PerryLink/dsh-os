@@ -24,6 +24,7 @@ needs only Node 22+; nothing is installed or published.
 **Docs:** [Quickstart](docs/quickstart.md) ·
 [AI handbook](docs/ai-handbook.md) ·
 [Real-model eval](docs/eval-real.md) (5/5 real run) ·
+[Web approval bridge](docs/presets/web-approval.md) ·
 [Architecture 0.3](docs/architecture-0.3.md) ·
 [AI capability cards](docs/ai-capability-cards.md) ·
 [Validation plan](docs/validation/PLAN.md) ·
@@ -36,7 +37,7 @@ needs only Node 22+; nothing is installed or published.
 
 | Product | Package | Status | Design |
 |---|---|---|---|
-| **Act** | `dsh-act` | 0.6.0 (kernel capability names) | [design](docs/design/01-act.md) |
+| **Act** | `dsh-act` | 0.7.0 (one-approval proof) | [design](docs/design/01-act.md) |
 | **Allow** | `dsh-allow` | 0.4.0 (one-time grants) | [design](docs/design/02-allow.md) |
 | **Snip** | `dsh-snip` | 0.4.0 (capture + taint) | [design](docs/design/03-snip.md) |
 | **Check** | `dsh-canary` | 0.4.0 (runner + envelope) | [design](docs/design/04-check.md) |
@@ -55,8 +56,8 @@ needs only Node 22+; nothing is installed or published.
 | **Shell** | `dsh-os-shell` | 0.4.0 optional | injection-safe approvals/activity |
 | **CLI** | `dsh-os-cli` | 0.2.0 tool | `dsh-os list/doctor/install/approvals` |
 | **Contract** | `dsh-os-contract` | 0.2.0 library | result/error/handle protocols |
-| **Kit** | `dsh-os-kit` | 0.9.0 meta bundle | installs 6 latest modules |
-| **Kernel** | `dsh-os-kernel` | 0.5.0 core | Act projection + taint |
+| **Kit** | `dsh-os-kit` | 0.10.0 meta bundle | installs 6 latest modules |
+| **Kernel** | `dsh-os-kernel` | 0.6.0 core | clean one-approval bridge |
 | **MCP** | `dsh-os-mcp` | 0.2.0 tool | read-only default + write approval path |
 | **A2A** | `dsh-os-a2a` | 0.1.0 tool | agent card + task protocol prototype |
 

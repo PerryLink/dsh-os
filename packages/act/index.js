@@ -233,6 +233,14 @@ export class ActService {
     // let one grant authorize every background/plugin call.
     const subject = meta?.subject ?? meta?.sessionId
     if (typeof subject !== 'string' || subject === '') return false
+    // A trusted caller (the kernel) may hand over the Grant it already
+    // consumed; accept it only when it names this exact capability and is
+    // still active. Tool callers cannot supply meta.grant.
+    const proof = meta?.grant
+    if (proof && typeof proof === 'object'
+      && ['active', 'granted', 'approved', 'issued', 'used'].includes(proof.status)
+      && (proof.expiresAt === undefined || proof.expiresAt === null || proof.expiresAt > Date.now())
+      && [capability, alternate].filter(Boolean).includes(proof.capability)) return true
     for (const name of [capability, alternate].filter(Boolean)) {
       try {
         if (granted(await allow.check({ subject, capability: name }))) return true

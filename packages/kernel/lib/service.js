@@ -112,6 +112,10 @@ export class KernelService extends CapabilityRegistry {
               subject,
               agent: exec?.agent,
               signal: exec?.signal,
+              // The kernel has already consumed the human-approved Grant;
+              // hand it to Act so the module does not re-check (and see it
+              // exhausted) under the same one-time capability.
+              grant: exec?.grant,
             })
             if (!result || result.ok !== true) {
               const error = new Error(result?.message ?? `act.${action.id} failed`)

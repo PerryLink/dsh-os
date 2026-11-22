@@ -18,8 +18,14 @@
  * /home/yy/.dsh/.credentials.yaml, is passed to the server only through its
  * environment, and is never printed or written to disk.
  *
+ * Two modes:
+ *   default (bridge): the historical profile-layer bridge recipe (two approvals).
+ *   DSH_WEB_APPROVAL_CLEAN=1: a clean profile with only the shipped packages,
+ *   no test capability and exactly one cap:act.fs.write request/approval.
+ *
  * Usage:
  *   node evals/real/web-approval.mjs
+ *   DSH_WEB_APPROVAL_CLEAN=1 node evals/real/web-approval.mjs
  *   DSH_HOME=/tmp/dsh-real-home DSH_PROFILE=eval-gw node evals/real/web-approval.mjs
  */
 import { spawn, spawnSync } from 'node:child_process'
@@ -32,10 +38,13 @@ import { setTimeout as delay } from 'node:timers/promises'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO = resolve(HERE, '../..')
+const CLEAN = process.env.DSH_WEB_APPROVAL_CLEAN === '1' || process.env.DSH_WEB_APPROVAL_CLEAN === 'true'
 const DSH_BIN = process.env.DSH_BIN || '/home/yy/deepseek-harness/apps/cli/lib/bin.js'
 const DSH_HOME = process.env.DSH_HOME || '/tmp/dsh-real-home'
-const PROFILE = process.env.DSH_PROFILE || 'eval-gw'
-const WORKDIR = resolve(process.env.DSH_EVAL_WORKDIR || '/tmp/dsh-web-approval/work')
+const CLEAN_PROFILE = 'eval-gw-clean'
+const PROFILE = process.env.DSH_PROFILE || (CLEAN ? CLEAN_PROFILE : 'eval-gw')
+const WORKDIR = resolve(process.env.DSH_EVAL_WORKDIR
+  || (CLEAN ? '/tmp/dsh-web-approval-clean/work' : '/tmp/dsh-web-approval/work'))
 const CREDENTIALS = process.env.DSH_CREDENTIALS || '/home/yy/.dsh/.credentials.yaml'
 const APPROVER = 'eval-human'
 const CAP_ID = 'act.fs.write'
@@ -241,6 +250,7 @@ function dedupe(values) {
  * repository's packages/* tree is never modified.
  */
 function prepareProfile() {
+  if (CLEAN) return prepareCleanProfile()
   if (!existsSync(DSH_BIN)) fail('dsh/not-found', `dsh checkout CLI not found: ${DSH_BIN}`)
   if (!existsSync(profileDir())) {
     log(`initializing profile ${PROFILE} from the shipped web template`)
@@ -398,6 +408,145 @@ ${shellRow}# The Web bundle already composes agent-preset-registry. Override it;
                         return act.invoke('fs.write', input, { subject: exec.subject, origin: 'kernel', tainted: false });
                       }
                     }]
+`
+  writeFileSync(join(profileDir(), 'cordis.patch.yml'), patch)
+}
+
+/**
+ * Clean mode: a fresh Web profile with only the shipped packages. No
+ * dsh-eval-kernel-bridge, no dsh-eval-approval-bridge, no test capability.
+ * The profile is not the polluted eval-gw; the default is eval-gw-clean.
+ */
+function prepareCleanProfile() {
+  if (!existsSync(DSH_BIN)) fail('dsh/not-found', `dsh checkout CLI not found: ${DSH_BIN}`)
+  if (!existsSync(profileDir())) {
+    log(`initializing clean profile ${PROFILE} from the shipped web template`)
+    runDsh(['--profile', PROFILE, '--from-default-profile', 'web', '--dump-config'])
+  }
+
+  let { dir, manifest } = readProfile()
+  const bundles = Array.isArray(manifest.dsh?.profile?.bundles) ? [...manifest.dsh.profile.bundles] : []
+  let swapped = bundles.map(bundle => bundle === '@deepseek-ai/dsh-headless' ? '@deepseek-ai/dsh-web-app' : bundle)
+  if (!swapped.includes('@deepseek-ai/dsh-web-app')) {
+    const base = swapped.indexOf('@deepseek-ai/dsh-base')
+    swapped.splice(base >= 0 ? base + 1 : 0, 0, '@deepseek-ai/dsh-web-app')
+  }
+  // Drop every bridge and the old scoped dsh-os bundles from a reused profile.
+  swapped = swapped.filter(bundle => bundle !== KERNEL_BRIDGE_NAME
+    && bundle !== SHELL_BRIDGE_NAME
+    && !bundle.startsWith('@perrylink/dsh-os-'))
+  if (JSON.stringify(swapped) !== JSON.stringify(bundles)) {
+    manifest.dsh = { ...manifest.dsh, profile: { ...manifest.dsh?.profile, bundles: dedupe(swapped) } }
+    writeJson(join(dir, 'package.json'), manifest)
+  }
+
+  ;({ manifest } = readProfile())
+  const deps = manifest.dependencies ?? {}
+  const removals = []
+  if (deps['@deepseek-ai/dsh-agent-preset-registry'] !== undefined) {
+    removals.push('@deepseek-ai/dsh-agent-preset-registry')
+  }
+  for (const name of [KERNEL_BRIDGE_NAME, SHELL_BRIDGE_NAME]) {
+    if (deps[name] !== undefined) removals.push(name)
+  }
+  if (removals.length > 0) {
+    log(`removing non-clean profile package(s): ${removals.join(', ')}`)
+    runDsh(['plugin', '--profile', PROFILE, 'remove', ...removals])
+  }
+
+  const wanted = [
+    ['dsh-os-kernel', join(REPO, 'packages/kernel')],
+    ['dsh-allow', join(REPO, 'packages/allow')],
+    ['dsh-act', join(REPO, 'packages/act')],
+    ['dsh-os-shell', join(REPO, 'packages/shell')],
+  ]
+  ;({ manifest } = readProfile())
+  const currentDeps = manifest.dependencies ?? {}
+  const add = wanted.filter(([name, path]) => currentDeps[name] !== `link:${path}`).map(([, path]) => path)
+  if (add.length > 0) {
+    log(`installing ${add.length} shipped profile package(s) with dsh plugin add`)
+    runDsh(['plugin', '--profile', PROFILE, 'add', ...add])
+  }
+
+  ;({ manifest } = readProfile())
+  const finalBundles = Array.isArray(manifest.dsh?.profile?.bundles) ? [...manifest.dsh.profile.bundles] : []
+  const required = [
+    '@deepseek-ai/dsh-base',
+    '@deepseek-ai/dsh-web-app',
+    'dsh-act',
+    'dsh-allow',
+    'dsh-os-kernel',
+    'dsh-os-shell',
+  ]
+  const cleanBundles = finalBundles.filter(bundle => bundle !== KERNEL_BRIDGE_NAME
+    && bundle !== SHELL_BRIDGE_NAME
+    && !bundle.startsWith('@perrylink/dsh-os-'))
+  for (const bundle of required) {
+    if (!cleanBundles.includes(bundle)) cleanBundles.push(bundle)
+  }
+  manifest.dsh = { ...manifest.dsh, profile: { ...manifest.dsh?.profile, bundles: dedupe(cleanBundles) } }
+  writeJson(join(dir, 'package.json'), manifest)
+
+  const verify = readJson(join(dir, 'package.json'))
+  const verifyDeps = verify.dependencies ?? {}
+  for (const [name] of wanted) {
+    if (verifyDeps[name] === undefined) fail('profile/install-failed', `clean profile dependency missing: ${name}`)
+  }
+  for (const name of [KERNEL_BRIDGE_NAME, SHELL_BRIDGE_NAME]) {
+    if (verifyDeps[name] !== undefined) fail('profile/not-clean', `clean profile still depends on ${name}`)
+  }
+  for (const bundle of required) {
+    if (!verify.dsh?.profile?.bundles?.includes(bundle)) {
+      fail('profile/bundle-missing', `clean profile bundle list is missing ${bundle}`)
+    }
+  }
+  if (verify.dsh?.profile?.bundles?.some(bundle => bundle.startsWith('dsh-eval-'))) {
+    fail('profile/not-clean', 'clean profile still lists a dsh-eval-* bridge bundle')
+  }
+
+  writeCleanProfilePatch()
+}
+
+/** Only the Web registry override and the gateway preset; no bridge rows. */
+function writeCleanProfilePatch() {
+  const patch = `# Generated by evals/real/web-approval.mjs (DSH_WEB_APPROVAL_CLEAN=1).
+# Clean profile: only the shipped dsh-os-kernel/dsh-allow/dsh-act/dsh-os-shell.
+# No bridge packages, no disabled shell, no test capability.
+- id: agent-preset-registry
+  config:
+    default: os-gateway
+
+- insert:
+    - id: preset-os-gateway
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: os-gateway
+        name: OS Gateway
+        description: Only os_find / os_do / os_request / os_observe / os_help / os_status.
+        order: 4
+        plugins:
+          - id: os-persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              prefix: >-
+                You reach the operating system only through the six os_* verbs.
+                Discover with os_find, request write/execute access with
+                os_request, refresh an approval with os_observe, then execute
+                with os_do. Never assume a grant exists.
+              complete: true
+              includeRuntimeContext: false
+          # Isolate the kernel service so this preset coexists with the global
+          # kernel bundle without registering the kernel service twice.
+          - id: os-kernel-group
+            name: cordis:group
+            group: true
+            isolate:
+              kernel: true
+            config:
+              - id: os-kernel
+                name: dsh-os-kernel
+                config:
+                  gatewayOnly: true
 `
   writeFileSync(join(profileDir(), 'cordis.patch.yml'), patch)
 }
@@ -692,9 +841,292 @@ async function approvePending(api, kernelRequestId, moduleRequestId, recordPath)
   return approvals
 }
 
+function findStatusRun(runs) {
+  return runs.filter(run => run.name === 'os_status' && run.json?.ok === true).at(-1)
+}
+
+function findWriteAttempt(runs) {
+  return runs.filter(run => run.name === 'os_do' && run.args?.id === CAP_ID).at(-1)
+}
+
+function findModuleRequestAttempt(runs) {
+  return runs.find(run => run.name === 'os_do' && run.args?.id === 'legacy.allow_request')
+}
+
+function cleanStatusPrompt() {
+  return 'Call os_status exactly once. Report capabilities, legacy, modules and tools. Do not call any other tool.'
+}
+
+function cleanRequestPrompt() {
+  return `The kernel now projects Act actions as capabilities. Call os_request exactly once with:
+  id: "${CAP_ID}"
+  args: {"path": ${JSON.stringify(FILE_PATH)}, "text": ${JSON.stringify(FILE_TEXT)}}
+  reason: "write ${FILE_NAME} for the clean one-approval eval"
+
+This creates one PENDING request for a human; it does not write. Do not call os_observe, os_do, or legacy.allow_request. Report the requestId and capability. If it fails, report the exact error code and message.`
+}
+
+function cleanVerifyPrompt(requestId) {
+  return `The human approved the single request "${requestId}". Do exactly this:
+1. Call os_observe with requestId "${requestId}". Report state, grantAvailable, id and capability.
+2. If state is "approved" and grantAvailable is true, call os_do exactly once with:
+   id: "${CAP_ID}"
+   args: {"path": ${JSON.stringify(FILE_PATH)}, "text": ${JSON.stringify(FILE_TEXT)}}
+   Report the exact os_do result, including ok and any error code/message.
+
+Do not call os_request. Do not call legacy.allow_request. Do not create a module-owned request. Do not retry os_do.`
+}
+
+async function approvalAuditTail(api) {
+  try {
+    const value = await httpJson(api, 'GET', '/api/os-activity?limit=50')
+    return (value.entries ?? [])
+      .filter(entry => entry.capability === CAP_PERMISSION)
+      .slice(0, 8)
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Clean mode: only the shipped packages, no test capability, exactly one
+ * cap:act.fs.write request/approval. It either writes the file or records the
+ * shipped one-approval gap with the exact Denial.
+ */
+async function runClean() {
+  prepareCleanProfile()
+  const server = await bootServer()
+  const api = { base: server.base }
+  try {
+    api.cookie = await login(server.url)
+
+    // The shipped shell 0.4.0 owns the approval routes; no adapter here.
+    let preflight
+    try {
+      preflight = await httpJson(api, 'GET', '/api/os-approvals?status=pending')
+    } catch (error) {
+      fail('approval/unavailable', `the shipped-shell approval API is unavailable in clean mode: ${redact(error.message)}`, { cause: error })
+    }
+    if (!Array.isArray(preflight.items)) fail('approval/shape', 'approval preflight did not return an items array')
+    if (preflight.items.length !== 0) fail('approval/not-empty', `clean server started with ${preflight.items.length} pending request(s)`)
+
+    const presets = await rpc(api, 'agentPresets/list', {})
+    const gateway = (presets.presets ?? []).find(preset => preset.id === 'os-gateway')
+    if (gateway === undefined) fail('preset/missing', 'agentPresets/list does not contain os-gateway')
+
+    const created = await rpc(api, 'session/create', {
+      request: { cwd: WORKDIR, agentPreset: 'os-gateway' },
+    })
+    if (created.agentPreset !== 'os-gateway') {
+      fail('session/preset', `session/create returned agentPreset=${JSON.stringify(created.agentPreset)}`)
+    }
+    const sessionId = created.sessionId
+    log(`clean session ${sessionId} created with agentPreset=os-gateway`)
+
+    // Turn 1: os_status both asserts the surface and triggers refreshAct().
+    await promptAndWait(api, sessionId, cleanStatusPrompt())
+    const eventsStatus = await getEvents(api, sessionId)
+    const tools = assertGatewayHeaders(eventsStatus)
+    const runsStatus = parseToolRuns(eventsStatus)
+    const statusRun = findStatusRun(runsStatus)
+    if (statusRun === undefined) {
+      const errors = runsStatus.filter(run => run.name === 'os_status').map(run => run.text).slice(-3)
+      fail('status/missing', `the model did not call os_status: ${redact(errors.join(' | ')).slice(0, 1200)}`)
+    }
+    const capabilities = Number(statusRun.json.capabilities)
+    if (!Number.isFinite(capabilities) || capabilities <= 0) {
+      fail('status/no-capabilities', `os_status reported capabilities=${JSON.stringify(statusRun.json.capabilities)} in the clean profile`)
+    }
+    if (!Array.isArray(statusRun.json.tools) || JSON.stringify([...statusRun.json.tools].sort()) !== JSON.stringify([...SIX_TOOLS].sort())) {
+      fail('status/tools', `os_status tools=${JSON.stringify(statusRun.json.tools)}, not the six os_* verbs`)
+    }
+
+    // Turn 2: exactly one kernel request. No module request is allowed.
+    await promptAndWait(api, sessionId, cleanRequestPrompt())
+    const eventsRequest = await getEvents(api, sessionId)
+    assertGatewayHeaders(eventsRequest)
+    const runsRequest = parseToolRuns(eventsRequest)
+    if (findModuleRequestAttempt(runsRequest) !== undefined) {
+      fail('clean/module-request', 'the model created a legacy.allow_request module request in clean mode')
+    }
+    const kernel = findKernelRequest(runsRequest)
+    const requestPath = join(WORKDIR, 'request.json')
+    const record = {
+      mode: 'clean',
+      capability: CAP_PERMISSION,
+      requestId: kernel.id,
+      sessionId,
+      agentPreset: 'os-gateway',
+      status: 'pending',
+      approvedBy: APPROVER,
+      workdir: WORKDIR,
+      file: { path: FILE_PATH, text: FILE_TEXT },
+      statusReport: {
+        capabilities,
+        legacy: statusRun.json.legacy,
+        modules: statusRun.json.modules,
+        tools: statusRun.json.tools,
+      },
+      requests: {
+        kernel: { id: kernel.id, capability: CAP_PERMISSION, status: 'pending' },
+      },
+      createdAt: nowIso(),
+    }
+    writeJson(requestPath, record)
+
+    const pending = await httpJson(api, 'GET', '/api/os-approvals?status=pending')
+    if (!Array.isArray(pending.items) || pending.items.length !== 1) {
+      fail('clean/approval-count', `expected exactly 1 pending request, got ${JSON.stringify((pending.items ?? []).map(item => ({ id: item.id, capability: item.capability })))}`)
+    }
+    const item = pending.items[0]
+    if (item.id !== kernel.id) fail('clean/approval-id', `pending request ${item.id} is not the kernel request ${kernel.id}`)
+    if (item.capability !== CAP_PERMISSION) fail('clean/approval-capability', `pending capability is ${JSON.stringify(item.capability)}, not ${CAP_PERMISSION}`)
+
+    const approved = await httpJson(api, 'POST', `/api/os-approvals/${encodeURIComponent(kernel.id)}/approve`, { by: APPROVER })
+    const approvedRequest = approved.approval?.request
+    const grant = approved.approval?.grant
+    if (approvedRequest?.status !== 'approved' || typeof grant?.id !== 'string') {
+      fail('clean/approval-failed', `approval did not return an approved request + grant: ${JSON.stringify(approved).slice(0, 1200)}`)
+    }
+    record.status = 'approved'
+    record.approvedAt = nowIso()
+    record.requests.kernel = {
+      id: kernel.id,
+      capability: CAP_PERMISSION,
+      status: approvedRequest.status,
+      grantId: grant.id,
+      decidedBy: approvedRequest.decidedBy,
+    }
+    writeJson(requestPath, record)
+    log(`single request ${kernel.id} approved; grant=${grant.id}`)
+
+    // Turn 3: the required observe -> do sequence.
+    await promptAndWait(api, sessionId, cleanVerifyPrompt(kernel.id))
+    const eventsVerify = await getEvents(api, sessionId)
+    assertGatewayHeaders(eventsVerify)
+    const runsVerify = parseToolRuns(eventsVerify)
+    const observe = findObserve(runsVerify, kernel.id)
+    if (observe === undefined) fail('clean/observe-missing', `the model did not call os_observe for ${kernel.id}`)
+    const observed = {
+      state: observe.json.state,
+      grantAvailable: observe.json.grantAvailable,
+      id: observe.json.id,
+      capability: observe.json.capability,
+    }
+    if (observed.state !== 'approved' || observed.grantAvailable !== true) {
+      fail('clean/observe-not-approved', `os_observe returned ${JSON.stringify(observed)}`)
+    }
+
+    const attempt = findWriteAttempt(runsVerify)
+    // The kernel returns an OsResult directly; `tool` names the capability and
+    // the action payload lives under `data`. Older bridge runs nested it.
+    const payload = attempt?.json?.data?.ok === true ? attempt.json.data : attempt?.json
+    const action = attempt?.json?.tool === 'act.fs.write' ? attempt.json : payload
+    const success = payload?.ok === true && action?.tool === 'act.fs.write'
+    const auditTail = await approvalAuditTail(api)
+
+    if (success) {
+      const content = readFileSync(FILE_PATH, 'utf8')
+      if (content !== FILE_TEXT) fail('clean/file-content', `${FILE_PATH} contains ${JSON.stringify(content)}, not ${JSON.stringify(FILE_TEXT)}`)
+      const fileStat = { path: FILE_PATH, content, bytes: Buffer.byteLength(content), sha256: sha256(content) }
+      record.status = 'done'
+      record.observe = observed
+      record.do = { ok: true, actionId: action.tool, result: payload.data ?? payload.result }
+      record.file = fileStat
+      record.auditTail = auditTail
+      record.completedAt = nowIso()
+      writeJson(requestPath, record)
+      console.log(JSON.stringify({
+        ok: true,
+        mode: 'clean',
+        profile: PROFILE,
+        surface: { tools },
+        status: { capabilities, legacy: statusRun.json.legacy, modules: statusRun.json.modules, tools: statusRun.json.tools },
+        preset: { id: gateway.id, isDefault: gateway.isDefault === true },
+        session: { id: sessionId, agentPreset: created.agentPreset, cwd: WORKDIR },
+        approvalApi: { base: server.base, list: 'GET /api/os-approvals?status=pending', approve: 'POST /api/os-approvals/:id/approve', approver: APPROVER },
+        requests: { count: 1, kernel: record.requests.kernel },
+        approvals: { count: 1, by: APPROVER },
+        observe: observed,
+        do: record.do,
+        file: fileStat,
+        auditTail,
+        artifacts: { approvedFile: FILE_PATH, requestJson: requestPath },
+        notes: [
+          'clean profile: only dsh-os-kernel/dsh-allow/dsh-act/dsh-os-shell; no bridges, no test capability',
+          'exactly one cap:act.fs.write request and one approval; no module request was created',
+          'the model key was read from the credentials file and passed only via the server environment',
+          'the server ran on a random loopback port and is stopped in the finally block',
+        ],
+      }, undefined, 2))
+      return
+    }
+
+    // Honest failure: one approval did not write. Record the actual Denial.
+    const error = attempt?.json?.error ?? {
+      code: 'write/missing',
+      message: attempt === undefined ? 'the model did not call os_do(act.fs.write)' : 'os_do returned no JSON error',
+    }
+    const fileExists = existsSync(FILE_PATH)
+    const gap = 'the kernel os_observe consumes the single-use cap:act.fs.write Grant via allow.check and caches it; '
+      + 'os_do then invokes Act\'s projected act.fs.write handler, whose ActService.#authorized checks the same '
+      + 'cap:act.fs.write (alternate name) against Allow and finds the Grant used (grant_exhausted). The kernel '
+      + 'does not hand the cached Grant to Act, so one human approval cannot satisfy both checks.'
+    record.status = 'failed'
+    record.observe = observed
+    record.do = { ok: false, error }
+    record.file = fileExists ? { path: FILE_PATH, content: readFileSync(FILE_PATH, 'utf8') } : null
+    record.gap = gap
+    record.auditTail = auditTail
+    record.completedAt = nowIso()
+    writeJson(requestPath, record)
+    console.log(JSON.stringify({
+      ok: false,
+      mode: 'clean',
+      code: 'clean/one-approval-gap',
+      profile: PROFILE,
+      gap,
+      surface: { tools },
+      status: { capabilities, legacy: statusRun.json.legacy, modules: statusRun.json.modules, tools: statusRun.json.tools },
+      preset: { id: gateway.id, isDefault: gateway.isDefault === true },
+      session: { id: sessionId, agentPreset: created.agentPreset, cwd: WORKDIR },
+      approvalApi: { base: server.base, list: 'GET /api/os-approvals?status=pending', approve: 'POST /api/os-approvals/:id/approve', approver: APPROVER },
+      requests: { count: 1, kernel: record.requests.kernel },
+      approvals: { count: 1, by: APPROVER },
+      observe: observed,
+      do: { ok: false, error },
+      file: record.file,
+      auditTail,
+      artifacts: { approvedFile: FILE_PATH, requestJson: requestPath },
+      notes: [
+        'clean profile: only dsh-os-kernel/dsh-allow/dsh-act/dsh-os-shell; no bridges, no test capability',
+        'exactly one cap:act.fs.write request and one approval; no module request was created',
+        'the model key was read from the credentials file and passed only via the server environment',
+      ],
+    }, undefined, 2))
+    process.exitCode = 1
+  } catch (error) {
+    const tail = redact(`${server.stderr()}\n${server.stdout()}`).split(/\r?\n/).filter(Boolean).slice(-30).join('\n')
+    console.error(JSON.stringify({
+      ok: false,
+      mode: 'clean',
+      code: error.code ?? 'clean/failed',
+      error: redact(error.message),
+      serverLogTail: tail,
+    }, undefined, 2))
+    process.exitCode = 1
+  } finally {
+    await stopServer(server)
+  }
+}
+
 async function main() {
   prepareWorkdir()
   secret = readCredentialKey()
+  if (CLEAN) {
+    await runClean()
+    return
+  }
   prepareProfile()
   const server = await bootServer()
   const api = { base: server.base }

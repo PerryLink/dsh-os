@@ -1,6 +1,6 @@
 {
   "name": "dsh-os-kernel",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Thin capability kernel for dsh-os: descriptor protocol, registry, legacy tool bridge, six os_* verbs, Allow grant bridge, content-hash taint gate and optional idempotency journal.",
   "type": "module",
   "main": "index.js",

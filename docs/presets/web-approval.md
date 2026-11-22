@@ -124,3 +124,35 @@ The profile stays configured with the bridge packages and generated patch so the
 eval can rerun. To revert, remove `dsh-eval-kernel-bridge` /
 `dsh-eval-approval-bridge` from the profile and restore the previous patch. Do
 not delete `/tmp/dsh-real-home` if other evals share it.
+
+## 7. Clean-profile one-approval run (2026-11-22)
+
+Status: **passes on a clean Web profile with no bridges and no test capability.**
+
+```sh
+DSH_HOME=/tmp/dsh-clean-home \
+DSH_PROFILE=eval-gw-clean \
+DSH_WEB_APPROVAL_CLEAN=1 \
+node evals/real/web-approval.mjs
+```
+
+The clean profile installs only `dsh-os-kernel`, `dsh-allow`, `dsh-act` and
+`dsh-os-shell`, with the `os-gateway` preset and no `eval-bridges/`, no test
+`act.fs.write` capability and no module-owned request.
+
+Observed:
+
+- exactly **one** request: `cap:act.fs.write`
+- exactly **one** approval: `eval-human`
+- `os_observe` → `approved`, `grantAvailable:true`
+- `os_do("act.fs.write")` → `ok:true`, `tool:"act.fs.write"`, bytes 8
+- `approved.txt` = `approved`, sha256
+  `2687f86ed6784b8a5fca36e6c468e12aa44dc3c7e8137e3160d1a95079bdcd02`
+- no module request was created
+
+This closes gaps 4–5 from §5: the kernel projects Act actions as `act.<id>`,
+Act accepts `cap:act.<id>` and the kernel's consumed-Grant proof, so one human
+approval covers both sides.
+
+The script also accepts both `OsResult` shapes (`{ok,tool,data}` and a nested
+bridge payload) so a successful write is not misreported as a gap.

@@ -1,10 +1,10 @@
 {
   "schema": "dsh-os.eval/v1",
   "layer": "P-scripted (fixed policy; no model, no network)",
-  "generatedAt": "2026-11-21T15:49:09.646Z",
+  "generatedAt": "2026-11-22T02:06:15.403Z",
   "env": {
     "node": "v24.22.1",
-    "commit": "3f1dd3e",
+    "commit": "f514375",
     "dirty": true
   },
   "scenarios": [
@@ -118,7 +118,7 @@
           "args": {
             "id": "fs.write",
             "args": {
-              "path": "/tmp/dsh-eval-fix-EdD6el/src/math.mjs",
+              "path": "/tmp/dsh-eval-fix-M9ChaJ/src/math.mjs",
               "text": "export const add = (a, b) => a + b\n"
             }
           },
@@ -128,7 +128,7 @@
           "tokens": 119,
           "ms": 0,
           "changeSeq": 0,
-          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-fix-EdD6el/src/math.mjs\",\"text\":\"export const add = (a, b) => a + b\\n\"}}"
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-fix-M9ChaJ/src/math.mjs\",\"text\":\"export const add = (a, b) => a + b\\n\"}}"
         },
         {
           "n": 4,
@@ -143,7 +143,7 @@
           "code": null,
           "invalid": null,
           "tokens": 132,
-          "ms": 0,
+          "ms": 1,
           "changeSeq": 0,
           "key": "allow_request:{\"subject\":\"sess:fix-failing-test\",\"capability\":\"act:invoke:fs.write\",\"scope\":\"*\",\"reason\":\"修复 add 的差一错误\"}"
         },
@@ -151,7 +151,7 @@
           "n": 5,
           "tool": "allow_wait",
           "args": {
-            "requestId": "req_3011a1e2-f8e3-4882-b741-3f21151f70fe",
+            "requestId": "req_8f354362-d204-4bee-99a4-59711735fa81",
             "timeoutMs": 0,
             "subject": "sess:fix-failing-test"
           },
@@ -161,13 +161,13 @@
           "tokens": 150,
           "ms": 0,
           "changeSeq": 0,
-          "key": "allow_wait:{\"requestId\":\"req_3011a1e2-f8e3-4882-b741-3f21151f70fe\",\"timeoutMs\":0,\"subject\":\"sess:fix-failing-test\"}"
+          "key": "allow_wait:{\"requestId\":\"req_8f354362-d204-4bee-99a4-59711735fa81\",\"timeoutMs\":0,\"subject\":\"sess:fix-failing-test\"}"
         },
         {
           "n": 6,
           "tool": "allow_wait",
           "args": {
-            "requestId": "req_3011a1e2-f8e3-4882-b741-3f21151f70fe",
+            "requestId": "req_8f354362-d204-4bee-99a4-59711735fa81",
             "timeoutMs": 0,
             "subject": "sess:fix-failing-test"
           },
@@ -177,7 +177,7 @@
           "tokens": 175,
           "ms": 0,
           "changeSeq": 1,
-          "key": "allow_wait:{\"requestId\":\"req_3011a1e2-f8e3-4882-b741-3f21151f70fe\",\"timeoutMs\":0,\"subject\":\"sess:fix-failing-test\"}"
+          "key": "allow_wait:{\"requestId\":\"req_8f354362-d204-4bee-99a4-59711735fa81\",\"timeoutMs\":0,\"subject\":\"sess:fix-failing-test\"}"
         },
         {
           "n": 7,
@@ -185,7 +185,7 @@
           "args": {
             "id": "fs.write",
             "args": {
-              "path": "/tmp/dsh-eval-fix-EdD6el/src/math.mjs",
+              "path": "/tmp/dsh-eval-fix-M9ChaJ/src/math.mjs",
               "text": "export const add = (a, b) => a + b\n"
             }
           },
@@ -195,7 +195,7 @@
           "tokens": 108,
           "ms": 1,
           "changeSeq": 1,
-          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-fix-EdD6el/src/math.mjs\",\"text\":\"export const add = (a, b) => a + b\\n\"}}"
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-fix-M9ChaJ/src/math.mjs\",\"text\":\"export const add = (a, b) => a + b\\n\"}}"
         },
         {
           "n": 8,
@@ -208,7 +208,7 @@
           "code": null,
           "invalid": null,
           "tokens": 168,
-          "ms": 82,
+          "ms": 88,
           "changeSeq": 1,
           "key": "check_run:{\"prompt\":\"rerun math.add\",\"id\":\"math.add\"}"
         }
@@ -298,7 +298,7 @@
           "code": null,
           "invalid": null,
           "tokens": 114,
-          "ms": 2,
+          "ms": 1,
           "changeSeq": 0,
           "key": "snip_capture:{\"sourceApp\":\"Chrome\"}"
         },
@@ -321,15 +321,15 @@
           "n": 3,
           "tool": "snip_get",
           "args": {
-            "id": "clipboard://5ca26599-dd22-47e6-a8d6-2389b3845753"
+            "id": "clipboard://39cb2962-956f-461e-90b0-9aa680d53649"
           },
           "ok": true,
           "code": null,
           "invalid": null,
           "tokens": 200,
-          "ms": 0,
+          "ms": 1,
           "changeSeq": 0,
-          "key": "snip_get:{\"id\":\"clipboard://5ca26599-dd22-47e6-a8d6-2389b3845753\"}"
+          "key": "snip_get:{\"id\":\"clipboard://39cb2962-956f-461e-90b0-9aa680d53649\"}"
         },
         {
           "n": 4,
@@ -337,7 +337,7 @@
           "args": {
             "id": "fs.write",
             "args": {
-              "path": "/tmp/dsh-eval-clip-VIirt5/clip.md",
+              "path": "/tmp/dsh-eval-clip-EW7SHe/clip.md",
               "text": "Meeting notes: ship dsh-os 0.2.0 on Friday. Owner: Lin. Link: https://example.test/roadmap"
             }
           },
@@ -345,9 +345,9 @@
           "code": "grant_required",
           "invalid": null,
           "tokens": 131,
-          "ms": 1,
+          "ms": 0,
           "changeSeq": 0,
-          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-clip-VIirt5/clip.md\",\"text\":\"Meeting notes: ship dsh-os 0.2.0 on Friday. Owner: Lin. Link: https://example.test/roadmap\"}}"
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-clip-EW7SHe/clip.md\",\"text\":\"Meeting notes: ship dsh-os 0.2.0 on Friday. Owner: Lin. Link: https://example.test/roadmap\"}}"
         },
         {
           "n": 5,
@@ -370,7 +370,7 @@
           "n": 6,
           "tool": "allow_wait",
           "args": {
-            "requestId": "req_ed9522e5-5433-440a-9ede-45bfa67a3945",
+            "requestId": "req_7b20cd75-d422-46ae-99b6-55a36c588c66",
             "timeoutMs": 0,
             "subject": "sess:tidy-clipboard"
           },
@@ -380,13 +380,13 @@
           "tokens": 150,
           "ms": 0,
           "changeSeq": 0,
-          "key": "allow_wait:{\"requestId\":\"req_ed9522e5-5433-440a-9ede-45bfa67a3945\",\"timeoutMs\":0,\"subject\":\"sess:tidy-clipboard\"}"
+          "key": "allow_wait:{\"requestId\":\"req_7b20cd75-d422-46ae-99b6-55a36c588c66\",\"timeoutMs\":0,\"subject\":\"sess:tidy-clipboard\"}"
         },
         {
           "n": 7,
           "tool": "allow_wait",
           "args": {
-            "requestId": "req_ed9522e5-5433-440a-9ede-45bfa67a3945",
+            "requestId": "req_7b20cd75-d422-46ae-99b6-55a36c588c66",
             "timeoutMs": 0,
             "subject": "sess:tidy-clipboard"
           },
@@ -396,7 +396,7 @@
           "tokens": 175,
           "ms": 0,
           "changeSeq": 1,
-          "key": "allow_wait:{\"requestId\":\"req_ed9522e5-5433-440a-9ede-45bfa67a3945\",\"timeoutMs\":0,\"subject\":\"sess:tidy-clipboard\"}"
+          "key": "allow_wait:{\"requestId\":\"req_7b20cd75-d422-46ae-99b6-55a36c588c66\",\"timeoutMs\":0,\"subject\":\"sess:tidy-clipboard\"}"
         },
         {
           "n": 8,
@@ -404,7 +404,7 @@
           "args": {
             "id": "fs.write",
             "args": {
-              "path": "/tmp/dsh-eval-clip-VIirt5/clip.md",
+              "path": "/tmp/dsh-eval-clip-EW7SHe/clip.md",
               "text": "Meeting notes: ship dsh-os 0.2.0 on Friday. Owner: Lin. Link: https://example.test/roadmap"
             }
           },
@@ -414,7 +414,7 @@
           "tokens": 120,
           "ms": 0,
           "changeSeq": 1,
-          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-clip-VIirt5/clip.md\",\"text\":\"Meeting notes: ship dsh-os 0.2.0 on Friday. Owner: Lin. Link: https://example.test/roadmap\"}}"
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-clip-EW7SHe/clip.md\",\"text\":\"Meeting notes: ship dsh-os 0.2.0 on Friday. Owner: Lin. Link: https://example.test/roadmap\"}}"
         }
       ],
       "toolCalls": 8,
@@ -502,7 +502,7 @@
           "code": null,
           "invalid": null,
           "tokens": 78,
-          "ms": 0,
+          "ms": 1,
           "changeSeq": 0,
           "key": "trigger_register:{\"id\":\"tg.fs\",\"event\":\"fs.change\",\"actionId\":\"record\"}"
         },
@@ -511,16 +511,16 @@
           "tool": "trigger_source_start",
           "args": {
             "type": "fs",
-            "path": "/tmp/dsh-eval-upgrade-AKW6SI/app.txt",
+            "path": "/tmp/dsh-eval-upgrade-Iy60v3/app.txt",
             "id": "src.fs"
           },
           "ok": true,
           "code": null,
           "invalid": null,
           "tokens": 116,
-          "ms": 1,
+          "ms": 0,
           "changeSeq": 0,
-          "key": "trigger_source_start:{\"type\":\"fs\",\"path\":\"/tmp/dsh-eval-upgrade-AKW6SI/app.txt\",\"id\":\"src.fs\"}"
+          "key": "trigger_source_start:{\"type\":\"fs\",\"path\":\"/tmp/dsh-eval-upgrade-Iy60v3/app.txt\",\"id\":\"src.fs\"}"
         },
         {
           "n": 3,
@@ -603,7 +603,7 @@
           "code": null,
           "invalid": null,
           "tokens": 386,
-          "ms": 1,
+          "ms": 0,
           "changeSeq": 1,
           "key": "check_compare:{\"old\":{\"schema\":\"dsh.check.run/v1\",\"tasks\":[{\"id\":\"app.banner\",\"result\":{\"text\":\"v1\"},\"trajectory\":{\"steps\":4,\"toolCalls\":2,\"errors\":0},\"cost\":{\"usd\":0.1},\"approvals\":{\"asked\":0,\"rejected\":0}}]},\"new\":{\"schema\":\"dsh.check.run/v1\",\"tasks\":[{\"id\":\"app.banner\",\"result\":{\"text\":\"v2 changed\"},\"trajectory\":{\"steps\":4,\"toolCalls\":2,\"errors\":0},\"cost\":{\"usd\":0.1},\"approvals\":{\"asked\":0,\"rejected\":0}}]}}"
         },
@@ -618,7 +618,7 @@
           "code": null,
           "invalid": null,
           "tokens": 155,
-          "ms": 0,
+          "ms": 1,
           "changeSeq": 1,
           "key": "ring_raise:{\"source\":\"upgrade-regression\",\"risk\":\"write\"}"
         },
@@ -626,7 +626,7 @@
           "n": 7,
           "tool": "ring_escalate",
           "args": {
-            "id": "8c6cf7f0-c1d7-4769-85ff-2012b70f6542"
+            "id": "75aceea4-8c5f-456d-908f-48fbb4a0f25c"
           },
           "ok": true,
           "code": null,
@@ -634,7 +634,7 @@
           "tokens": 162,
           "ms": 0,
           "changeSeq": 1,
-          "key": "ring_escalate:{\"id\":\"8c6cf7f0-c1d7-4769-85ff-2012b70f6542\"}"
+          "key": "ring_escalate:{\"id\":\"75aceea4-8c5f-456d-908f-48fbb4a0f25c\"}"
         },
         {
           "n": 8,
@@ -657,7 +657,7 @@
           "n": 9,
           "tool": "allow_wait",
           "args": {
-            "requestId": "req_4ff68c56-2722-4207-a73f-a714703b1d9f",
+            "requestId": "req_ab12acee-5e3b-4107-90fc-e2d3199432aa",
             "timeoutMs": 0,
             "subject": "sess:upgrade-regression"
           },
@@ -667,13 +667,13 @@
           "tokens": 153,
           "ms": 0,
           "changeSeq": 1,
-          "key": "allow_wait:{\"requestId\":\"req_4ff68c56-2722-4207-a73f-a714703b1d9f\",\"timeoutMs\":0,\"subject\":\"sess:upgrade-regression\"}"
+          "key": "allow_wait:{\"requestId\":\"req_ab12acee-5e3b-4107-90fc-e2d3199432aa\",\"timeoutMs\":0,\"subject\":\"sess:upgrade-regression\"}"
         },
         {
           "n": 10,
           "tool": "allow_wait",
           "args": {
-            "requestId": "req_4ff68c56-2722-4207-a73f-a714703b1d9f",
+            "requestId": "req_ab12acee-5e3b-4107-90fc-e2d3199432aa",
             "timeoutMs": 0,
             "subject": "sess:upgrade-regression"
           },
@@ -683,13 +683,13 @@
           "tokens": 178,
           "ms": 0,
           "changeSeq": 2,
-          "key": "allow_wait:{\"requestId\":\"req_4ff68c56-2722-4207-a73f-a714703b1d9f\",\"timeoutMs\":0,\"subject\":\"sess:upgrade-regression\"}"
+          "key": "allow_wait:{\"requestId\":\"req_ab12acee-5e3b-4107-90fc-e2d3199432aa\",\"timeoutMs\":0,\"subject\":\"sess:upgrade-regression\"}"
         },
         {
           "n": 11,
           "tool": "ring_notify",
           "args": {
-            "id": "8c6cf7f0-c1d7-4769-85ff-2012b70f6542"
+            "id": "75aceea4-8c5f-456d-908f-48fbb4a0f25c"
           },
           "ok": false,
           "code": "E_UNAVAILABLE",
@@ -697,7 +697,7 @@
           "tokens": 78,
           "ms": 1,
           "changeSeq": 2,
-          "key": "ring_notify:{\"id\":\"8c6cf7f0-c1d7-4769-85ff-2012b70f6542\"}"
+          "key": "ring_notify:{\"id\":\"75aceea4-8c5f-456d-908f-48fbb4a0f25c\"}"
         },
         {
           "n": 12,
@@ -732,7 +732,7 @@
           "n": 14,
           "tool": "allow_wait",
           "args": {
-            "requestId": "req_dd19b8fc-3a97-4e64-8a89-93c13e5a0db4",
+            "requestId": "req_091a22d1-c953-4734-b636-852a75afff7d",
             "timeoutMs": 0,
             "subject": "sess:upgrade-regression"
           },
@@ -742,13 +742,13 @@
           "tokens": 155,
           "ms": 0,
           "changeSeq": 3,
-          "key": "allow_wait:{\"requestId\":\"req_dd19b8fc-3a97-4e64-8a89-93c13e5a0db4\",\"timeoutMs\":0,\"subject\":\"sess:upgrade-regression\"}"
+          "key": "allow_wait:{\"requestId\":\"req_091a22d1-c953-4734-b636-852a75afff7d\",\"timeoutMs\":0,\"subject\":\"sess:upgrade-regression\"}"
         },
         {
           "n": 15,
           "tool": "allow_wait",
           "args": {
-            "requestId": "req_dd19b8fc-3a97-4e64-8a89-93c13e5a0db4",
+            "requestId": "req_091a22d1-c953-4734-b636-852a75afff7d",
             "timeoutMs": 0,
             "subject": "sess:upgrade-regression"
           },
@@ -758,13 +758,13 @@
           "tokens": 181,
           "ms": 0,
           "changeSeq": 4,
-          "key": "allow_wait:{\"requestId\":\"req_dd19b8fc-3a97-4e64-8a89-93c13e5a0db4\",\"timeoutMs\":0,\"subject\":\"sess:upgrade-regression\"}"
+          "key": "allow_wait:{\"requestId\":\"req_091a22d1-c953-4734-b636-852a75afff7d\",\"timeoutMs\":0,\"subject\":\"sess:upgrade-regression\"}"
         },
         {
           "n": 16,
           "tool": "ring_notify",
           "args": {
-            "id": "8c6cf7f0-c1d7-4769-85ff-2012b70f6542"
+            "id": "75aceea4-8c5f-456d-908f-48fbb4a0f25c"
           },
           "ok": true,
           "code": null,
@@ -772,13 +772,13 @@
           "tokens": 98,
           "ms": 0,
           "changeSeq": 4,
-          "key": "ring_notify:{\"id\":\"8c6cf7f0-c1d7-4769-85ff-2012b70f6542\"}"
+          "key": "ring_notify:{\"id\":\"75aceea4-8c5f-456d-908f-48fbb4a0f25c\"}"
         },
         {
           "n": 17,
           "tool": "ring_receipts",
           "args": {
-            "id": "8c6cf7f0-c1d7-4769-85ff-2012b70f6542"
+            "id": "75aceea4-8c5f-456d-908f-48fbb4a0f25c"
           },
           "ok": true,
           "code": null,
@@ -786,7 +786,7 @@
           "tokens": 225,
           "ms": 0,
           "changeSeq": 4,
-          "key": "ring_receipts:{\"id\":\"8c6cf7f0-c1d7-4769-85ff-2012b70f6542\"}"
+          "key": "ring_receipts:{\"id\":\"75aceea4-8c5f-456d-908f-48fbb4a0f25c\"}"
         },
         {
           "n": 18,
@@ -798,7 +798,7 @@
           "code": null,
           "invalid": null,
           "tokens": 52,
-          "ms": 0,
+          "ms": 1,
           "changeSeq": 4,
           "key": "trigger_source_stop:{\"id\":\"src.fs\"}"
         }
@@ -845,7 +845,7 @@
         {
           "id": "notify-delivery-ok",
           "ok": true,
-          "detail": "ring_notify delivery={\"caseId\":\"8c6cf7f0-c1d7-4769-85ff-2012b70f6542\",\"channel\":\"console\",\"ok\":true,\"error\":null,\"at\":1795276149491,\"dedupeKey\":\"8c6cf7f0-c1d7-4769-85ff-2012b70f6542:t1:console\"}",
+          "detail": "ring_notify delivery={\"caseId\":\"75aceea4-8c5f-456d-908f-48fbb4a0f25c\",\"channel\":\"console\",\"ok\":true,\"error\":null,\"at\":1795313175292,\"dedupeKey\":\"75aceea4-8c5f-456d-908f-48fbb4a0f25c:t1:console\"}",
           "deferred": false
         },
         {
@@ -985,7 +985,7 @@
           "code": "E_REF_NOT_FOUND",
           "invalid": null,
           "tokens": 122,
-          "ms": 0,
+          "ms": 1,
           "changeSeq": 0,
           "key": "trace_remember:{\"key\":\"repo:dsh-os/bogus\",\"text\":\"stale decoy must not be stored\",\"source\":\"dsh://locator/docs/missing.md\",\"confidence\":0.2}"
         },
@@ -1002,7 +1002,7 @@
           "code": null,
           "invalid": null,
           "tokens": 190,
-          "ms": 1,
+          "ms": 0,
           "changeSeq": 0,
           "key": "trace_remember:{\"key\":\"repo:dsh-os/user-trust\",\"text\":\"user-trust profiles are hidden from agent-layer resolution.\",\"source\":\"dsh://memento/mem-42\",\"confidence\":0.8}"
         },
@@ -1033,7 +1033,7 @@
           "code": null,
           "invalid": null,
           "tokens": 134,
-          "ms": 0,
+          "ms": 1,
           "changeSeq": 0,
           "key": "trace_search:{\"query\":\"user-trust\"}"
         }
@@ -1125,7 +1125,7 @@
           "args": {
             "id": "fs.write",
             "args": {
-              "path": "/tmp/dsh-eval-approve-Nz42go/config.json",
+              "path": "/tmp/dsh-eval-approve-uPvJIN/config.json",
               "text": "{\"timeout\":30}\n"
             }
           },
@@ -1135,7 +1135,7 @@
           "tokens": 115,
           "ms": 0,
           "changeSeq": 0,
-          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-approve-Nz42go/config.json\",\"text\":\"{\\\"timeout\\\":30}\\n\"}}"
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-approve-uPvJIN/config.json\",\"text\":\"{\\\"timeout\\\":30}\\n\"}}"
         },
         {
           "n": 2,
@@ -1158,7 +1158,7 @@
           "n": 3,
           "tool": "allow_wait",
           "args": {
-            "requestId": "req_53f14080-44e0-4964-b92f-bbd07da05e2e",
+            "requestId": "req_5fec3b44-8b34-4c11-b22c-50100cc71a81",
             "timeoutMs": 0,
             "subject": "sess:approval-recovery"
           },
@@ -1168,13 +1168,13 @@
           "tokens": 151,
           "ms": 0,
           "changeSeq": 0,
-          "key": "allow_wait:{\"requestId\":\"req_53f14080-44e0-4964-b92f-bbd07da05e2e\",\"timeoutMs\":0,\"subject\":\"sess:approval-recovery\"}"
+          "key": "allow_wait:{\"requestId\":\"req_5fec3b44-8b34-4c11-b22c-50100cc71a81\",\"timeoutMs\":0,\"subject\":\"sess:approval-recovery\"}"
         },
         {
           "n": 4,
           "tool": "allow_wait",
           "args": {
-            "requestId": "req_53f14080-44e0-4964-b92f-bbd07da05e2e",
+            "requestId": "req_5fec3b44-8b34-4c11-b22c-50100cc71a81",
             "timeoutMs": 0,
             "subject": "sess:approval-recovery"
           },
@@ -1184,7 +1184,7 @@
           "tokens": 177,
           "ms": 0,
           "changeSeq": 1,
-          "key": "allow_wait:{\"requestId\":\"req_53f14080-44e0-4964-b92f-bbd07da05e2e\",\"timeoutMs\":0,\"subject\":\"sess:approval-recovery\"}"
+          "key": "allow_wait:{\"requestId\":\"req_5fec3b44-8b34-4c11-b22c-50100cc71a81\",\"timeoutMs\":0,\"subject\":\"sess:approval-recovery\"}"
         },
         {
           "n": 5,
@@ -1192,7 +1192,7 @@
           "args": {
             "id": "fs.write",
             "args": {
-              "path": "/tmp/dsh-eval-approve-Nz42go/config.json",
+              "path": "/tmp/dsh-eval-approve-uPvJIN/config.json",
               "text": "{\"timeout\":30}\n"
             }
           },
@@ -1202,7 +1202,7 @@
           "tokens": 105,
           "ms": 0,
           "changeSeq": 1,
-          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-approve-Nz42go/config.json\",\"text\":\"{\\\"timeout\\\":30}\\n\"}}"
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-approve-uPvJIN/config.json\",\"text\":\"{\\\"timeout\\\":30}\\n\"}}"
         },
         {
           "n": 6,
@@ -1210,7 +1210,7 @@
           "args": {
             "id": "fs.write",
             "args": {
-              "path": "/tmp/dsh-eval-approve-Nz42go/config.json",
+              "path": "/tmp/dsh-eval-approve-uPvJIN/config.json",
               "text": "{\"timeout\":30}\n"
             }
           },
@@ -1220,7 +1220,7 @@
           "tokens": 115,
           "ms": 0,
           "changeSeq": 1,
-          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-approve-Nz42go/config.json\",\"text\":\"{\\\"timeout\\\":30}\\n\"}}"
+          "key": "act_invoke:{\"id\":\"fs.write\",\"args\":{\"path\":\"/tmp/dsh-eval-approve-uPvJIN/config.json\",\"text\":\"{\\\"timeout\\\":30}\\n\"}}"
         }
       ],
       "toolCalls": 6,
@@ -1320,7 +1320,7 @@
           "code": null,
           "invalid": null,
           "tokens": 403,
-          "ms": 6,
+          "ms": 7,
           "changeSeq": 0,
           "key": "os_find:{\"intent\":\"write a file fs.write\"}"
         },
@@ -1371,18 +1371,18 @@
               "content": "written through the kernel gateway\n"
             },
             "grant": {
-              "id": "grant_03f1e722-6c7c-4269-a400-4f044ad9bc8c",
+              "id": "grant_ee33a145-74fd-4c00-8ddd-2ac52294d0ca",
               "subject": "sess:kernel-write",
               "capability": "cap:fs.write",
               "scope": "*",
               "status": "active",
-              "createdAt": 1795276149645,
-              "expiresAt": 1795362549645,
+              "createdAt": 1795313175401,
+              "expiresAt": 1795399575401,
               "maxUses": 1,
               "uses": 0,
               "lastUsedAt": null,
               "approver": "user",
-              "requestId": "req_c0cfd8da-27cf-4bd9-96ec-c7a7f9883d8d",
+              "requestId": "req_222a4545-353f-46cf-a318-633750c8b653",
               "requestHash": "f6ed8e061fcb447d689a261947505cc596b6b82968bde6ee8e788cabf506cdd2"
             }
           },
@@ -1392,7 +1392,7 @@
           "tokens": 311,
           "ms": 1,
           "changeSeq": 1,
-          "key": "os_do:{\"id\":\"fs.write\",\"args\":{\"path\":\"note.txt\",\"content\":\"written through the kernel gateway\\n\"},\"grant\":{\"id\":\"grant_03f1e722-6c7c-4269-a400-4f044ad9bc8c\",\"subject\":\"sess:kernel-write\",\"capability\":\"cap:fs.write\",\"scope\":\"*\",\"status\":\"active\",\"createdAt\":1795276149645,\"expiresAt\":1795362549645,\"maxUses\":1,\"uses\":0,\"lastUsedAt\":null,\"approver\":\"user\",\"requestId\":\"req_c0cfd8da-27cf-4bd9-96ec-c7a7f9883d8d\",\"requestHash\":\"f6ed8e061fcb447d689a261947505cc596b6b82968bde6ee8e788cabf506cdd2\"}}"
+          "key": "os_do:{\"id\":\"fs.write\",\"args\":{\"path\":\"note.txt\",\"content\":\"written through the kernel gateway\\n\"},\"grant\":{\"id\":\"grant_ee33a145-74fd-4c00-8ddd-2ac52294d0ca\",\"subject\":\"sess:kernel-write\",\"capability\":\"cap:fs.write\",\"scope\":\"*\",\"status\":\"active\",\"createdAt\":1795313175401,\"expiresAt\":1795399575401,\"maxUses\":1,\"uses\":0,\"lastUsedAt\":null,\"approver\":\"user\",\"requestId\":\"req_222a4545-353f-46cf-a318-633750c8b653\",\"requestHash\":\"f6ed8e061fcb447d689a261947505cc596b6b82968bde6ee8e788cabf506cdd2\"}}"
         },
         {
           "n": 5,
@@ -1433,7 +1433,7 @@
         {
           "id": "os-request-opens-request",
           "ok": true,
-          "detail": "requestId=req_c0cfd8da-27cf-4bd9-96ec-c7a7f9883d8d status=approved",
+          "detail": "requestId=req_222a4545-353f-46cf-a318-633750c8b653 status=approved",
           "deferred": false
         },
         {

@@ -3,7 +3,7 @@
     "name": "dsh-act",
     "product": "Act",
     "service": "act",
-    "version": "0.5.0",
+    "version": "0.7.0",
     "stability": "experimental",
     "description": "Typed action registry with filesystem actions, previews and undo for DeepSeek Harness.",
     "install": "dsh plugin --profile web add dsh-act"
@@ -102,7 +102,7 @@
     "name": "dsh-os-kernel",
     "product": "Kernel",
     "service": "kernel",
-    "version": "0.4.0",
+    "version": "0.6.0",
     "stability": "experimental",
     "description": "Thin capability kernel for dsh-os: descriptor protocol, registry, legacy tool bridge, six os_* verbs, Allow grant bridge, content-hash taint gate and optional idempotency journal.",
     "install": "dsh plugin --profile web add dsh-os-kernel"
@@ -171,7 +171,7 @@
     "name": "dsh-os-kit",
     "product": "Kit",
     "service": null,
-    "version": "0.8.0",
+    "version": "0.10.0",
     "stability": "experimental",
     "description": "Thin meta bundle that installs and mounts the six core dsh-os modules: Act, Allow, Snip, Check, Kernel and Shell.",
     "install": "dsh plugin --profile web add dsh-os-kit",
