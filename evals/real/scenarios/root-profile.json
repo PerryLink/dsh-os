@@ -1,0 +1,39 @@
+{
+  "id": "root-profile",
+  "title": "Root profile 读写",
+  "goal": "用 root_set 建 demo profile，root_resolve 读回 vars，并写 root.json。",
+  "initial": [
+    "profile 已挂载 dsh-root；Root 账本初始为空，不修改 process.env",
+    "root_set 建的 profile 固定 trust=agent、scope=agent；root_resolve 以 agent 层解析，返回 {vars,secretRefs,...}",
+    "工作区可写 root.json"
+  ],
+  "prompt": "任务：1) 调 root_set，args 为 {\"name\":\"demo\",\"profile\":{\"vars\":{\"DEMO\":\"1\"}}}。2) 调 root_resolve，args 为 {\"name\":\"demo\"}，从返回的 vars 读回 DEMO。3) 写 root.json：{\"DEMO\":\"1\"}。不要修改 process.env，不要写其他文件。",
+  "timeoutMs": 120000,
+  "maxSteps": 8,
+  "maxTokens": 120000,
+  "expectedFirstTool": [
+    "root_set"
+  ],
+  "checks": [
+    {
+      "id": "root-set-used",
+      "kind": "toolUsed",
+      "name": "root_set",
+      "min": 1
+    },
+    {
+      "id": "root-resolve-used",
+      "kind": "toolUsed",
+      "name": "root_resolve",
+      "min": 1
+    },
+    {
+      "id": "root-json",
+      "kind": "json",
+      "path": "root.json",
+      "expect": {
+        "DEMO": "1"
+      }
+    }
+  ]
+}

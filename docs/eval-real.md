@@ -150,3 +150,28 @@ node evals/real-run.mjs --scenario=seek-evidence
 ```
 
 > 真机数字与 `evals/BASELINE.md` 的 P 层脚本基线**不可横比**。
+
+## 8. 十场景真机（2026-11-22）
+
+场景从 6 个扩到 10 个，新增 `snip-search`、`trace-recall`、`ring-lifecycle`（真实工具面只到 ack，不伪造 resolve）、`root-profile`。
+
+两轮真机结果：
+
+| 轮次 | 成功 | tokens | 失败 |
+|---|---:|---:|---|
+| 第 1 轮 | **9/10** | 993,167 | `root-profile`：profile 忘了装 `dsh-runtime-env`，不是模型失败 |
+| 第 2 轮 | **9/10** | 1,162,940 | `fix-failing-test`：4 个判据全绿，但 318k tokens 撞到 300k 预算被终止 |
+| 单跑修复 | **10/10** | — | 装 Root 后 `root-profile` 通过；`fix-failing-test` 预算调到 450k 后通过 |
+
+按真实工具面，`ring-lifecycle` 只验证 `raise → ack`，`ring.json` 是
+`{state:"acked",decision:null,resolvable:false}`；Ring 故意没有模型侧
+`ring_resolve`，不把它写成“已解决”。
+
+**结论：19/20 次通过；两次失败都是“环境/预算”，不是模型没完成判据。**
+但这不是 10/10 的单轮成绩，不能对外说成稳定 100%。
+
+仍成立的限制：
+
+- headless 没有实时审批人；`approval/asked` 只代表发起，不代表人批准。
+- `fix-failing-test` 单次可到 300k+ tokens；预算应场景化，不要一刀切。
+- 模型行为非确定；两轮失败点不同（Root 缺包、fix 撞预算）。

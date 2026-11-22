@@ -1,0 +1,41 @@
+{
+  "id": "trace-recall",
+  "title": "Trace 记忆检索",
+  "goal": "用 trace_remember 记住两条事实，按 user-trust 检索，并写 trace.json。",
+  "initial": [
+    "profile 已挂载 dsh-trace；Trace 账本初始为空，不联网",
+    "trace_search 对 key 与 text 做大小写不敏感子串匹配，返回 {results:[...]}",
+    "工作区可写 trace.json"
+  ],
+  "prompt": "任务：调用 trace_remember 两次，记录两条事实：1) key=\"user-trust-profile\"、text=\"User-trust profiles are hidden from agent-layer resolution.\"、source=\"user-trust\"；2) key=\"user-trust-env\"、text=\"Root never materializes process.env.\"、source=\"note\"。然后调用 trace_search，query=\"user-trust\"、limit=10，数出返回的 results 条数。最后写 trace.json：{\"found\":true,\"refs\":<results 条数>}。不要编造记录，不要写其他文件。",
+  "timeoutMs": 120000,
+  "maxSteps": 10,
+  "maxTokens": 120000,
+  "expectedFirstTool": [
+    "trace_remember",
+    "trace_search"
+  ],
+  "checks": [
+    {
+      "id": "trace-remember-used",
+      "kind": "toolUsed",
+      "name": "trace_remember",
+      "min": 2
+    },
+    {
+      "id": "trace-search-used",
+      "kind": "toolUsed",
+      "name": "trace_search",
+      "min": 1
+    },
+    {
+      "id": "trace-json",
+      "kind": "json",
+      "path": "trace.json",
+      "expect": {
+        "found": true,
+        "refs": 2
+      }
+    }
+  ]
+}

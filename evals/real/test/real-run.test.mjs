@@ -39,9 +39,18 @@ const base = {
 
 test('scenario JSONs load and cover the required kinds', () => {
   const scenarios = loadScenarios()
-  assert.equal(scenarios.length, 6)
+  assert.equal(scenarios.length, 10)
   const ids = scenarios.map(scenario => scenario.id)
-  for (const id of ['fix-failing-test', 'approval-recovery', 'seek-evidence', 'kernel-discovery']) assert.ok(ids.includes(id), id)
+  for (const id of [
+    'approval-recovery', 'cost-summary', 'fix-failing-test', 'kernel-discovery', 'regression-triage',
+    'seek-evidence', 'snip-search', 'trace-recall', 'ring-lifecycle', 'root-profile',
+  ]) assert.ok(ids.includes(id), id)
+  for (const id of ['snip-search', 'trace-recall', 'ring-lifecycle', 'root-profile']) {
+    const scenario = scenarios.find(item => item.id === id)
+    assert.ok(scenario.maxSteps <= 15, `${id} maxSteps`)
+    assert.ok(scenario.maxTokens <= 120000, `${id} maxTokens`)
+    assert.ok(scenario.timeoutMs <= 120000, `${id} timeoutMs`)
+  }
   for (const scenario of scenarios) {
     assert.ok(scenario.goal && scenario.prompt && scenario.initial.length > 0, scenario.id)
     assert.ok(scenario.checks.length > 0, scenario.id)

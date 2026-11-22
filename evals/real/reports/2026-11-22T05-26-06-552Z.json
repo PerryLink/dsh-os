@@ -1,0 +1,164 @@
+{
+  "schema": "dsh-os.eval-real/v1",
+  "layer": "A-real (DSH headless; real model calls; external-state grading)",
+  "generatedAt": "2026-11-22T05:26:06.552Z",
+  "env": {
+    "node": "v24.22.1",
+    "platform": "linux",
+    "dshBin": "/home/yy/deepseek-harness/apps/cli/lib/bin.js",
+    "profile": "eval",
+    "keyVar": "DEEPSEEK_API_KEY",
+    "commit": "6f84162",
+    "dirty": true
+  },
+  "scenarios": [
+    {
+      "id": "root-profile",
+      "title": "Root profile 读写",
+      "goal": "用 root_set 建 demo profile，root_resolve 读回 vars，并写 root.json。",
+      "initial": [
+        "profile 已挂载 dsh-root；Root 账本初始为空，不修改 process.env",
+        "root_set 建的 profile 固定 trust=agent、scope=agent；root_resolve 以 agent 层解析，返回 {vars,secretRefs,...}",
+        "工作区可写 root.json"
+      ],
+      "prompt": "任务：1) 调 root_set，args 为 {\"name\":\"demo\",\"profile\":{\"vars\":{\"DEMO\":\"1\"}}}。2) 调 root_resolve，args 为 {\"name\":\"demo\"}，从返回的 vars 读回 DEMO。3) 写 root.json：{\"DEMO\":\"1\"}。不要修改 process.env，不要写其他文件。",
+      "success": true,
+      "strictSuccess": true,
+      "deferredChecks": 0,
+      "toolCalls": 5,
+      "invalidCalls": 0,
+      "tokensEstimate": 83461,
+      "interventions": [],
+      "firstTool": "root_set",
+      "expectedFirstTool": [
+        "root_set"
+      ],
+      "firstStepCorrect": true,
+      "steps": [
+        {
+          "n": 1,
+          "tool": "root_set",
+          "args": "{\"name\":\"demo\",\"profile\":{\"vars\":{\"DEMO\":\"1\"}}}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_Q0UD5EYtBFqqopICIeNm6474"
+        },
+        {
+          "n": 2,
+          "tool": "root_resolve",
+          "args": "{\"name\":\"demo\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_UmQ8CF8DTwi5me3eKk6R2118"
+        },
+        {
+          "n": 3,
+          "tool": "write",
+          "args": "{\"file_path\":\"/tmp/dsh-real-root-profile-pgLpBu/root.json\",\"content\":\"{\\\"DEMO\\\":\\\"1\\\"}\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_ILBFHMhY9H0t5TS8sWJF2990"
+        },
+        {
+          "n": 4,
+          "tool": "bash",
+          "args": "{\"command\":\"cat root.json; echo; ls -la\",\"description\":\"Verify root.json contents\",\"workdir\":\"/tmp/dsh-real-root-profile-pgLpBu\"}",
+          "ok": false,
+          "code": "SANDBOX_UNAVAILABLE",
+          "invalid": null,
+          "callId": "call_00_ET_Hmy4jN4ZV0Q7cnvvMWHA2359"
+        },
+        {
+          "n": 5,
+          "tool": "read",
+          "args": "{\"file_path\":\"/tmp/dsh-real-root-profile-pgLpBu/root.json\"}",
+          "ok": true,
+          "code": null,
+          "invalid": null,
+          "callId": "call_00_47wOpvqhorEbequhBBO02424"
+        }
+      ],
+      "checks": [
+        {
+          "id": "root-set-used",
+          "ok": true,
+          "detail": "root_set 调用 1 次（至少 1）"
+        },
+        {
+          "id": "root-resolve-used",
+          "ok": true,
+          "detail": "root_resolve 调用 1 次（至少 1）"
+        },
+        {
+          "id": "root-json",
+          "ok": true,
+          "detail": "root.json 字段符合期望"
+        }
+      ],
+      "failures": [
+        {
+          "n": 4,
+          "tool": "bash",
+          "code": "SANDBOX_UNAVAILABLE",
+          "invalid": null
+        }
+      ],
+      "approvals": {
+        "asked": 0,
+        "decided": 0,
+        "rejected": 0,
+        "outcomes": {},
+        "parsed": 54,
+        "files": 4,
+        "source": "log"
+      },
+      "finalReason": {
+        "kind": "completed"
+      },
+      "finalText": "三步均已完成：\n\n1. **root_set** — 创建了 profile `demo`（trust=agent, scope=agent），vars 为 `{\"DEMO\":\"1\"}`。\n2. **root_resolve** — 解析成功，返回 `vars: {\"DEMO\":\"1\"}`，sources 显示 `DEMO` 来自 `demo`，读回的 `DEMO` 值为 `1`。\n3. **写 root.json** — 在 `/tmp/dsh-real-root-profile-pgLpBu/root.json` 写入 `{\"DEMO\":\"1\"}`，已用 read 工具确认内容一致（单行，无多余字符）。\n\n说明与偏差：\n- 未修改 `process.env`（root_set/root_resolve 只操作 Root 配置账本，不触碰进程环境）。\n- 未创建其他文件。\n- 我尝试用 `cat` 做额外校验时，bash 因本机缺少可用沙箱后端（bubblewrap/Landlock 等）而拒绝执行，属环境限制，不影响任务；改用 read 工具完成了校验。",
+      "sessionId": "session-4ffbd221-6187-4982-87c4-ba13563c49cd",
+      "exitCode": 0,
+      "timedOut": false,
+      "stepLimitHit": false,
+      "tokenLimitHit": false,
+      "tokensUsed": 83461,
+      "outputLimitHit": false,
+      "protocolOk": true,
+      "parseErrors": 0,
+      "badLines": [],
+      "usageComplete": true,
+      "tokensSource": "usage",
+      "durationMs": 9203,
+      "stdoutBytes": 6436,
+      "stderr": "[llm-deepseek-api-key] model listing from https://api.deepseek.com/models loaded 2 model(s), skipped 0 row(s)\n",
+      "profile": "eval",
+      "dshBin": "/home/yy/deepseek-harness/apps/cli/lib/bin.js",
+      "error": null
+    }
+  ],
+  "metrics": {
+    "scenarios": 1,
+    "successes": 1,
+    "successRate": 1,
+    "strictSuccesses": 1,
+    "strictSuccessRate": 1,
+    "deferredChecks": 0,
+    "deferredScenarios": 0,
+    "firstStepAccuracy": 1,
+    "recoveryRate": 1,
+    "recoveredScenarios": 1,
+    "scenariosWithFailures": 1,
+    "toolCalls": 5,
+    "invalidCalls": 0,
+    "invalidCallRate": 0,
+    "avgSteps": 5,
+    "tokensEstimate": 83461,
+    "avgTokens": 83461,
+    "interventions": 0,
+    "assistedSuccesses": 0,
+    "autonomousSuccesses": 1
+  }
+}

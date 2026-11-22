@@ -1,0 +1,49 @@
+{
+  "id": "snip-search",
+  "title": "剪贴板检索与脱敏",
+  "goal": "把 notes.md 的两条素材写入 Snip 账本，检索 invoice，并如实报告匹配数与脱敏结果。",
+  "initial": [
+    "profile 已挂载 dsh-snip；剪贴板账本初始为空，不联网",
+    "notes.md 有两行素材：一条含 Invoice，一条含伪造的 sk- 测试密钥",
+    "snip_add 默认对 secret-looking 文本脱敏：只存 [redacted:<reason>]，返回 redacted=true",
+    "工作区可写 snip.json"
+  ],
+  "prompt": "任务：读取 notes.md，把其中两行素材分别用 snip_add 记录（两次独立调用，sourceApp 都用 \"eval\"，并去掉行首的 \"- \"）：第一条是 Invoice 行，第二条是 secret sk- 行。然后调用 snip_search，query=\"invoice\"、limit=10，从返回值读出匹配条数。最后写 snip.json：{\"found\":true,\"count\":<invoice 匹配条数>,\"redacted\":<第二条 snip_add 返回的 redacted>}。不要修改 notes.md，不要写其他文件。",
+  "timeoutMs": 120000,
+  "maxSteps": 12,
+  "maxTokens": 120000,
+  "expectedFirstTool": [
+    "read",
+    "snip_add"
+  ],
+  "setup": [
+    {
+      "path": "notes.md",
+      "content": "# notes\n\n- Invoice INV-2041 from Acme, due 2026-12-01\n- secret sk-eval0123456789\n"
+    }
+  ],
+  "checks": [
+    {
+      "id": "snip-add-used",
+      "kind": "toolUsed",
+      "name": "snip_add",
+      "min": 2
+    },
+    {
+      "id": "snip-search-used",
+      "kind": "toolUsed",
+      "name": "snip_search",
+      "min": 1
+    },
+    {
+      "id": "snip-json",
+      "kind": "json",
+      "path": "snip.json",
+      "expect": {
+        "found": true,
+        "count": 1,
+        "redacted": true
+      }
+    }
+  ]
+}

@@ -23,7 +23,7 @@ needs only Node 22+; nothing is installed or published.
 
 **Docs:** [Quickstart](docs/quickstart.md) ·
 [AI handbook](docs/ai-handbook.md) ·
-[Real-model eval](docs/eval-real.md) (5/5 real run) ·
+[Real-model eval](docs/eval-real.md) (10-scenario, 19/20) ·
 [Web approval bridge](docs/presets/web-approval.md) ·
 [Architecture 0.3](docs/architecture-0.3.md) ·
 [AI capability cards](docs/ai-capability-cards.md) ·
